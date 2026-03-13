@@ -120,12 +120,14 @@ function ProjectAddForm({ onAdd, disabled }) {
               <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} style={{ width: 160 }} />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 100 }}>
-              <span style={{ fontSize: 10, color: "#aaaaaa", letterSpacing: "0.06em" }}>場所（CBC蟹江/NH春日井/AO扶桑/三重T/三重TLX）</span>
+              <span style={{ fontSize: 10, color: "#aaaaaa", letterSpacing: "0.06em" }}>場所</span>
               <input value={eventPlace} onChange={e => setEventPlace(e.target.value)} placeholder="" style={{ width: "100%" }} />
+              <span style={{ fontSize: 10, color: "#cccccc" }}>ex. CBC蟹江 / NH春日井 / AO扶桑 / 三重T / 三重TLX</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 100 }}>
-              <span style={{ fontSize: 10, color: "#aaaaaa", letterSpacing: "0.06em" }}>内容（苺大福 / わらび餅 / マルシェ）</span>
+              <span style={{ fontSize: 10, color: "#aaaaaa", letterSpacing: "0.06em" }}>内容</span>
               <input value={eventContent} onChange={e => setEventContent(e.target.value)} placeholder="" style={{ width: "100%" }} />
+              <span style={{ fontSize: 10, color: "#cccccc" }}>ex. 苺大福 / わらび餅 / マルシェ</span>
             </div>
           </div>
           {preview && <div style={{ fontSize: 11, color: "#FF8C42", marginBottom: 6 }}>→ {preview}</div>}
