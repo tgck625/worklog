@@ -62,6 +62,80 @@ async function postToGAS(url, payload) {
   } catch { return false; }
 }
 
+function ProjectAddForm({ onAdd, disabled }) {
+  const [mode, setMode] = useState(null);
+  const [eventDate, setEventDate] = useState("");
+  const [eventPlace, setEventPlace] = useState("");
+  const [eventContent, setEventContent] = useState("");
+  const [otherName, setOtherName] = useState("");
+
+  function getEventName() {
+    if (!eventDate) return "";
+    const d = new Date(eventDate);
+    const yy = String(d.getFullYear()).slice(2);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const parts = [`${yy}${mm}${dd}`];
+    if (eventPlace.trim()) parts.push(eventPlace.trim());
+    if (eventContent.trim()) parts.push(eventContent.trim());
+    return parts.join("_");
+  }
+
+  function handleAddEvent() {
+    const name = getEventName();
+    if (!name) return;
+    onAdd(name);
+    setEventDate(""); setEventPlace(""); setEventContent(""); setMode(null);
+  }
+
+  function handleAddOther() {
+    const name = otherName.trim();
+    if (!name) return;
+    onAdd(name);
+    setOtherName(""); setMode(null);
+  }
+
+  const preview = getEventName();
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={() => setMode(mode === "event" ? null : "event")} disabled={disabled} className="btn"
+          style={{ padding: "6px 16px", background: mode === "event" ? "#FF8C42" : "#f0ebe4", color: mode === "event" ? "#fff" : "#666666", fontSize: 12 }}>
+          + イベント
+        </button>
+        <button onClick={() => setMode(mode === "other" ? null : "other")} disabled={disabled} className="btn"
+          style={{ padding: "6px 16px", background: mode === "other" ? "#FF8C42" : "#f0ebe4", color: mode === "other" ? "#fff" : "#666666", fontSize: 12 }}>
+          + その他
+        </button>
+      </div>
+      {mode === "event" && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+            <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} style={{ width: 150, flex: "0 0 auto" }} />
+            <input value={eventPlace} onChange={e => setEventPlace(e.target.value)} placeholder="場所（例：レクサス）" style={{ flex: 1, minWidth: 100 }} />
+            <input value={eventContent} onChange={e => setEventContent(e.target.value)} placeholder="体験内容（例：苺大福）" style={{ flex: 1, minWidth: 100 }} />
+          </div>
+          {preview && <div style={{ fontSize: 11, color: "#FF8C42", marginBottom: 6 }}>→ {preview}</div>}
+          <button onClick={handleAddEvent} disabled={!preview} className="btn"
+            style={{ padding: "6px 20px", background: preview ? "#FF8C42" : "#f0ebe4", color: preview ? "#fff" : "#bbbbbb", fontSize: 12 }}>
+            追加
+          </button>
+        </div>
+      )}
+      {mode === "other" && (
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <input value={otherName} onChange={e => setOtherName(e.target.value)} placeholder="プロジェクト名..." onKeyDown={e => { if (e.key === "Enter") handleAddOther(); }} disabled={disabled} />
+          <button onClick={handleAddOther} disabled={!otherName.trim() || disabled} className="btn"
+            style={{ padding: "0 16px", background: otherName.trim() ? "#FF8C42" : "#f0ebe4", color: otherName.trim() ? "#fff" : "#bbbbbb", fontSize: 13, whiteSpace: "nowrap" }}>
+            追加
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ManualLogForm({ projects, tasks, setProjects, setTasks, onAdd }) {
   const [selProject, setSelProject] = useState("");
   const [selTask, setSelTask] = useState("");
@@ -122,9 +196,8 @@ function ManualLogForm({ projects, tasks, setProjects, setTasks, onAdd }) {
           </button>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <input value={newProj} onChange={e => setNewProj(e.target.value)} placeholder="新規プロジェクト..." onKeyDown={e => { if (e.key === "Enter") e.preventDefault(); }} />
-        <button onClick={addProject} className="btn" style={{ padding: "0 16px", background: "#f0ebe4", color: "#666666", fontSize: 13, whiteSpace: "nowrap" }}>+ 追加</button>
+      <div style={{ marginBottom: 12 }}>
+        <ProjectAddForm onAdd={(name) => { if (!projects.includes(name)) { setProjects(prev => [...prev, name]); setSelProject(name); } }} />
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
         {tasks.map(t => (
@@ -490,10 +563,7 @@ export default function App() {
                     </button>
                   ))}
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input value={newProject} onChange={e => setNewProject(e.target.value)} placeholder="例：260308豆腐（年月日イベント内容）" onKeyDown={e => { if (e.key === "Enter") e.preventDefault(); }} disabled={running} />
-                  <button onClick={addProject} disabled={running} className="btn" style={{ padding: "0 16px", background: "#f0ebe4", color: "#666666", fontSize: 13, whiteSpace: "nowrap" }}>+ 追加</button>
-                </div>
+                <ProjectAddForm onAdd={(name) => { if (!projects.includes(name)) { setProjects(prev => [...prev, name]); setSelectedProject(name); } }} disabled={running} />
               </div>
 
               <div style={{ marginBottom: 20 }}>
