@@ -115,9 +115,9 @@ function ProjectAddForm({ onAdd, disabled }) {
       {mode === "event" && (
         <div style={{ marginTop: 8 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-            <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} style={{ width: 150, flex: "0 0 auto" }} />
+            <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} placeholder="イベント開催日" style={{ width: 160, flex: "0 0 auto" }} />
             <input value={eventPlace} onChange={e => setEventPlace(e.target.value)} placeholder="場所（例：レクサス）" style={{ flex: 1, minWidth: 100 }} />
-            <input value={eventContent} onChange={e => setEventContent(e.target.value)} placeholder="体験内容（例：苺大福）" style={{ flex: 1, minWidth: 100 }} />
+            <input value={eventContent} onChange={e => setEventContent(e.target.value)} placeholder="内容（例：苺大福）" style={{ flex: 1, minWidth: 100 }} />
           </div>
           {preview && <div style={{ fontSize: 11, color: "#FF8C42", marginBottom: 6 }}>→ {preview}</div>}
           <button onClick={handleAddEvent} disabled={!preview} className="btn"
