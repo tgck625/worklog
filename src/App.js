@@ -119,7 +119,7 @@ function ProjectAddForm({ onAdd, disabled }) {
               <span style={{ fontSize: 10, color: "#aaaaaa", letterSpacing: "0.06em" }}>イベント開催日</span>
               <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} style={{ width: 160 }} />
             </div>
-            <input value={eventPlace} onChange={e => setEventPlace(e.target.value)} placeholder="場所（例：レクサス）" style={{ flex: 1, minWidth: 100 }} />
+            <input value={eventPlace} onChange={e => setEventPlace(e.target.value)} placeholder="レクサス / CBC蟹江 / イオン扶桑 / NH春日井" style={{ flex: 1, minWidth: 100 }} />
             <input value={eventContent} onChange={e => setEventContent(e.target.value)} placeholder="内容（例：苺大福）" style={{ flex: 1, minWidth: 100 }} />
           </div>
           {preview && <div style={{ fontSize: 11, color: "#FF8C42", marginBottom: 6 }}>→ {preview}</div>}
