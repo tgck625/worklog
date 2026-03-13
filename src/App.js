@@ -99,14 +99,17 @@ function ProjectAddForm({ onAdd, disabled }) {
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={() => setMode(mode === "event" ? null : "event")} disabled={disabled} className="btn"
-          style={{ padding: "5px 14px", fontSize: 11, borderRadius: 20, background: mode === "event" ? "#FF8C42" : "transparent", color: mode === "event" ? "#fff" : "#aaaaaa", border: mode === "event" ? "1.5px solid #FF8C42" : "1.5px dashed #c8c0b8", letterSpacing: "0.06em" }}>
-          + イベント
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+        <span style={{ fontSize: 10, color: "#bbbbbb", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>新規プロジェクトを追加</span>
+        <div style={{ flex: 1, height: 1, background: "#f0ebe4" }} />
+        <button onClick={() => setMode(mode === "event" ? null : "event")} disabled={disabled}
+          style={{ background: "none", border: "none", cursor: disabled ? "default" : "pointer", fontSize: 11, color: mode === "event" ? "#FF8C42" : "#aaaaaa", fontFamily: "inherit", letterSpacing: "0.06em", padding: "2px 4px", fontWeight: mode === "event" ? 600 : 400 }}>
+          ＋ イベント
         </button>
-        <button onClick={() => setMode(mode === "other" ? null : "other")} disabled={disabled} className="btn"
-          style={{ padding: "5px 14px", fontSize: 11, borderRadius: 20, background: mode === "other" ? "#FF8C42" : "transparent", color: mode === "other" ? "#fff" : "#aaaaaa", border: mode === "other" ? "1.5px solid #FF8C42" : "1.5px dashed #c8c0b8", letterSpacing: "0.06em" }}>
-          + その他
+        <span style={{ color: "#e0d8d0", fontSize: 10 }}>|</span>
+        <button onClick={() => setMode(mode === "other" ? null : "other")} disabled={disabled}
+          style={{ background: "none", border: "none", cursor: disabled ? "default" : "pointer", fontSize: 11, color: mode === "other" ? "#FF8C42" : "#aaaaaa", fontFamily: "inherit", letterSpacing: "0.06em", padding: "2px 4px", fontWeight: mode === "other" ? 600 : 400 }}>
+          ＋ その他
         </button>
       </div>
       {mode === "event" && (
@@ -191,7 +194,7 @@ function ManualLogForm({ projects, tasks, setProjects, setTasks, onAdd }) {
     <div>
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#FF8C42", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.1em" }}>PROJECT</span>
+          <span style={{ fontSize: 10, fontWeight: 600, color: "#888888", background: "#f0ebe4", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.1em" }}>PROJECT</span>
           <div style={{ flex: 1, height: 1, background: "#f0ebe4" }} />
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: projects.length > 0 ? 10 : 0 }}>
@@ -205,7 +208,7 @@ function ManualLogForm({ projects, tasks, setProjects, setTasks, onAdd }) {
       </div>
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#4FC48A", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.1em" }}>作業内容</span>
+          <span style={{ fontSize: 10, fontWeight: 600, color: "#888888", background: "#f0ebe4", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.1em" }}>作業内容</span>
           <div style={{ flex: 1, height: 1, background: "#f0ebe4" }} />
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
@@ -566,7 +569,7 @@ export default function App() {
             <div style={{ background: "#ffffff", border: "1px solid #f0ebe4", borderRadius: 16, padding: 24 }}>
               <div style={{ marginBottom: 20 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#FF8C42", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.1em" }}>PROJECT</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "#888888", background: "#f0ebe4", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.1em" }}>PROJECT</span>
                   <div style={{ flex: 1, height: 1, background: "#f0ebe4" }} />
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: projects.length > 0 ? 10 : 0 }}>
@@ -581,7 +584,7 @@ export default function App() {
 
               <div style={{ marginBottom: 20 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#4FC48A", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.1em" }}>作業内容</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "#888888", background: "#f0ebe4", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.1em" }}>作業内容</span>
                   <div style={{ flex: 1, height: 1, background: "#f0ebe4" }} />
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
