@@ -439,7 +439,7 @@ export default function App() {
         <div style={{ maxWidth: 720, margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 54 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: running ? "#4FC48A" : "#bbbbbb", boxShadow: running ? "0 0 8px #4FC48A" : "none" }} className={running ? "pulse" : ""} />
-            <span style={{ fontFamily: "'Pacifico', cursive", fontSize: 16, letterSpacing: "0.06em" }}>WORKLOG</span>
+            <span style={{ fontFamily: "'Pacifico', cursive", fontSize: 16, letterSpacing: "0.06em" }}>TIMESHEET</span>
           </div>
           <div style={{ display: "flex" }}>
             {[["plan","計画"],["timer","タイマー"],["log","ログ"],["report","レポート"],["settings","設定"]].map(([id, label]) => (
