@@ -101,11 +101,11 @@ function ProjectAddForm({ onAdd, disabled }) {
     <div>
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={() => setMode(mode === "event" ? null : "event")} disabled={disabled} className="btn"
-          style={{ padding: "6px 16px", background: mode === "event" ? "#FF8C42" : "#f0ebe4", color: mode === "event" ? "#fff" : "#666666", fontSize: 12 }}>
+          style={{ padding: "5px 14px", fontSize: 11, borderRadius: 20, background: mode === "event" ? "#FF8C42" : "transparent", color: mode === "event" ? "#fff" : "#aaaaaa", border: mode === "event" ? "1.5px solid #FF8C42" : "1.5px dashed #c8c0b8", letterSpacing: "0.06em" }}>
           + イベント
         </button>
         <button onClick={() => setMode(mode === "other" ? null : "other")} disabled={disabled} className="btn"
-          style={{ padding: "6px 16px", background: mode === "other" ? "#FF8C42" : "#f0ebe4", color: mode === "other" ? "#fff" : "#666666", fontSize: 12 }}>
+          style={{ padding: "5px 14px", fontSize: 11, borderRadius: 20, background: mode === "other" ? "#FF8C42" : "transparent", color: mode === "other" ? "#fff" : "#aaaaaa", border: mode === "other" ? "1.5px solid #FF8C42" : "1.5px dashed #c8c0b8", letterSpacing: "0.06em" }}>
           + その他
         </button>
       </div>
@@ -189,24 +189,34 @@ function ManualLogForm({ projects, tasks, setProjects, setTasks, onAdd }) {
 
   return (
     <div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-        {projects.map(p => (
-          <button key={p} onClick={() => setSelProject(p)} className="btn" style={{ padding: "6px 14px", background: selProject === p ? "#FF8C42" : "#f0ebe4", color: selProject === p ? "#fff" : "#666666", fontSize: 12 }}>
-            {p}<span onClick={e => { e.stopPropagation(); setProjects(prev => prev.filter(x => x !== p)); if (selProject === p) setSelProject(""); }} style={{ marginLeft: 6, cursor: "pointer" }}>×</span>
-          </button>
-        ))}
-      </div>
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#FF8C42", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.1em" }}>PROJECT</span>
+          <div style={{ flex: 1, height: 1, background: "#f0ebe4" }} />
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: projects.length > 0 ? 10 : 0 }}>
+          {projects.map(p => (
+            <button key={p} onClick={() => setSelProject(p)} className="btn" style={{ padding: "6px 14px", background: selProject === p ? "#FF8C42" : "#f0ebe4", color: selProject === p ? "#fff" : "#666666", fontSize: 12 }}>
+              {p}<span onClick={e => { e.stopPropagation(); setProjects(prev => prev.filter(x => x !== p)); if (selProject === p) setSelProject(""); }} style={{ marginLeft: 6, cursor: "pointer" }}>×</span>
+            </button>
+          ))}
+        </div>
         <ProjectAddForm onAdd={(name) => { if (!projects.includes(name)) { setProjects(prev => [...prev, name]); setSelProject(name); } }} />
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-        {tasks.map(t => (
-          <button key={t} onClick={() => setSelTask(t)} className="btn" style={{ padding: "6px 14px", background: selTask === t ? "#FF8C42" : "#f0ebe4", color: selTask === t ? "#fff" : "#666666", fontSize: 12 }}>{t}</button>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <input value={newTsk} onChange={e => setNewTsk(e.target.value)} placeholder="新規作業内容..." onKeyDown={e => { if (e.key === "Enter") e.preventDefault(); }} />
-        <button onClick={addTask} className="btn" style={{ padding: "0 16px", background: "#f0ebe4", color: "#666666", fontSize: 13, whiteSpace: "nowrap" }}>+ 追加</button>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#4FC48A", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.1em" }}>作業内容</span>
+          <div style={{ flex: 1, height: 1, background: "#f0ebe4" }} />
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+          {tasks.map(t => (
+            <button key={t} onClick={() => setSelTask(t)} className="btn" style={{ padding: "6px 14px", background: selTask === t ? "#FF8C42" : "#f0ebe4", color: selTask === t ? "#fff" : "#666666", fontSize: 12 }}>{t}</button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input value={newTsk} onChange={e => setNewTsk(e.target.value)} placeholder="新規作業内容..." onKeyDown={e => { if (e.key === "Enter") e.preventDefault(); }} />
+          <button onClick={addTask} className="btn" style={{ padding: "0 16px", background: "#f0ebe4", color: "#666666", fontSize: 13, whiteSpace: "nowrap" }}>+ 追加</button>
+        </div>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
         <div style={{ flex: 1, minWidth: 160 }}>
@@ -555,8 +565,11 @@ export default function App() {
 
             <div style={{ background: "#ffffff", border: "1px solid #f0ebe4", borderRadius: 16, padding: 24 }}>
               <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 11, color: "#999999", letterSpacing: "0.1em", marginBottom: 10 }}>PROJECT</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#FF8C42", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.1em" }}>PROJECT</span>
+                  <div style={{ flex: 1, height: 1, background: "#f0ebe4" }} />
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: projects.length > 0 ? 10 : 0 }}>
                   {projects.map(p => (
                     <button key={p} onClick={() => !running && setSelectedProject(p)} className="btn" style={{ padding: "6px 14px", background: selectedProject === p ? projectColor(p) : "#f0ebe4", color: selectedProject === p ? "#fff" : "#666666", fontSize: 12 }}>
                       {p}{!running && <span onClick={e => { e.stopPropagation(); deleteProject(p); }} style={{ marginLeft: 6, cursor: "pointer" }}>×</span>}
@@ -567,7 +580,10 @@ export default function App() {
               </div>
 
               <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 11, color: "#999999", letterSpacing: "0.1em", marginBottom: 10 }}>作業内容</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#4FC48A", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.1em" }}>作業内容</span>
+                  <div style={{ flex: 1, height: 1, background: "#f0ebe4" }} />
+                </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
                   {tasks.map(t => (
                     <button key={t} onClick={() => !running && setSelectedTask(t)} className="btn" style={{ padding: "6px 14px", background: selectedTask === t ? "#FF8C42" : "#f0ebe4", color: selectedTask === t ? "#fff" : "#666666", fontSize: 12 }}>
