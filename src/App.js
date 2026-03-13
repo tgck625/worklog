@@ -119,8 +119,14 @@ function ProjectAddForm({ onAdd, disabled }) {
               <span style={{ fontSize: 10, color: "#aaaaaa", letterSpacing: "0.06em" }}>イベント開催日</span>
               <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} style={{ width: 160 }} />
             </div>
-            <input value={eventPlace} onChange={e => setEventPlace(e.target.value)} placeholder="レクサス / CBC蟹江 / イオン扶桑 / NH春日井" style={{ flex: 1, minWidth: 100 }} />
-            <input value={eventContent} onChange={e => setEventContent(e.target.value)} placeholder="内容（例：苺大福）" style={{ flex: 1, minWidth: 100 }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 100 }}>
+              <span style={{ fontSize: 10, color: "#aaaaaa", letterSpacing: "0.06em" }}>場所（CBC蟹江/NH春日井/AO扶桑/三重T/三重TLX）</span>
+              <input value={eventPlace} onChange={e => setEventPlace(e.target.value)} placeholder="" style={{ width: "100%" }} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 100 }}>
+              <span style={{ fontSize: 10, color: "#aaaaaa", letterSpacing: "0.06em" }}>内容（苺大福 / わらび餅 / マルシェ）</span>
+              <input value={eventContent} onChange={e => setEventContent(e.target.value)} placeholder="" style={{ width: "100%" }} />
+            </div>
           </div>
           {preview && <div style={{ fontSize: 11, color: "#FF8C42", marginBottom: 6 }}>→ {preview}</div>}
           <button onClick={handleAddEvent} disabled={!preview} className="btn"
