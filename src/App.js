@@ -4,6 +4,21 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbwrH1MPcKI1vWDT5Os4hheC
 
 const COLORS = ["#FF8C42","#F76E6E","#4FC48A","#F7C34F","#B47FF7","#F7914F","#4FD6F7","#F74FA8"];
 
+const DEFAULT_TASKS = [
+  "作り手との日程調整",
+  "作り手打ち合わせ",
+  "マニュアル作成更新",
+  "紙芝居作成",
+  "会場とのやりとり",
+  "チラシ作成",
+  "LINE配信",
+  "Instagram配信",
+  "予約管理",
+  "当日イベント運営",
+  "印刷・パウチ",
+  "社内打ち合わせ",
+];
+
 function formatDurationShort(seconds) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -248,7 +263,12 @@ export default function App() {
   const [newProject, setNewProject] = useState("");
   const [selectedProject, setSelectedProject] = useState("");
 
-  const [tasks, setTasks] = useState(() => loadLS("wl_tasks", []));
+  const [tasks, setTasks] = useState(() => {
+    const saved = loadLS("wl_tasks", []);
+    const merged = [...DEFAULT_TASKS];
+    saved.forEach(t => { if (!merged.includes(t)) merged.push(t); });
+    return merged;
+  });
   const [newTask, setNewTask] = useState("");
   const [selectedTask, setSelectedTask] = useState("");
 
