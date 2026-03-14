@@ -161,6 +161,7 @@ function ManualLogForm({ projects, tasks, setProjects, setTasks, onAdd }) {
   const [endTime, setEndTime] = useState("");
   const [newProj, setNewProj] = useState("");
   const [newTsk, setNewTsk] = useState("");
+  const [note, setNote] = useState("");
 
   const duration = (() => {
     if (!startTime || !endTime) return null;
@@ -195,10 +196,11 @@ function ManualLogForm({ projects, tasks, setProjects, setTasks, onAdd }) {
       startedAt: new Date(startTime).toISOString(),
       endedAt: new Date(endTime).toISOString(),
       duration,
-      note: "",
+      note,
     });
     setStartTime("");
     setEndTime("");
+    setNote("");
   }
 
   return (
@@ -246,6 +248,10 @@ function ManualLogForm({ projects, tasks, setProjects, setTasks, onAdd }) {
             {Math.floor(duration/3600)}h {Math.floor((duration%3600)/60)}m
           </div>
         )}
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: "#999999", marginBottom: 4 }}>詳細・備考</div>
+        <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="詳細・備考を入力..." rows={2} style={{ fontSize: 12, resize: "vertical" }} />
       </div>
       <button onClick={handleAdd} disabled={!selProject || !selTask || !duration} className="btn" style={{ width: "100%", padding: 12, background: (selProject && selTask && duration) ? "#FF8C42" : "#f0ebe4", color: (selProject && selTask && duration) ? "#fff" : "#bbbbbb", fontSize: 13 }}>→ シート送信</button>
     </div>
@@ -381,6 +387,7 @@ export default function App() {
   const [updatedNoteIds, setUpdatedNoteIds] = useState(new Set());
   const [savedLogs, setSavedLogs] = useState([]);
   const [editingNote, setEditingNote] = useState(null);
+  const [savedLogNotes, setSavedLogNotes] = useState({});
 
   useEffect(() => { saveLS("wl_projects", projects); }, [projects]);
   useEffect(() => { saveLS("wl_tasks", tasks); }, [tasks]);
@@ -624,20 +631,33 @@ export default function App() {
             </div>
 
             {savedLogs.map(savedLog => (
-              <div key={savedLog.id} style={{ background: "#ffffff", border: "1px solid #f0ebe4", borderRadius: 16, padding: 16, marginTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ flex: 1, fontSize: 13, color: "#333333" }}>✅ {savedLog.project} · {savedLog.task} · {formatDurationShort(savedLog.duration)}</span>
-                <button onClick={() => {
-                  if (gasUrl) {
-                    postToGAS(gasUrl, { action: "syncLogs", logs: [savedLog], deletedIds: [], updatedNotes: [] });
-                    setExportedIds(prev => new Set([...prev, String(savedLog.id)]));
+              <div key={savedLog.id} style={{ background: "#ffffff", border: "1px solid #f0ebe4", borderRadius: 16, padding: 16, marginTop: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+                  <span style={{ flex: 1, fontSize: 13, color: "#333333" }}>✅ {savedLog.project} · {savedLog.task} · {formatDurationShort(savedLog.duration)}</span>
+                  <button onClick={() => {
+                    if (gasUrl) {
+                      const note = savedLogNotes[savedLog.id] || "";
+                      const logWithNote = { ...savedLog, note };
+                      updateNote(savedLog.id, note);
+                      postToGAS(gasUrl, { action: "syncLogs", logs: [logWithNote], deletedIds: [], updatedNotes: [] });
+                      setExportedIds(prev => new Set([...prev, String(savedLog.id)]));
+                      setSavedLogs(prev => prev.filter(l => String(l.id) !== String(savedLog.id)));
+                      setSavedLogNotes(prev => { const n = { ...prev }; delete n[savedLog.id]; return n; });
+                    }
+                  }} className="btn" style={{ padding: "8px 16px", background: "#FF8C4218", color: "#FF8C42", border: "1px solid #FF8C4244", fontSize: 12, whiteSpace: "nowrap" }}>→ シート送信</button>
+                  <button onClick={() => {
+                    setLastDeleted(prev => [savedLog, ...prev].slice(0, 3));
+                    setLogs(prev => prev.filter(l => String(l.id) !== String(savedLog.id)));
                     setSavedLogs(prev => prev.filter(l => String(l.id) !== String(savedLog.id)));
-                  }
-                }} className="btn" style={{ padding: "8px 16px", background: "#FF8C4218", color: "#FF8C42", border: "1px solid #FF8C4244", fontSize: 12, whiteSpace: "nowrap" }}>→ シート送信</button>
-                <button onClick={() => {
-                  setLastDeleted(prev => [savedLog, ...prev].slice(0, 3));
-                  setLogs(prev => prev.filter(l => String(l.id) !== String(savedLog.id)));
-                  setSavedLogs(prev => prev.filter(l => String(l.id) !== String(savedLog.id)));
-                }} className="btn" style={{ padding: "8px 16px", background: "#F76E6E18", color: "#F76E6E", border: "1px solid #F76E6E44", fontSize: 12, whiteSpace: "nowrap" }}>🗑 削除</button>
+                  }} className="btn" style={{ padding: "8px 16px", background: "#F76E6E18", color: "#F76E6E", border: "1px solid #F76E6E44", fontSize: 12, whiteSpace: "nowrap" }}>🗑 削除</button>
+                </div>
+                <textarea
+                  value={savedLogNotes[savedLog.id] || ""}
+                  onChange={e => setSavedLogNotes(prev => ({ ...prev, [savedLog.id]: e.target.value }))}
+                  placeholder="詳細・備考を入力..."
+                  rows={2}
+                  style={{ fontSize: 12, resize: "vertical" }}
+                />
               </div>
             ))}
 
@@ -772,7 +792,7 @@ export default function App() {
                     </div>
                     {editingNote === log.id ? (
                       <div style={{ display: "flex", gap: 8 }}>
-                        <textarea value={log.note} onChange={e => updateNote(log.id, e.target.value)} placeholder="備考を入力..." rows={2} style={{ fontSize: 12, resize: "vertical" }} />
+                        <textarea value={log.note} onChange={e => updateNote(log.id, e.target.value)} placeholder="詳細・備考を入力..." rows={2} style={{ fontSize: 12, resize: "vertical" }} />
                         <button onClick={() => setEditingNote(null)} className="btn" style={{ padding: "6px 12px", background: "#FF8C4222", color: "#FF8C42", fontSize: 12, whiteSpace: "nowrap" }}>完了</button>
                       </div>
                     ) : (
@@ -780,9 +800,9 @@ export default function App() {
                         {log.note ? (
                           <span style={{ fontSize: 12, color: "#666666", flex: 1 }}>📝 {log.note}</span>
                         ) : (
-                          <span style={{ fontSize: 12, color: "#bbbbbb", flex: 1 }}>備考なし</span>
+                          <span style={{ fontSize: 12, color: "#bbbbbb", flex: 1 }}>詳細・備考なし</span>
                         )}
-                        <button onClick={() => setEditingNote(log.id)} className="btn" style={{ padding: "4px 10px", background: "#f0ebe4", color: "#999999", fontSize: 11 }}>備考を編集</button>
+                        <button onClick={() => setEditingNote(log.id)} className="btn" style={{ padding: "4px 10px", background: "#f0ebe4", color: "#999999", fontSize: 11 }}>詳細・備考を編集</button>
                       </div>
                     )}
                   </div>
