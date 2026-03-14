@@ -388,6 +388,7 @@ export default function App() {
   const [savedLogs, setSavedLogs] = useState([]);
   const [editingNote, setEditingNote] = useState(null);
   const [savedLogNotes, setSavedLogNotes] = useState({});
+  const [preNote, setPreNote] = useState("");
 
   useEffect(() => { saveLS("wl_projects", projects); }, [projects]);
   useEffect(() => { saveLS("wl_tasks", tasks); }, [tasks]);
@@ -437,11 +438,13 @@ export default function App() {
       startedAt: new Date(startTime).toISOString(),
       endedAt: new Date().toISOString(),
       duration: elapsed,
-      note: "",
+      note: preNote,
     };
     setLogs(prev => [log, ...prev]);
     setElapsed(0);
     setSavedLogs(prev => [log, ...prev]);
+    setSavedLogNotes(prev => ({ ...prev, [log.id]: preNote }));
+    setPreNote("");
   }
 
   function addProject() {
@@ -619,6 +622,12 @@ export default function App() {
                 </div>
               </div>
 
+              {!running && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, color: "#999999", marginBottom: 4 }}>詳細・備考</div>
+                  <textarea value={preNote} onChange={e => setPreNote(e.target.value)} placeholder="詳細・備考を入力..." rows={2} style={{ fontSize: 12, resize: "vertical" }} />
+                </div>
+              )}
               {!running ? (
                 <button onClick={handleStart} disabled={!selectedTask.trim() || !selectedProject} className="btn" style={{ width: "100%", padding: 14, background: (selectedTask.trim() && selectedProject) ? "#FF8C42" : "#f0ebe4", color: (selectedTask.trim() && selectedProject) ? "#fff" : "#bbbbbb", fontSize: 14, letterSpacing: "0.1em" }}>
                   ▶ 開始
