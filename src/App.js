@@ -258,7 +258,7 @@ function ManualLogForm({ projects, tasks, setProjects, setTasks, onAdd }) {
   );
 }
 
-function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl, trelloApiKey, trelloToken, trelloMemberId }) {
+function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl, trelloApiKey, trelloToken, trelloMemberId, trelloOrgId }) {
   const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
   const [plans, setPlans] = useState(() => loadLS("wl_plans", []));
   const [selProject, setSelProject] = useState("");
@@ -282,9 +282,12 @@ function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl, trelloApiKey,
     const todayDate = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
     try {
       const base = "https://api.trello.com/1";
+      const boardsUrl = trelloOrgId
+        ? `${base}/organizations/${trelloOrgId}/boards?filter=open&key=${trelloApiKey}&token=${trelloToken}&fields=id,name`
+        : `${base}/members/${trelloMemberId}/boards?filter=open&key=${trelloApiKey}&token=${trelloToken}&fields=id,name`;
       const [cardsRes, boardsRes] = await Promise.all([
         fetch(`${base}/members/${trelloMemberId}/cards?filter=open&key=${trelloApiKey}&token=${trelloToken}&fields=id,name,idList,idBoard,idMembers`),
-        fetch(`${base}/members/${trelloMemberId}/boards?filter=open&key=${trelloApiKey}&token=${trelloToken}&fields=id,name&lists=open`)
+        fetch(boardsUrl)
       ]);
       if (!cardsRes.ok || !boardsRes.ok) { setTrelloStatus("APIエラー"); return; }
       const cards = await cardsRes.json();
@@ -292,7 +295,11 @@ function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl, trelloApiKey,
       if (!Array.isArray(cards) || !Array.isArray(boards)) { setTrelloStatus("データ形式エラー"); return; }
       const boardMap = {};
       boards.forEach(b => { boardMap[b.id] = b.name; });
-      const myCards = cards.filter(c => Array.isArray(c.idMembers) && c.idMembers.includes(trelloMemberId));
+      const workspaceBoardIds = new Set(boards.map(b => b.id));
+      const myCards = cards.filter(c =>
+        Array.isArray(c.idMembers) && c.idMembers.includes(trelloMemberId) &&
+        (!trelloOrgId || workspaceBoardIds.has(c.idBoard))
+      );
       setPlans(prev => {
         const manualPlans = prev.filter(p => !p.trelloId);
         const existingTrelloPlans = prev.filter(p => p.trelloId);
@@ -476,10 +483,12 @@ export default function App() {
   const [trelloApiKey, setTrelloApiKey] = useState(() => loadLS("wl_trelloApiKey", ""));
   const [trelloToken, setTrelloToken] = useState(() => loadLS("wl_trelloToken", ""));
   const [trelloMemberId, setTrelloMemberId] = useState(() => loadLS("wl_trelloMemberId", ""));
+  const [trelloOrgId, setTrelloOrgId] = useState(() => loadLS("wl_trelloOrgId", ""));
   const [trelloInputs, setTrelloInputs] = useState(() => ({
     apiKey: loadLS("wl_trelloApiKey", ""),
     token: loadLS("wl_trelloToken", ""),
     memberId: loadLS("wl_trelloMemberId", ""),
+    orgId: loadLS("wl_trelloOrgId", ""),
   }));
   useEffect(() => {
     if (!gasUrl) return;
@@ -906,7 +915,7 @@ export default function App() {
 
         {activeTab === "plan" && (
           <div className="fade-in">
-            <PlanTab projects={projects} tasks={tasks} setProjects={setProjects} setTasks={setTasks} gasUrl={gasUrl} trelloApiKey={trelloApiKey} trelloToken={trelloToken} trelloMemberId={trelloMemberId} />
+            <PlanTab projects={projects} tasks={tasks} setProjects={setProjects} setTasks={setTasks} gasUrl={gasUrl} trelloApiKey={trelloApiKey} trelloToken={trelloToken} trelloMemberId={trelloMemberId} trelloOrgId={trelloOrgId} />
           </div>
         )}
 
@@ -935,6 +944,7 @@ export default function App() {
                     { label: "API キー", key: "apiKey", placeholder: "Trello API Key", type: "text" },
                     { label: "トークン", key: "token", placeholder: "Trello Token", type: "password" },
                     { label: "メンバー ID", key: "memberId", placeholder: "Member ID", type: "text" },
+                    { label: "ワークスペース ID（任意）", key: "orgId", placeholder: "例: kodawarin", type: "text" },
                   ].map(({ label, key, placeholder, type }) => (
                     <div key={key}>
                       <div style={{ fontSize: 11, color: "#999999", marginBottom: 4 }}>{label}</div>
@@ -951,9 +961,11 @@ export default function App() {
                       setTrelloApiKey(trelloInputs.apiKey);
                       setTrelloToken(trelloInputs.token);
                       setTrelloMemberId(trelloInputs.memberId);
+                      setTrelloOrgId(trelloInputs.orgId);
                       saveLS("wl_trelloApiKey", trelloInputs.apiKey);
                       saveLS("wl_trelloToken", trelloInputs.token);
                       saveLS("wl_trelloMemberId", trelloInputs.memberId);
+                      saveLS("wl_trelloOrgId", trelloInputs.orgId);
                       alert("保存しました！");
                     }}
                     className="btn"
@@ -961,7 +973,7 @@ export default function App() {
                   >
                     保存
                   </button>
-                  <div style={{ fontSize: 11, color: "#bbbbbb" }}>APIキーとトークンは trello.com/app-key から取得できます。</div>
+                  <div style={{ fontSize: 11, color: "#bbbbbb" }}>APIキー・トークンは trello.com/app-key から取得。ワークスペースIDはTrelloのワークスペースURL（trello.com/{"{id}"}）の部分。</div>
                 </div>
               </div>
               <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid #f0ebe4" }}>
