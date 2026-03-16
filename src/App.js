@@ -258,7 +258,84 @@ function ManualLogForm({ projects, tasks, setProjects, setTasks, onAdd }) {
   );
 }
 
-function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl }) {
+function getWorkflowDueDateStyle(dueDateStr) {
+  if (!dueDateStr) return { color: "#999999", label: null };
+  const due = new Date(dueDateStr);
+  due.setHours(0, 0, 0, 0);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const diff = Math.round((due - now) / (1000 * 60 * 60 * 24));
+  if (diff < 0) return { color: "#F76E6E", label: `${Math.abs(diff)}日超過` };
+  if (diff === 0) return { color: "#C04000", label: "今日" };
+  if (diff === 1) return { color: "#FF8C42", label: "明日" };
+  if (diff <= 3) return { color: "#F7A825", label: `${diff}日後` };
+  if (diff <= 7) return { color: "#8BAD30", label: `${diff}日後` };
+  return { color: "#999999", label: `${diff}日後` };
+}
+
+function WorkflowTasksSection({ userName }) {
+  const [wfData, setWfData] = useState(() => loadLS("kodawarin_plan_tasks", null));
+
+  useEffect(() => {
+    function onStorage(e) {
+      if (e.key === "kodawarin_plan_tasks") {
+        setWfData(e.newValue ? JSON.parse(e.newValue) : null);
+      }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const STATUS_LABELS = { todo: "未着手", in_progress: "進行中", done: "完了" };
+  const STATUS_COLORS = { todo: "#999999", in_progress: "#FF8C42", done: "#4FC48A" };
+
+  const allTasks = wfData && Array.isArray(wfData.tasks) ? wfData.tasks : [];
+  const myTasks = userName ? allTasks.filter(t => t.assignee === userName) : [];
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 10, fontWeight: 600, color: "#888888", background: "#f0ebe4", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.1em" }}>WORKFLOW タスク</span>
+        <div style={{ flex: 1, height: 1, background: "#f0ebe4" }} />
+      </div>
+      {!userName ? (
+        <div style={{ background: "#ffffff", border: "1px solid #f0ebe4", borderRadius: 16, padding: 20, fontSize: 12, color: "#bbbbbb", textAlign: "center" }}>
+          設定タブで名前を入力してください
+        </div>
+      ) : allTasks.length === 0 ? (
+        <div style={{ background: "#ffffff", border: "1px solid #f0ebe4", borderRadius: 16, padding: 20, fontSize: 12, color: "#bbbbbb", textAlign: "center" }}>
+          Workflowアプリと連携されていません
+        </div>
+      ) : (
+        <div style={{ background: "#ffffff", border: "1px solid #f0ebe4", borderRadius: 16, padding: 20 }}>
+          {myTasks.length === 0 ? (
+            <div style={{ fontSize: 12, color: "#bbbbbb", textAlign: "center" }}>担当タスクはありません</div>
+          ) : (
+            myTasks.map((t, i) => {
+              const { color: dueColor, label: dueLabel } = getWorkflowDueDateStyle(t.due);
+              const status = t.status || "todo";
+              const statusLabel = STATUS_LABELS[status] || status;
+              const statusColor = STATUS_COLORS[status] || "#999999";
+              return (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: i < myTasks.length - 1 ? "1px solid #f0ebe4" : "none" }}>
+                  <span style={{ fontSize: 10, color: statusColor, background: statusColor + "18", border: `1px solid ${statusColor}33`, padding: "2px 8px", borderRadius: 10, whiteSpace: "nowrap" }}>{statusLabel}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: status === "done" ? "#999999" : "#333333", textDecoration: status === "done" ? "line-through" : "none" }}>{t.title}</div>
+                    {t.project && <div style={{ fontSize: 11, color: "#999999", marginTop: 2 }}>{t.project}</div>}
+                  </div>
+                  {dueLabel && <span style={{ fontSize: 11, color: dueColor, fontWeight: 600, whiteSpace: "nowrap" }}>{dueLabel}</span>}
+                  {t.due && <span style={{ fontSize: 10, color: "#bbbbbb", whiteSpace: "nowrap" }}>{t.due.slice(0, 10).replace(/-/g, "/")}</span>}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl, userName }) {
   const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
   const [plans, setPlans] = useState(() => loadLS("wl_plans", []));
   const [selProject, setSelProject] = useState("");
@@ -358,6 +435,7 @@ function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl }) {
           </div>
         ))}
       </div>
+      <WorkflowTasksSection userName={userName} />
     </div>
   );
 }
@@ -399,6 +477,8 @@ export default function App() {
   useEffect(() => { saveLS("wl_exportedIds", [...exportedIds]); }, [exportedIds]);
   useEffect(() => { saveLS("wl_deletedIds", deletedIds); }, [deletedIds]);
 
+  const [userName, setUserName] = useState(() => loadLS("wl_userName", ""));
+  const [userNameInput, setUserNameInput] = useState(() => loadLS("wl_userName", ""));
   const [gasUrl, setGasUrl] = useState(() => loadLS("wl_gasUrl", GAS_URL));
   useEffect(() => {
     if (!gasUrl) return;
@@ -825,12 +905,28 @@ export default function App() {
 
         {activeTab === "plan" && (
           <div className="fade-in">
-            <PlanTab projects={projects} tasks={tasks} setProjects={setProjects} setTasks={setTasks} gasUrl={gasUrl} />
+            <PlanTab projects={projects} tasks={tasks} setProjects={setProjects} setTasks={setTasks} gasUrl={gasUrl} userName={userName} />
           </div>
         )}
 
         {activeTab === "settings" && (
           <div className="fade-in">
+            <div style={{ background: "#ffffff", border: "1px solid #f0ebe4", borderRadius: 16, padding: 24, marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: "#999999", letterSpacing: "0.1em", marginBottom: 16 }}>あなたの名前</div>
+              <input
+                value={userNameInput}
+                onChange={e => setUserNameInput(e.target.value)}
+                placeholder="例：田中 さやか"
+                style={{ marginBottom: 10 }}
+              />
+              <button
+                onClick={() => { setUserName(userNameInput); saveLS("wl_userName", userNameInput); alert("保存しました！"); }}
+                className="btn"
+                style={{ width: "100%", padding: 12, background: "#FF8C42", color: "#fff", fontSize: 13 }}
+              >
+                保存
+              </button>
+            </div>
             <div style={{ background: "#ffffff", border: "1px solid #f0ebe4", borderRadius: 16, padding: 24 }}>
               <div style={{ fontSize: 11, color: "#999999", letterSpacing: "0.1em", marginBottom: 16 }}>Google Sheets 連携設定</div>
               <div style={{ fontSize: 12, color: "#666666", marginBottom: 12 }}>自分専用のGAS WebアプリURLを入力してください。</div>
