@@ -258,7 +258,7 @@ function ManualLogForm({ projects, tasks, setProjects, setTasks, onAdd }) {
   );
 }
 
-function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl }) {
+function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl, trelloApiKey, trelloToken, trelloBoardId, trelloMemberId }) {
   const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
   const [plans, setPlans] = useState(() => loadLS("wl_plans", []));
   const [selProject, setSelProject] = useState("");
@@ -266,9 +266,63 @@ function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl }) {
   const [minutes, setMinutes] = useState("");
   const [newProj, setNewProj] = useState("");
   const [newTsk, setNewTsk] = useState("");
+  const [trelloLoading, setTrelloLoading] = useState(false);
+  const [trelloStatus, setTrelloStatus] = useState(null);
+  const trelloIntervalRef = useRef(null);
 
   useEffect(() => { saveLS("wl_plans", plans); }, [plans]);
   useEffect(() => { setPlans(prev => prev.filter(p => p.date === today || !p.done)); }, [today]);
+
+  const trelloEnabled = !!(trelloApiKey && trelloToken && trelloBoardId && trelloMemberId);
+
+  async function fetchTrelloCards() {
+    if (!trelloApiKey || !trelloToken || !trelloBoardId || !trelloMemberId) return;
+    setTrelloLoading(true);
+    setTrelloStatus(null);
+    const todayDate = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
+    try {
+      const base = "https://api.trello.com/1";
+      const [listsRes, cardsRes] = await Promise.all([
+        fetch(`${base}/boards/${trelloBoardId}/lists?key=${trelloApiKey}&token=${trelloToken}&fields=id,name`),
+        fetch(`${base}/boards/${trelloBoardId}/cards?filter=open&key=${trelloApiKey}&token=${trelloToken}&fields=id,name,idList,idMembers`)
+      ]);
+      if (!listsRes.ok || !cardsRes.ok) { setTrelloStatus("APIエラー"); return; }
+      const lists = await listsRes.json();
+      const cards = await cardsRes.json();
+      if (!Array.isArray(lists) || !Array.isArray(cards)) { setTrelloStatus("データ形式エラー"); return; }
+      const listMap = {};
+      lists.forEach(l => { listMap[l.id] = l.name; });
+      const myCards = cards.filter(c => Array.isArray(c.idMembers) && c.idMembers.includes(trelloMemberId));
+      setPlans(prev => {
+        const manualPlans = prev.filter(p => !p.trelloId);
+        const existingTrelloPlans = prev.filter(p => p.trelloId);
+        const updatedExisting = existingTrelloPlans.map(p => {
+          const card = myCards.find(c => c.id === p.trelloId);
+          if (card) return { ...p, task: card.name, project: listMap[card.idList] || p.project };
+          return p;
+        });
+        const existingIds = new Set(existingTrelloPlans.map(p => p.trelloId));
+        const now = Date.now();
+        const newCards = myCards
+          .filter(c => !existingIds.has(c.id))
+          .map((c, i) => ({ id: now + i, date: todayDate, project: listMap[c.idList] || "Trello", task: c.name, minutes: 0, done: false, trelloId: c.id }));
+        return [...manualPlans, ...updatedExisting, ...newCards];
+      });
+      setTrelloStatus(`✓ ${myCards.length}件取得`);
+      setTimeout(() => setTrelloStatus(null), 3000);
+    } catch {
+      setTrelloStatus("取得エラー");
+    } finally {
+      setTrelloLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!trelloEnabled) return;
+    fetchTrelloCards();
+    trelloIntervalRef.current = setInterval(fetchTrelloCards, 5 * 60 * 1000);
+    return () => clearInterval(trelloIntervalRef.current);
+  }, [trelloEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function addPlanProject() {
     const name = newProj.trim();
@@ -298,14 +352,36 @@ function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl }) {
     setMinutes("");
   }
 
-  function toggleDone(id) { setPlans(prev => prev.map(p => p.id === id ? { ...p, done: !p.done } : p)); }
+  async function toggleDone(id) {
+    const plan = plans.find(p => p.id === id);
+    if (!plan) return;
+    const newDone = !plan.done;
+    setPlans(prev => prev.map(p => p.id === id ? { ...p, done: newDone } : p));
+    if (plan.trelloId && newDone && trelloApiKey && trelloToken) {
+      try {
+        await fetch(`https://api.trello.com/1/cards/${plan.trelloId}?closed=true&key=${trelloApiKey}&token=${trelloToken}`, { method: "PUT" });
+      } catch {}
+    }
+  }
+
   function deletePlan(id) { setPlans(prev => prev.filter(p => p.id !== id)); }
 
   const totalMin = plans.reduce((s, p) => s + p.minutes, 0);
 
   return (
     <div>
-      <div style={{ fontSize: 11, color: "#999999", letterSpacing: "0.1em", marginBottom: 16 }}>{today} の計画</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <span style={{ fontSize: 11, color: "#999999", letterSpacing: "0.1em" }}>{today} の計画</span>
+        {trelloEnabled && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {trelloStatus && <span style={{ fontSize: 11, color: trelloStatus.startsWith("✓") ? "#4FC48A" : "#F76E6E" }}>{trelloStatus}</span>}
+            <button onClick={fetchTrelloCards} disabled={trelloLoading} className="btn"
+              style={{ padding: "6px 14px", background: "#0052CC18", color: "#0052CC", border: "1px solid #0052CC33", fontSize: 11, opacity: trelloLoading ? 0.6 : 1 }}>
+              {trelloLoading ? "取得中..." : "Trelloから取得"}
+            </button>
+          </div>
+        )}
+      </div>
       <div style={{ background: "#ffffff", border: "1px solid #f0ebe4", borderRadius: 16, padding: 20, marginBottom: 12 }}>
         <div style={{ fontSize: 11, color: "#999999", letterSpacing: "0.1em", marginBottom: 10 }}>PROJECT</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
@@ -399,6 +475,16 @@ export default function App() {
   useEffect(() => { saveLS("wl_deletedIds", deletedIds); }, [deletedIds]);
 
   const [gasUrl, setGasUrl] = useState(() => loadLS("wl_gasUrl", GAS_URL));
+  const [trelloApiKey, setTrelloApiKey] = useState(() => loadLS("wl_trelloApiKey", ""));
+  const [trelloToken, setTrelloToken] = useState(() => loadLS("wl_trelloToken", ""));
+  const [trelloBoardId, setTrelloBoardId] = useState(() => loadLS("wl_trelloBoardId", ""));
+  const [trelloMemberId, setTrelloMemberId] = useState(() => loadLS("wl_trelloMemberId", ""));
+  const [trelloInputs, setTrelloInputs] = useState(() => ({
+    apiKey: loadLS("wl_trelloApiKey", ""),
+    token: loadLS("wl_trelloToken", ""),
+    boardId: loadLS("wl_trelloBoardId", ""),
+    memberId: loadLS("wl_trelloMemberId", ""),
+  }));
   useEffect(() => {
     if (!gasUrl) return;
     fetchFromGAS(gasUrl, "getLogs").then(data => {
@@ -824,7 +910,7 @@ export default function App() {
 
         {activeTab === "plan" && (
           <div className="fade-in">
-            <PlanTab projects={projects} tasks={tasks} setProjects={setProjects} setTasks={setTasks} gasUrl={gasUrl} />
+            <PlanTab projects={projects} tasks={tasks} setProjects={setProjects} setTasks={setTasks} gasUrl={gasUrl} trelloApiKey={trelloApiKey} trelloToken={trelloToken} trelloBoardId={trelloBoardId} trelloMemberId={trelloMemberId} />
           </div>
         )}
 
@@ -846,6 +932,45 @@ export default function App() {
               >
                 保存
               </button>
+              <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid #f0ebe4" }}>
+                <div style={{ fontSize: 11, color: "#999999", letterSpacing: "0.1em", marginBottom: 16 }}>Trello 連携設定</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
+                  {[
+                    { label: "API キー", key: "apiKey", placeholder: "Trello API Key", type: "text" },
+                    { label: "トークン", key: "token", placeholder: "Trello Token", type: "password" },
+                    { label: "ボード ID", key: "boardId", placeholder: "Board ID", type: "text" },
+                    { label: "メンバー ID", key: "memberId", placeholder: "Member ID", type: "text" },
+                  ].map(({ label, key, placeholder, type }) => (
+                    <div key={key}>
+                      <div style={{ fontSize: 11, color: "#999999", marginBottom: 4 }}>{label}</div>
+                      <input
+                        type={type}
+                        value={trelloInputs[key]}
+                        onChange={e => setTrelloInputs(prev => ({ ...prev, [key]: e.target.value }))}
+                        placeholder={placeholder}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => {
+                      setTrelloApiKey(trelloInputs.apiKey);
+                      setTrelloToken(trelloInputs.token);
+                      setTrelloBoardId(trelloInputs.boardId);
+                      setTrelloMemberId(trelloInputs.memberId);
+                      saveLS("wl_trelloApiKey", trelloInputs.apiKey);
+                      saveLS("wl_trelloToken", trelloInputs.token);
+                      saveLS("wl_trelloBoardId", trelloInputs.boardId);
+                      saveLS("wl_trelloMemberId", trelloInputs.memberId);
+                      alert("保存しました！");
+                    }}
+                    className="btn"
+                    style={{ width: "100%", padding: 12, background: "#0052CC", color: "#fff", fontSize: 13 }}
+                  >
+                    保存
+                  </button>
+                  <div style={{ fontSize: 11, color: "#bbbbbb" }}>APIキーとトークンは trello.com/app-key から取得できます。</div>
+                </div>
+              </div>
               <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid #f0ebe4" }}>
                 <div style={{ fontSize: 11, color: "#999999", letterSpacing: "0.1em", marginBottom: 12 }}>データリセット</div>
                 <button
