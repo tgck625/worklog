@@ -307,18 +307,9 @@ function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl, trelloApiKey,
       );
       setPlans(prev => {
         const manualPlans = prev.filter(p => !p.trelloId);
-        const existingTrelloPlans = prev.filter(p => p.trelloId);
-        const updatedExisting = existingTrelloPlans.map(p => {
-          const card = myCards.find(c => c.id === p.trelloId);
-          if (card) return { ...p, task: card.name, project: boardMap[card.idBoard] || p.project };
-          return p;
-        });
-        const existingIds = new Set(existingTrelloPlans.map(p => p.trelloId));
         const now = Date.now();
-        const newCards = myCards
-          .filter(c => !existingIds.has(c.id))
-          .map((c, i) => ({ id: now + i, date: todayDate, project: boardMap[c.idBoard] || "Trello", task: c.name, minutes: 0, done: false, trelloId: c.id }));
-        return [...manualPlans, ...updatedExisting, ...newCards];
+        const newCards = myCards.map((c, i) => ({ id: now + i, date: todayDate, project: boardMap[c.idBoard] || "Trello", task: c.name, minutes: 0, done: false, trelloId: c.id }));
+        return [...manualPlans, ...newCards];
       });
       setTrelloStatus(`✓ ${myCards.length}件取得`);
       setTimeout(() => setTrelloStatus(null), 3000);
