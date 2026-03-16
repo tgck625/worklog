@@ -297,8 +297,10 @@ function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl, trelloApiKey,
       boards.forEach(b => { boardMap[b.id] = b.name; });
       const workspaceBoardIds = new Set(boards.map(b => b.id));
       console.log("[Trello DEBUG] boards response:", boards);
-      console.log("[Trello DEBUG] workspaceBoardIds:", [...workspaceBoardIds]);
-      console.log("[Trello DEBUG] all fetched cards:", cards.map(c => ({ id: c.id, name: c.name, idBoard: c.idBoard, inWorkspace: workspaceBoardIds.has(c.idBoard) })));
+      console.log("[Trello DEBUG] workspaceBoardIds（ワークスペースのボードID一覧）:", [...workspaceBoardIds]);
+      boards.forEach(b => console.log(`  ボード: "${b.name}" → ID: ${b.id}`));
+      console.log("[Trello DEBUG] 全カードのidBoard一覧:");
+      cards.forEach(c => console.log(`  カード: "${c.name}" → idBoard: ${c.idBoard} → 一致: ${workspaceBoardIds.has(c.idBoard)}`));
       const myCards = cards.filter(c =>
         Array.isArray(c.idMembers) && c.idMembers.includes(trelloMemberId) &&
         (!trelloOrgId || workspaceBoardIds.has(c.idBoard))
