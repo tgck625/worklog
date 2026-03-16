@@ -329,7 +329,7 @@ function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl, trelloApiKey,
     fetchTrelloCards();
     trelloIntervalRef.current = setInterval(fetchTrelloCards, 5 * 60 * 1000);
     return () => clearInterval(trelloIntervalRef.current);
-  }, [trelloEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [trelloApiKey, trelloToken, trelloMemberId, trelloOrgId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function addPlanProject() {
     const name = newProj.trim();
