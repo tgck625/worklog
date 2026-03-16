@@ -372,15 +372,13 @@ function PlanTab({ projects, tasks, setProjects, setTasks, gasUrl, trelloApiKey,
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <span style={{ fontSize: 11, color: "#999999", letterSpacing: "0.1em" }}>{today} の計画</span>
-        {trelloEnabled && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {trelloStatus && <span style={{ fontSize: 11, color: trelloStatus.startsWith("✓") ? "#4FC48A" : "#F76E6E" }}>{trelloStatus}</span>}
-            <button onClick={fetchTrelloCards} disabled={trelloLoading} className="btn"
-              style={{ padding: "6px 14px", background: "#0052CC18", color: "#0052CC", border: "1px solid #0052CC33", fontSize: 11, opacity: trelloLoading ? 0.6 : 1 }}>
-              {trelloLoading ? "取得中..." : "Trelloから取得"}
-            </button>
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {trelloStatus && <span style={{ fontSize: 11, color: trelloStatus.startsWith("✓") ? "#4FC48A" : "#F76E6E" }}>{trelloStatus}</span>}
+          <button onClick={trelloEnabled ? fetchTrelloCards : () => alert("設定タブでTrelloのAPIキー・トークン・ボードID・メンバーIDを入力してください")} disabled={trelloLoading} className="btn"
+            style={{ padding: "6px 14px", background: trelloEnabled ? "#0052CC18" : "#f0ebe4", color: trelloEnabled ? "#0052CC" : "#aaaaaa", border: `1px solid ${trelloEnabled ? "#0052CC33" : "#e8e0d8"}`, fontSize: 11, opacity: trelloLoading ? 0.6 : 1 }}>
+            {trelloLoading ? "取得中..." : "Trelloから取得"}
+          </button>
+        </div>
       </div>
       <div style={{ background: "#ffffff", border: "1px solid #f0ebe4", borderRadius: 16, padding: 20, marginBottom: 12 }}>
         <div style={{ fontSize: 11, color: "#999999", letterSpacing: "0.1em", marginBottom: 10 }}>PROJECT</div>
