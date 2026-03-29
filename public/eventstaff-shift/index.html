@@ -1,0 +1,2893 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>イベントスタッフ管理システム</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1c1c1e;
+    --ink-mid: #48484a;
+    --ink-soft: #8e8e93;
+    --ink-faint: #c7c7cc;
+    --surface: #ffffff;
+    --surface-2: #f2f2f7;
+    --surface-3: #e5e5ea;
+    --accent: #1a6bbf;
+    --accent-light: #e8f1fb;
+    --green: #34c759;
+    --green-light: #e8f8ed;
+    --green-dark: #1e7e34;
+    --red: #ff3b30;
+    --red-light: #fff0ef;
+    --red-dark: #c0392b;
+    --yellow: #ff9500;
+    --yellow-light: #fff8ec;
+    --purple: #5856d6;
+    --purple-light: #f0f0ff;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --sidebar: 216px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--surface-2);
+    color: var(--ink);
+    font-size: 14px;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── LAYOUT ── */
+  .app { display: flex; height: 100vh; }
+
+  .sidebar {
+    width: var(--sidebar);
+    min-width: var(--sidebar);
+    background: var(--surface);
+    border-right: 1px solid var(--surface-3);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .sidebar-logo {
+    padding: 20px 18px 16px;
+    border-bottom: 1px solid var(--surface-3);
+  }
+  .sidebar-logo h1 { font-size: 14px; font-weight: 500; letter-spacing: -0.01em; }
+  .sidebar-logo p { font-size: 11px; color: var(--ink-soft); margin-top: 2px; font-weight: 300; }
+
+  .sidebar-nav { flex: 1; padding: 6px 0; }
+  .nav-group { padding: 14px 18px 4px; font-size: 10px; font-weight: 500; letter-spacing: 0.08em; color: var(--ink-faint); text-transform: uppercase; }
+  .nav-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 18px; cursor: pointer;
+    font-size: 13px; color: var(--ink-mid);
+    border-radius: 0;
+    transition: all 0.12s;
+    position: relative;
+  }
+  .nav-item:hover { background: var(--surface-2); color: var(--ink); }
+  .nav-item.active {
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    border-radius: 0 2px 2px 0;
+  }
+  .nav-badge {
+    margin-left: auto;
+    background: var(--red);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 1px 5px;
+    border-radius: 10px;
+    min-width: 16px;
+    text-align: center;
+  }
+  .nav-icon { width: 16px; font-size: 14px; text-align: center; flex-shrink: 0; }
+
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--surface-3);
+    padding: 12px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .topbar h2 { font-size: 16px; font-weight: 500; }
+  .topbar-right { display: flex; gap: 8px; align-items: center; }
+
+  .content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+  /* ── BUTTONS ── */
+  .btn {
+    padding: 7px 14px; border-radius: var(--radius-sm); font-size: 12px;
+    cursor: pointer; border: 1px solid var(--surface-3);
+    background: var(--surface); color: var(--ink);
+    font-family: inherit; transition: all 0.12s; font-weight: 400;
+  }
+  .btn:hover { background: var(--surface-2); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: #155a9e; }
+  .btn-sm { padding: 4px 9px; font-size: 11px; }
+  .btn-danger { background: var(--red-light); color: var(--red-dark); border-color: var(--red); }
+  .btn-danger:hover { background: #ffd6d4; }
+  .btn-success { background: var(--green-light); color: var(--green-dark); border-color: var(--green); }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--surface-3);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--surface-3);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-header h3 { font-size: 13px; font-weight: 500; }
+  .card-body { padding: 16px; }
+
+  /* ── TABLE ── */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 12px; font-weight: 500; font-size: 11px; color: var(--ink-soft); border-bottom: 1px solid var(--surface-3); white-space: nowrap; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--surface-3); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface-2); }
+  .no-hover tr:hover td { background: inherit; }
+
+  /* ── BADGES ── */
+  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-blue { background: var(--accent-light); color: var(--accent); }
+  .badge-green { background: var(--green-light); color: var(--green-dark); }
+  .badge-amber { background: var(--yellow-light); color: #7d4a00; }
+  .badge-red { background: var(--red-light); color: var(--red-dark); }
+  .badge-gray { background: var(--surface-3); color: var(--ink-soft); }
+  .badge-purple { background: var(--purple-light); color: var(--purple); }
+
+  /* ── FORM ── */
+  .form-group { margin-bottom: 14px; }
+  .form-label { display: block; font-size: 12px; color: var(--ink-mid); margin-bottom: 5px; font-weight: 500; }
+  .form-label .req { color: var(--red); margin-left: 2px; }
+  .form-control {
+    width: 100%; padding: 8px 11px;
+    border: 1px solid var(--surface-3); border-radius: var(--radius-sm);
+    font-size: 13px; font-family: inherit;
+    background: var(--surface-2); color: var(--ink);
+    transition: border-color 0.12s, background 0.12s;
+    -webkit-appearance: none; appearance: none;
+  }
+  .form-control:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 2px rgba(26,107,191,0.12); }
+  select.form-control { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' stroke='%238e8e93' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; padding-right: 32px; cursor: pointer; }
+  textarea.form-control { min-height: 70px; resize: vertical; line-height: 1.6; }
+
+  /* autocomplete */
+  .ac-wrap { position: relative; }
+  .ac-list {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--surface); border: 1px solid var(--surface-3);
+    border-radius: var(--radius-sm); box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    z-index: 200; display: none; overflow: hidden; max-height: 220px; overflow-y: auto;
+  }
+  .ac-list.open { display: block; }
+  .ac-item {
+    padding: 10px 13px; font-size: 13px; cursor: pointer;
+    border-bottom: 1px solid var(--surface-2); display: flex; gap: 8px;
+  }
+  .ac-item:last-child { border-bottom: none; }
+  .ac-item:hover { background: var(--accent-light); }
+  .ac-main { font-weight: 500; }
+  .ac-sub { font-size: 11px; color: var(--ink-soft); font-weight: 300; margin-top: 1px; }
+
+  /* modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
+  }
+  .modal {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--surface-3);
+    width: 560px; max-width: 96vw; max-height: 88vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+  .modal-lg { width: 720px; }
+  .modal-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--surface-3);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--surface); z-index: 1;
+  }
+  .modal-header h3 { font-size: 15px; font-weight: 500; }
+  .modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--ink-soft); line-height: 1; padding: 0 2px; }
+  .modal-body { padding: 20px; }
+  .modal-footer { padding: 12px 20px; border-top: 1px solid var(--surface-3); display: flex; justify-content: flex-end; gap: 8px; }
+
+  /* tabs */
+  .tab-bar { display: flex; border-bottom: 1px solid var(--surface-3); margin-bottom: 16px; }
+  .tab { padding: 8px 16px; font-size: 13px; cursor: pointer; color: var(--ink-soft); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+
+  /* grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+
+  /* stat */
+  .stat-card { background: var(--surface-2); border-radius: var(--radius-sm); padding: 14px 16px; }
+  .stat-label { font-size: 11px; color: var(--ink-soft); margin-bottom: 4px; font-weight: 300; }
+  .stat-value { font-size: 24px; font-weight: 500; line-height: 1; }
+  .stat-sub { font-size: 11px; color: var(--ink-soft); margin-top: 4px; font-weight: 300; }
+
+  /* info row */
+  .info-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--surface-3); font-size: 13px; }
+  .info-row:last-child { border-bottom: none; }
+  .info-key { color: var(--ink-soft); font-size: 12px; }
+
+  /* progress */
+  .prog-bar { height: 4px; background: var(--surface-3); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+  .prog-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+
+  /* attendance status btns */
+  .status-pill {
+    padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 500;
+    cursor: pointer; border: 1px solid; transition: all 0.12s; white-space: nowrap;
+  }
+  .sp-ok     { background: var(--green-light); color: var(--green-dark); border-color: #a3d9b1; }
+  .sp-ng     { background: var(--red-light);   color: var(--red-dark);   border-color: #f5b0ab; }
+  .sp-unknown{ background: var(--surface-3);   color: var(--ink-soft);   border-color: var(--ink-faint); }
+  .sp-unsure { background: var(--yellow-light); color: #7d4a00;          border-color: #ffcc80; }
+  .sp-candidate { background: var(--yellow-light); color: #7d4a00;  border-color: #ffcc80; }
+  .sp-confirmed { background: var(--accent-light); color: var(--accent); border-color: #90bfe8; }
+  .sp-worked    { background: var(--green-light);  color: var(--green-dark); border-color: #a3d9b1; }
+  .sp-leader    { background: var(--purple-light); color: var(--purple); border-color: #b3b2f5; }
+
+  /* attendance row */
+  .att-row { display: flex; align-items: center; gap: 8px; padding: 9px 16px; border-bottom: 1px solid var(--surface-3); flex-wrap: wrap; }
+  .att-row:last-child { border-bottom: none; }
+  .att-row:hover { background: var(--surface-2); }
+  .att-name { flex: 1; min-width: 80px; font-size: 13px; }
+  .att-rank { font-size: 11px; color: var(--ink-soft); font-weight: 300; }
+
+  /* avatar */
+  .av { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-light); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; color: var(--accent); flex-shrink: 0; }
+
+  /* pay total */
+  .pay-total { font-size: 14px; font-weight: 500; color: var(--accent); }
+
+  /* copy link */
+  .copy-link {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface-2); border: 1px solid var(--surface-3);
+    border-radius: var(--radius-sm); padding: 8px 12px;
+    font-size: 12px; color: var(--ink-mid); font-family: monospace;
+    overflow: hidden; margin-top: 6px;
+  }
+  .copy-link .link-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+
+  .dropdown-menu { display:none; }
+  .dd-item { padding:9px 14px; font-size:12px; cursor:pointer; border-bottom:1px solid var(--surface-3); color:var(--ink); }
+  .dd-item:hover { background:var(--accent-light); }
+  .dd-item.dd-active { font-weight:500; background:var(--surface-2); }
+  .dd-item:last-child { border-bottom:none; }
+  .empty-state { text-align: center; padding: 36px 16px; color: var(--ink-soft); font-size: 13px; font-weight: 300; }
+
+  /* settings */
+  .setting-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--surface-3); }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-row .setting-label { flex: 1; font-size: 13px; }
+  .setting-row .setting-hint { font-size: 11px; color: var(--ink-soft); font-weight: 300; margin-top: 2px; }
+
+  /* pending badge */
+  .pending-row { background: var(--yellow-light) !important; }
+
+  /* responsive */
+  @media (max-width: 760px) {
+    :root { --sidebar: 52px; }
+    .sidebar-logo p, .nav-item span:not(.nav-icon), .nav-group, .nav-badge { display: none; }
+    .grid-4, .grid-3 { grid-template-columns: 1fr 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <h1>スタッフ管理</h1>
+      <p>イベント運営システム</p>
+    </div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <h2 id="pageTitle">ダッシュボード</h2>
+      <div class="topbar-right" id="topbarRight"></div>
+    </div>
+    <div class="content" id="mainContent"></div>
+  </div>
+</div>
+<div id="modalContainer"></div>
+
+<script>
+// =====================================================
+// STORAGE KEYS
+// =====================================================
+const SK = {
+  events:    'staff_mgmt_events',
+  staffs:    'staff_mgmt_staffs',
+  venues:    'staff_mgmt_venues',
+  cats:      'staff_mgmt_categories',
+  ranks:     'staff_mgmt_ranks',
+  schedule:  'staff_mgmt_schedule_responses',
+  pending:   'staff_mgmt_pending_registrations',
+  pendingBank: 'staff_mgmt_pending_bank',
+  apikey:    'staff_mgmt_gmaps_key',
+};
+
+function load(key, def) {
+  try { return JSON.parse(localStorage.getItem(key)) || def; } catch { return def; }
+}
+function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+// =====================================================
+// INITIAL DATA (only set if not already in storage)
+// =====================================================
+function initDefaultData() {
+  if (!localStorage.getItem(SK.ranks)) {
+    save(SK.ranks, [
+      { id: 1, name: 'スタンダード', label: '★',   level: 1 },
+      { id: 2, name: 'シルバー',     label: '★★',  level: 2 },
+      { id: 3, name: 'ゴールド',     label: '★★★', level: 3 },
+    ]);
+  }
+  if (!localStorage.getItem(SK.cats)) {
+    save(SK.cats, [
+      { id: 1, name: 'マルシェ',  color: 'badge-green',
+        // 一般スタッフ基本稼働
+        studyHours: 1, opStart: '10:00', opEnd: '17:00', opBreak: 0,
+        // ランク別日給
+        rankWages: { 1: 8320, 2: 8400, 3: 8640 },
+        // リーダー基本稼働（別設定）
+        ldrStudyHours: 1.5, ldrOpStart: '09:00', ldrOpEnd: '17:00', ldrOpBreak: 0,
+        leaderDailyWage: 9000 },
+      { id: 2, name: 'プレミア',  color: 'badge-purple',
+        studyHours: 1, opStart: '10:00', opEnd: '18:00', opBreak: 60,
+        rankWages: { 1: 9000, 2: 9200, 3: 9600 },
+        ldrStudyHours: 2, ldrOpStart: '09:00', ldrOpEnd: '18:00', ldrOpBreak: 60,
+        leaderDailyWage: 11000 },
+      { id: 3, name: 'フェスタ',  color: 'badge-amber',
+        studyHours: 1, opStart: '10:00', opEnd: '17:00', opBreak: 0,
+        rankWages: { 1: 8500, 2: 8640, 3: 8960 },
+        ldrStudyHours: 1.5, ldrOpStart: '09:00', ldrOpEnd: '17:00', ldrOpBreak: 0,
+        leaderDailyWage: 10000 },
+    ]);
+  }
+  if (!localStorage.getItem(SK.venues)) {
+    save(SK.venues, [
+      { id: 1, name: 'グランキューブ大阪',     address: '大阪市北区中之島5-3-51',         lat: 34.6935, lng: 135.4845 },
+      { id: 2, name: '名古屋栄イベントホール', address: '名古屋市中区栄3-18-1',           lat: 35.1709, lng: 136.9073 },
+      { id: 3, name: '京都パルスプラザ',       address: '京都市伏見区竹田鳥羽殿町5',      lat: 34.9393, lng: 135.7631 },
+    ]);
+  }
+  if (!localStorage.getItem(SK.staffs)) {
+    save(SK.staffs, [
+      { id:1, name:'田中 美咲', kana:'タナカ ミサキ', rankId:3, address:'名古屋市千種区', lat:35.1752, lng:136.9326, contractSigned:true, phone:'090-1111-2222', email:'', station:'千種駅', bankName:'三菱UFJ銀行', branchName:'名古屋支店', accountType:'普通', accountNumber:'1234567', accountHolder:'タナカ ミサキ' },
+      { id:2, name:'鈴木 健太', kana:'スズキ ケンタ', rankId:2, address:'名古屋市中区', lat:35.1709, lng:136.9073, contractSigned:true, phone:'090-2222-3333', email:'', station:'栄駅', bankName:'', branchName:'', accountType:'', accountNumber:'', accountHolder:'' },
+      { id:3, name:'山田 花子', kana:'ヤマダ ハナコ', rankId:1, address:'名古屋市守山区', lat:35.2061, lng:136.9726, contractSigned:false, phone:'090-3333-4444', email:'', station:'', bankName:'', branchName:'', accountType:'', accountNumber:'', accountHolder:'' },
+    ]);
+  }
+  if (!localStorage.getItem(SK.events)) {
+    save(SK.events, [
+      { id:1, date:'2025-03-08', venueId:2, categoryId:1, requiredCount:4,
+        staffAssignments:[{staffId:1,status:'worked',isLeader:true},{staffId:2,status:'worked',isLeader:false}],
+        attendance:{1:'ok',2:'ok',3:'ng'}, opStart:'10:00', opEnd:'18:00', opBreak:60, studyHours:1 },
+      { id:2, date:'2025-06-21', venueId:1, categoryId:2, requiredCount:3,
+        staffAssignments:[],
+        attendance:{}, opStart:'10:00', opEnd:'18:00', opBreak:60, studyHours:0 },
+    ]);
+  }
+}
+
+initDefaultData();
+
+// データマイグレーション：rankWages のキーを文字列に統一
+// + ldrOpStart/ldrOpEnd/ldrOpBreak/ldrStudyHours が未設定なら一般時間で初期化
+(function migrateRankWages() {
+  const cats = load(SK.cats, []);
+  let changed = false;
+  cats.forEach(c => {
+    if (c.rankWages) {
+      const newWages = {};
+      Object.entries(c.rankWages).forEach(([k, v]) => {
+        newWages[String(k)] = v;
+      });
+      c.rankWages = newWages;
+      changed = true;
+    }
+    // リーダー時間が未設定なら一般時間で初期化
+    if (c.ldrOpStart  == null && c.opStart   != null) { c.ldrOpStart  = c.opStart;   changed = true; }
+    if (c.ldrOpEnd    == null && c.opEnd     != null) { c.ldrOpEnd    = c.opEnd;     changed = true; }
+    if (c.ldrOpBreak  == null && c.opBreak   != null) { c.ldrOpBreak  = c.opBreak;   changed = true; }
+    if (c.ldrStudyHours == null && c.studyHours != null) { c.ldrStudyHours = c.studyHours; changed = true; }
+  });
+  if (changed) save(SK.cats, cats);
+})();
+
+// =====================================================
+// HELPERS
+// =====================================================
+const TRANSPORT_TABLE = [
+  [0,5,0],[5,10,200],[10,15,300],[15,20,400],[20,25,500],
+  [25,30,600],[30,35,700],[35,40,800],[40,45,900],[45,50,1000],
+  [50,55,1100],[55,60,1200],[60,65,1300],[65,70,1400],[70,75,1500],
+  [75,80,1600],[80,85,1700],[85,90,1800],[90,95,1900],[95,100,2000],
+];
+function transportAmt(km) {
+  for (const [a,b,c] of TRANSPORT_TABLE) if (km>=a && km<b) return c;
+  // 規定の最大距離（100km）を超えた場合は最大額を返す
+  if (km >= 100) return 2000;
+  return 0;
+}
+function haversine(lat1,lng1,lat2,lng2) {
+  const R=6371, dL=(lat2-lat1)*Math.PI/180, dN=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dL/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dN/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+// 30分単位の丸め（例：7h20m → 7.5h）
+function roundHalfHour(h) {
+  // 0.25刻みで最も近い0.5単位に丸める
+  // 区間：[N, N+0.25) → N、[N+0.25, N+0.75) → N+0.5、[N+0.75, N+1) → N+1
+  const floor = Math.floor(h);
+  const frac  = h - floor;
+  if (frac < 0.25)       return floor;
+  else if (frac < 0.75)  return floor + 0.5;
+  else                   return floor + 1;
+}
+
+// 稼働時間に応じた賃金計算（8h超は1.25倍）
+function calcHoursWage(h, rate) {
+  if (h <= 8) return h * rate;
+  return 8 * rate + (h - 8) * rate * 1.25;
+}
+
+// 時間文字列→時間数変換
+function timeToHours(start, end, breakMin) {
+  if (!start || !end) return 0;
+  const [sh,sm] = start.split(':').map(Number);
+  const [eh,em] = end.split(':').map(Number);
+  return Math.max(0, ((eh*60+em)-(sh*60+sm)-(breakMin||0))/60);
+}
+
+// 時給Aを逆算する
+// A = dailyWage / (studyH + opH) ※opH>8の場合は 8 + 1.25*(opH-8) として計算
+function calcHourlyRate(dailyWage, baseStudyH, baseOpH) {
+  const denom = baseStudyH + (baseOpH <= 8 ? baseOpH : 8 + 1.25 * (baseOpH - 8));
+  if (denom <= 0) return 0;
+  return dailyWage / denom;
+}
+
+function calcPay(ev, staffId) {
+  const a = ev.staffAssignments.find(x=>x.staffId===staffId);
+  if (!a) return {hourly:0, studyPay:0, opPay:0, total:0, dailyWage:0};
+
+  const staffs = load(SK.staffs,[]);
+  const cats   = load(SK.cats,[]);
+  const ranks  = load(SK.ranks,[]);
+
+  const staff = staffs.find(s=>s.id===staffId);
+  const cat   = cats.find(c=>c.id===ev.categoryId);
+  const rank  = ranks.find(r=>r.id===staff?.rankId);
+  if (!staff||!cat||!rank) return {hourly:0, studyPay:0, opPay:0, total:0, dailyWage:0};
+
+  // 実際の稼働時間（イベントに入力された値）
+  const {opHours, studyHours} = calcEventHours(ev);
+
+  // ── 日給・基本稼働時間を決定 ──
+  let dailyWage, baseStudy, baseOp, isLeaderRole = false;
+
+  if (a.isLeader) {
+    // リーダー：leaderDailyWage をそのまま支給（フラット日給制）
+    isLeaderRole = true;
+    dailyWage = cat.leaderDailyWage || 0;
+    const ldrOpStart = cat.ldrOpStart || cat.opStart;
+    const ldrOpEnd   = cat.ldrOpEnd   || cat.opEnd;
+    const ldrOpBreak = cat.ldrOpBreak != null ? cat.ldrOpBreak : (cat.opBreak || 0);
+    const ldrStudy   = cat.ldrStudyHours != null ? cat.ldrStudyHours : (cat.studyHours || 1);
+    const ldrOp      = timeToHours(ldrOpStart, ldrOpEnd, ldrOpBreak) || 7;
+    const ldrStudyR  = roundHalfHour(ldrStudy);
+    const ldrOpR     = roundHalfHour(ldrOp);
+    const hourlyRate = Math.floor(calcHourlyRate(dailyWage, ldrStudyR, ldrOpR));
+    return { hourly: hourlyRate, studyPay: 0, opPay: dailyWage, total: dailyWage, dailyWage, missingWage: dailyWage === 0, isLeader: true };
+  } else {
+    // 一般：ランク別日給・一般基本稼働時間を使用
+    dailyWage = (cat.rankWages && (cat.rankWages[rank.id] || cat.rankWages[String(rank.id)])) || 0;
+    baseStudy = cat.studyHours || 1;
+    baseOp    = timeToHours(cat.opStart, cat.opEnd, cat.opBreak||0) || 7;
+  }
+
+  const baseStudyR = roundHalfHour(baseStudy);
+  const baseOpR    = roundHalfHour(baseOp);
+  const hourly     = calcHourlyRate(dailyWage, baseStudyR, baseOpR);
+
+  // イベントの実際の稼働時間（リーダーはldrStudyHoursを使用）
+  const actualStudyRaw = isLeaderRole
+    ? (ev.ldrStudyHours != null ? ev.ldrStudyHours : studyHours)
+    : studyHours;
+  const actualStudyR = roundHalfHour(actualStudyRaw);
+  const actualOpR    = roundHalfHour(opHours);
+
+  // 基本と実際が同じ → 日給をそのまま返す（端数ゼロ）
+  if (actualStudyR === baseStudyR && actualOpR === baseOpR) {
+    return { hourly: Math.floor(hourly), studyPay: 0, opPay: dailyWage, total: dailyWage, dailyWage, missingWage: dailyWage === 0, isLeader: isLeaderRole };
+  }
+
+  // イレギュラー → 時給ベースで計算
+  const studyPay = Math.floor(hourly * actualStudyR);
+  const opPay    = Math.floor(calcHoursWage(actualOpR, hourly));
+  return { hourly: Math.floor(hourly), studyPay, opPay, total: studyPay + opPay, dailyWage, missingWage: dailyWage === 0, isLeader: isLeaderRole };
+}
+
+function calcEventHours(ev) {
+  if (!ev.opStart||!ev.opEnd) return {opHours:0,studyHours:ev.studyHours||0,totalHours:ev.studyHours||0};
+  const [sh,sm]=ev.opStart.split(':').map(Number);
+  const [eh,em]=ev.opEnd.split(':').map(Number);
+  const opHours    = Math.max(0,((eh*60+em)-(sh*60+sm)-(ev.opBreak||0))/60);
+  const studyHours = ev.studyHours||0;
+  return {opHours, studyHours, totalHours: opHours+studyHours};
+}
+const ATT_LABEL = {ok:'○ 参加可', ng:'× 参加不可', unknown:'未回答', unsure:'△ 未定'};
+const ATT_CLASS = {ok:'sp-ok', ng:'sp-ng', unknown:'sp-unknown', unsure:'sp-unsure'};
+const ASS_LABEL = {candidate:'候補', confirmed:'決定済', worked:'稼働済'};
+const ASS_CLASS = {candidate:'sp-candidate', confirmed:'sp-confirmed', worked:'sp-worked'};
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// =====================================================
+// GOOGLE MAPS
+// =====================================================
+let _mapsLoaded = false;
+let _autocompleteService = null;
+let _geocoder = null;
+
+function initMaps() {
+  const key = localStorage.getItem(SK.apikey);
+  if (!key) return;
+  if (_mapsLoaded) return;
+  const s = document.createElement('script');
+  s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&language=ja&callback=_onMapsReady`;
+  s.async = true; s.defer = true;
+  document.head.appendChild(s);
+}
+window._onMapsReady = function() {
+  _mapsLoaded = true;
+  _autocompleteService = new google.maps.places.AutocompleteService();
+  _geocoder = new google.maps.Geocoder();
+};
+
+function setupAddressField(inputId, displayId, coordId, coordFieldId) {
+  const inp = document.getElementById(inputId);
+  const disp = document.getElementById(displayId);
+  if (!inp) return;
+
+  let timer = null;
+  let listEl = document.getElementById(inputId + '_list');
+
+  inp.addEventListener('input', function() {
+    clearTimeout(timer);
+    const val = this.value.trim();
+    if (!val || val.length < 2) { if(listEl) listEl.classList.remove('open'); return; }
+    if (!_mapsLoaded) {
+      if (disp) disp.value = val;
+      return;
+    }
+    timer = setTimeout(() => {
+      _autocompleteService.getPlacePredictions(
+        { input: val, componentRestrictions: {country:'jp'}, language:'ja' },
+        (preds, status) => {
+          if (!preds || status !== google.maps.places.PlacesServiceStatus.OK) {
+            if(listEl) listEl.classList.remove('open'); return;
+          }
+          if (!listEl) return;
+          listEl.innerHTML = preds.slice(0,5).map(p=>`
+            <div class="ac-item" onclick="_pickPlace('${esc(p.place_id)}','${esc(p.description)}','${inputId}','${displayId}','${coordId}','${coordFieldId}')">
+              <div>
+                <div class="ac-main">${esc(p.structured_formatting.main_text)}</div>
+                <div class="ac-sub">${esc(p.structured_formatting.secondary_text||p.description)}</div>
+              </div>
+            </div>`).join('');
+          listEl.classList.add('open');
+        }
+      );
+    }, 350);
+  });
+
+  document.addEventListener('click', function(e) {
+    if (listEl && !e.target.closest('.ac-wrap')) listEl.classList.remove('open');
+  });
+}
+
+window._pickPlace = function(placeId, description, inputId, displayId, coordId, coordFieldId) {
+  document.getElementById(inputId).value = description;
+  if (displayId && document.getElementById(displayId)) document.getElementById(displayId).value = description;
+  const listEl = document.getElementById(inputId + '_list');
+  if (listEl) listEl.classList.remove('open');
+
+  if (_geocoder) {
+    _geocoder.geocode({placeId}, (results, status) => {
+      if (status==='OK' && results[0]) {
+        const loc = results[0].geometry.location;
+        const lat = loc.lat().toFixed(6), lng = loc.lng().toFixed(6);
+        if (coordId && document.getElementById(coordId)) document.getElementById(coordId).value = `${lat}, ${lng}`;
+        if (coordFieldId && document.getElementById(coordFieldId)) document.getElementById(coordFieldId).style.display = 'block';
+        window['_coords_' + inputId] = { lat: parseFloat(lat), lng: parseFloat(lng) };
+      }
+    });
+  }
+};
+
+// =====================================================
+// ROUTING
+// =====================================================
+let currentPage = 'dashboard';
+let activeTab   = '';
+let selectedEventId = null;
+
+const PAGES = [
+  { group: 'メイン',   id:'dashboard',      label:'ダッシュボード',   icon:'⊞' },
+  { group: '',         id:'staffing',        label:'イベント別調整',   icon:'◷' },
+  { group: '',         id:'staffing_staff',  label:'スタッフ別調整',   icon:'⊞' },
+  { group: '登録',     id:'staffs',     label:'スタッフ登録',  icon:'♟', badge: () => { try { return (load(SK.pending,[]).length + load(SK.pendingBank||'staff_mgmt_pending_bank',[]).length) || 0; } catch(e){ return 0; } } },
+  { group: '',         id:'venues',     label:'会場登録',      icon:'◈' },
+  { group: '集計',     id:'payment',    label:'支払い管理',    icon:'¥' },
+  { group: '',         id:'categories', label:'支払金額登録',  icon:'◎' },
+  { group: '設定',     id:'settings',   label:'設定',          icon:'⚙' },
+];
+
+function renderSidebar() {
+  let html = '';
+  let lastGroup = null;
+  for (const p of PAGES) {
+    if (p.group && p.group !== lastGroup) {
+      html += `<div class="nav-group">${p.group}</div>`;
+      lastGroup = p.group;
+    }
+    const badgeCount = p.badge ? p.badge() : 0;
+    html += `<div class="nav-item ${currentPage===p.id?'active':''}" onclick="navigate('${p.id}')">
+      <span class="nav-icon">${p.icon}</span>
+      <span>${p.label}</span>
+      ${badgeCount ? `<span class="nav-badge">${badgeCount}</span>` : ''}
+    </div>`;
+  }
+  document.getElementById('sidebarNav').innerHTML = html;
+}
+
+function navigate(page, eventId) {
+  currentPage = page;
+  activeTab = '';
+  if (eventId) selectedEventId = eventId;
+  renderSidebar();
+  document.getElementById('pageTitle').textContent = PAGES.find(p=>p.id===page)?.label || page;
+  renderPage();
+}
+
+function renderPage() {
+  const content = document.getElementById('mainContent');
+  const right   = document.getElementById('topbarRight');
+  right.innerHTML = '';
+  const map = {
+    dashboard:  renderDashboard,
+    events:     renderEvents,
+    staffing:        renderStaffing,
+    staffing_staff:  renderStaffingByStaff,
+    staffs:     renderStaffs,
+    venues:     renderVenues,
+    categories: renderCategories,
+    payment:    renderPayment,
+    settings:   renderSettings,
+  };
+  if (map[currentPage]) map[currentPage](content, right);
+}
+
+// =====================================================
+// DASHBOARD
+// =====================================================
+function renderDashboard(content) {
+  const events  = load(SK.events,[]);
+  const staffs  = load(SK.staffs,[]);
+  const pending = load(SK.pending,[]);
+  const venues  = load(SK.venues,[]);
+  const cats    = load(SK.cats,[]);
+  const today   = new Date().toISOString().slice(0,10);
+  const thisMonth = today.slice(0,7);
+
+  const upcoming = events.filter(e=>e.date>=today);
+  let totalPayMonth = 0;
+  events.filter(e=>e.date.startsWith(thisMonth)).forEach(e=>{
+    e.staffAssignments.filter(a=>a.status==='worked').forEach(a=>{ totalPayMonth += calcPay(e,a.staffId).total; });
+  });
+
+  content.innerHTML = `
+    <div class="grid-4" style="margin-bottom:16px">
+      <div class="stat-card"><div class="stat-label">スタッフ数</div><div class="stat-value">${staffs.length}</div><div class="stat-sub">契約済 ${staffs.filter(s=>s.contractSigned).length}名</div></div>
+      <div class="stat-card"><div class="stat-label">今後のイベント</div><div class="stat-value">${upcoming.length}</div><div class="stat-sub">件</div></div>
+      <div class="stat-card"><div class="stat-label">今月の人件費</div><div class="stat-value" style="font-size:17px">¥${totalPayMonth.toLocaleString()}</div><div class="stat-sub">交通費除く</div></div>
+      <div class="stat-card" style="${pending.length?'background:var(--yellow-light);cursor:pointer':''}" onclick="${pending.length?"navigate('staffs')":''}">
+        <div class="stat-label">登録申請</div>
+        <div class="stat-value" style="${pending.length?'color:var(--yellow)':''}">${pending.length}</div>
+        <div class="stat-sub">${pending.length?'承認待ちあり':'件'}</div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3>直近のイベント</h3><button class="btn btn-sm" onclick="navigate('events')">すべて</button></div>
+        <div class="card-body" style="padding:0">
+          ${events.slice().sort((a,b)=>a.date.localeCompare(b.date)).slice(0,6).map(e=>{
+            const v=venues.find(x=>x.id===e.venueId), c=cats.find(x=>x.id===e.categoryId);
+            const conf=e.staffAssignments.filter(a=>a.status==='confirmed'||a.status==='worked').length;
+            return `<div style="padding:10px 16px;border-bottom:1px solid var(--surface-3);display:flex;align-items:center;gap:10px">
+              <div style="flex:1"><div style="font-size:13px;font-weight:500">${e.date}</div><div style="font-size:11px;color:var(--ink-soft)">${v?.name||'-'}</div></div>
+              <span class="badge ${c?.color||'badge-gray'}">${c?.name||'-'}</span>
+              <span style="font-size:12px;color:var(--ink-soft)">${conf}/${e.requiredCount}名</span>
+              <button class="btn btn-sm" onclick="navigate('staffing',${e.id})">調整</button>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>スタッフ</h3><button class="btn btn-sm" onclick="navigate('staffs')">すべて</button></div>
+        <div class="card-body" style="padding:0">
+          ${staffs.slice(0,6).map(s=>{
+            const rank=load(SK.ranks,[]).find(r=>r.id===s.rankId);
+            return `<div style="padding:8px 16px;border-bottom:1px solid var(--surface-3);display:flex;align-items:center;gap:10px">
+              <div class="av">${s.name[0]}</div>
+              <div style="flex:1"><div style="font-size:13px">${s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${s.address||''}</div></div>
+              <span class="badge badge-blue">${rank?.label||''}</span>
+              ${s.contractSigned?'<span class="badge badge-green" style="font-size:10px">契約済</span>':'<span class="badge badge-red" style="font-size:10px">未契約</span>'}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+// =====================================================
+// EVENTS
+// =====================================================
+function renderEvents(content, right) {
+  // イベント管理とスタッフ調整を1画面に統合
+  navigate('staffing');
+}
+
+function copyLink(url) {
+  const full = `${getBaseUrl()}${url}`;
+  navigator.clipboard?.writeText(full).then(()=>alert('リンクをコピーしました'));
+}
+
+// =====================================================
+// STAFFING
+// =====================================================
+// ステータスの順序定義（セルクリックで順番に切り替わる）
+const CELL_CYCLE = ['unknown','ok','ng','unsure','candidate','confirmed','worked','leader'];
+const CELL_LABEL = {
+  unknown:   '未回答',
+  ok:        '○ 参加可',
+  ng:        '× 不参加',
+  unsure:    '△ 未定',
+  candidate: '候補',
+  confirmed: '決定',
+  worked:    '稼働済',
+  leader:    '★ リーダー',
+};
+// 上ボタン（出欠）の色
+const ATT_STYLE = {
+  unknown: 'background:#c7c7cc;color:#3a3a3c;',           // 濃いグレー
+  ok:      'background:#fff;color:#c7c7cc;border:none;',  // 白・枠なし
+  ng:      'background:#ff3b30;color:#fff;',              // 赤
+  unsure:  'background:#ff9500;color:#fff;',              // オレンジ
+};
+// 下ボタン（アサイン）の色
+const CELL_STYLE = {
+  unknown:   'background:#f2f2f7;color:#8e8e93;',
+  ok:        'background:#e8f8ed;color:#1e7e34;',
+  ng:        'background:#fff0ef;color:#c0392b;',
+  unsure:    'background:#fff8ec;color:#7d4a00;',
+  none:      'background:#f2f2f7;color:#8e8e93;',
+  candidate: 'background:#fff8ec;color:#854F0B;border:1px solid #ffcc80;font-weight:500',
+  confirmed: 'background:#1a6bbf;color:#fff;font-weight:500',
+  worked:    'background:#1e7e34;color:#fff;font-weight:500',
+  leader:    'background:#5856d6;color:#fff;font-weight:500',
+};
+
+function getCellStatus(ev, staffId) {
+  const asgn = ev.staffAssignments?.find(a=>a.staffId===staffId);
+  const att  = ev.attendance?.[staffId] || 'unknown';
+  if (asgn) {
+    if (asgn.isLeader) return 'leader';
+    return asgn.status; // candidate / confirmed / worked
+  }
+  return att; // unknown / ok / ng / unsure
+}
+
+function cycleCellStatus(evId, staffId) {
+  const evs = load(SK.events,[]);
+  const ev  = evs.find(e=>e.id===evId);
+  if (!ev) return;
+
+  const cur = getCellStatus(ev, staffId);
+  const idx = CELL_CYCLE.indexOf(cur);
+  const next = CELL_CYCLE[(idx+1) % CELL_CYCLE.length];
+
+  // attendance を更新
+  if (!ev.attendance) ev.attendance = {};
+  const attMap = { unknown:'unknown', ok:'ok', ng:'ng', unsure:'unsure',
+                   candidate:'ok', confirmed:'ok', worked:'ok', leader:'ok' };
+  ev.attendance[staffId] = attMap[next];
+
+  // staffAssignments を更新
+  const aIdx = ev.staffAssignments.findIndex(a=>a.staffId===staffId);
+
+  if (next === 'unknown' || next === 'ng' || next === 'unsure' || next === 'ok') {
+    // アサイン解除
+    if (aIdx >= 0) ev.staffAssignments.splice(aIdx, 1);
+  } else if (next === 'candidate') {
+    if (aIdx >= 0) { ev.staffAssignments[aIdx].status='candidate'; ev.staffAssignments[aIdx].isLeader=false; }
+    else ev.staffAssignments.push({staffId, status:'candidate', isLeader:false});
+  } else if (next === 'confirmed') {
+    if (aIdx >= 0) { ev.staffAssignments[aIdx].status='confirmed'; ev.staffAssignments[aIdx].isLeader=false; }
+    else ev.staffAssignments.push({staffId, status:'confirmed', isLeader:false});
+  } else if (next === 'worked') {
+    if (aIdx >= 0) { ev.staffAssignments[aIdx].status='worked'; ev.staffAssignments[aIdx].isLeader=false; }
+    else ev.staffAssignments.push({staffId, status:'worked', isLeader:false});
+  } else if (next === 'leader') {
+    if (aIdx >= 0) { ev.staffAssignments[aIdx].status='worked'; ev.staffAssignments[aIdx].isLeader=true; }
+    else ev.staffAssignments.push({staffId, status:'worked', isLeader:true});
+  }
+
+  save(SK.events, evs);
+  renderPage();
+}
+
+function renderStaffingByStaff(content, right) {
+  right.innerHTML = `<button class="btn btn-primary" onclick="openStaffModal()">+ スタッフ追加</button>`;
+  const events = load(SK.events,[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const staffs = load(SK.staffs,[]);
+  const venues = load(SK.venues,[]);
+  const cats   = load(SK.cats,[]);
+  const ranks  = load(SK.ranks,[]);
+
+  if (!staffs.length) {
+    content.innerHTML = '<div class="empty-state" style="padding:48px">スタッフが登録されていません</div>';
+    return;
+  }
+
+  if (!window._checkedEvents) window._checkedEvents = new Set();
+
+  // スタッフヘッダー（クリックで情報モーダル、リンクボタン付き）
+  const staffHeaders = staffs.map(s => {
+    const rank = ranks.find(r=>r.id===s.rankId);
+    const checkedIds = [...window._checkedEvents];
+    const hasChecked = checkedIds.length > 0;
+    return `<th style="min-width:100px;padding:6px 4px;text-align:center;border-left:1px solid var(--surface-3);vertical-align:top">
+      ${hasChecked ? `
+        <div style="margin-bottom:4px">
+          <button onclick="copyStaffSchedLink(${s.id})"
+            style="font-size:9px;padding:2px 7px;border-radius:10px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-family:inherit;white-space:nowrap">
+            リンク
+          </button>
+        </div>` : ''}
+      <div onclick="openStaffInfoModal(${s.id})" style="cursor:pointer" title="クリックで詳細">
+        <div style="font-size:11px;font-weight:500;color:var(--accent)">${s.name}</div>
+        <div style="font-size:9px;color:var(--ink-soft)">${rank?.label||''}</div>
+      </div>
+    </th>`;
+  }).join('');
+
+  // イベント行
+  const eventRows = events.map(e => {
+    const v    = venues.find(x=>x.id===e.venueId);
+    const c    = cats.find(x=>x.id===e.categoryId);
+    const conf = e.staffAssignments.filter(a=>a.status==='confirmed'||a.status==='worked').length;
+    const ldrAsgn = e.staffAssignments.find(a=>a.isLeader);
+    const ldrName = ldrAsgn ? (staffs.find(s=>s.id===ldrAsgn.staffId)?.name||'') : '';
+    const isChecked = window._checkedEvents.has(e.id);
+
+    // 参加可/候補/NG カウント
+    const okCount        = staffs.filter(s=>(e.attendance?.[s.id]||'unknown')==='ok').length;
+    const ngCount        = staffs.filter(s=>(e.attendance?.[s.id]||'unknown')==='ng').length;
+    const candidateCount = (e.staffAssignments||[]).filter(a=>a.status==='candidate').length;
+
+    const confirmedNames = e.staffAssignments
+      .filter(a=>a.status==='confirmed'||a.status==='worked')
+      .map(a=>{ const s=staffs.find(x=>x.id===a.staffId); return s?.name||'-'; });
+
+    const cells = staffs.map(s => {
+      const att   = e.attendance?.[s.id] || 'unknown';
+      const asgn  = e.staffAssignments?.find(a=>a.staffId===s.id);
+      const asgnStatus = asgn ? (asgn.isLeader ? 'leader' : asgn.status) : 'none';
+      const aMenuId = `att_${e.id}_${s.id}`;
+      const sMenuId = `asgn_${e.id}_${s.id}`;
+      const attStyle = ATT_STYLE[att] || ATT_STYLE['unknown'];
+      const attLabel = CELL_LABEL[att] || '未回答';
+      const showAsgn = att === 'ok' || asgnStatus !== 'none';
+      const asgnLabel = asgnStatus==='candidate'?'候補' : asgnStatus==='confirmed'?'決定' : asgnStatus==='worked'?'稼働済' : asgnStatus==='leader'?'★リーダー' : '選択なし';
+      const asgnStyle = ['candidate','confirmed','worked','leader'].includes(asgnStatus) ? CELL_STYLE[asgnStatus] : 'background:var(--surface-2);color:var(--ink-soft);';
+      const attOptions = ['unknown','ok','ng','unsure'].map(k=>
+        `<div class="dd-item ${k===att?'dd-active':''}" onclick="setAttOnly(${e.id},${s.id},'${k}');closeDropdowns()">${CELL_LABEL[k]}</div>`
+      ).join('');
+      const asgnOptions = ['none','candidate','confirmed','worked','leader'].map(k=>
+        `<div class="dd-item ${k===asgnStatus?'dd-active':''}" onclick="setAsgnOnly(${e.id},${s.id},'${k}');closeDropdowns()">${k==='none'?'選択なし':CELL_LABEL[k]}</div>`
+      ).join('');
+
+      return `<td style="padding:3px;border-left:1px solid var(--surface-3);text-align:center;vertical-align:middle">
+        <div style="position:relative;margin-bottom:${showAsgn?'2px':'0'}">
+          <button onclick="toggleDropdown('${aMenuId}',event)" style="width:100%;padding:2px 3px;border-radius:4px;border:1px solid rgba(0,0,0,0.1);cursor:pointer;font-size:9px;font-family:inherit;${attStyle}">${attLabel}▾</button>
+          <div id="${aMenuId}" class="dropdown-menu" style="display:none;position:fixed;background:var(--surface);border:1px solid var(--surface-3);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:999;min-width:100px;overflow:hidden;text-align:left">${attOptions}</div>
+        </div>
+        ${showAsgn ? `
+        <div style="position:relative">
+          <button onclick="toggleDropdown('${sMenuId}',event)" style="width:100%;padding:3px 3px;border-radius:4px;border:1px solid rgba(0,0,0,0.1);cursor:pointer;font-size:10px;font-family:inherit;${asgnStyle}">${asgnLabel}▾</button>
+          <div id="${sMenuId}" class="dropdown-menu" style="display:none;position:fixed;background:var(--surface);border:1px solid var(--surface-3);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:999;min-width:110px;overflow:hidden;text-align:left">${asgnOptions}</div>
+        </div>` : ''}
+      </td>`;
+    }).join('');
+
+    return `<tr style="border-bottom:1px solid var(--surface-3)">
+      <td style="padding:8px 10px;position:sticky;left:0;background:var(--surface);z-index:1;border-right:1px solid var(--surface-3);min-width:210px">
+        <div style="display:flex;align-items:flex-start;gap:7px">
+          <input type="checkbox" style="margin-top:3px;flex-shrink:0;accent-color:var(--accent)"
+            ${isChecked?'checked':''}
+            onchange="if(this.checked){window._checkedEvents.add(${e.id})}else{window._checkedEvents.delete(${e.id})};renderPage()">
+          <div style="flex:1;min-width:0">
+            <div onclick="openEventModal(${e.id})" style="cursor:pointer" title="クリックで編集">
+              ${(()=>{
+                const parsed = parseEventName(e);
+                const d = new Date(e.date+'T00:00:00');
+                const days=['日','月','火','水','木','金','土'];
+                const dateLabel = `${d.getMonth()+1}/${d.getDate()}（${days[d.getDay()]}）`;
+                return `<div style="font-size:11px;color:var(--ink-soft)">📅 ${dateLabel}</div>
+                  ${parsed.place?`<div style="font-size:11px;font-weight:500;color:var(--ink)">📍 ${parsed.place}</div>`:''}
+                  ${parsed.content?`<div style="font-size:11px;color:var(--accent)">✦ ${parsed.content}</div>`:''}
+                  ${c?`<span class="badge ${c.color||'badge-gray'}" style="font-size:10px;margin-top:3px">${c.name}</span>`:''}`;
+              })()}
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;margin-top:5px;flex-wrap:wrap">
+              <span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--green-light);color:var(--green-dark)">○ ${okCount}名</span>
+              ${candidateCount>0?`<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--accent-light);color:var(--accent)">候補 ${candidateCount}名</span>`:''}
+              <span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--red-light);color:var(--red-dark)">× ${ngCount}名</span>
+              <span onclick="togglePopNames('pop_${e.id}')"
+                style="font-size:10px;padding:1px 6px;border-radius:10px;cursor:pointer;
+                       background:${conf>=e.requiredCount?'var(--green-light)':'var(--surface-3)'};
+                       color:${conf>=e.requiredCount?'var(--green-dark)':'var(--ink-soft)'}">
+                確定 ${conf}/${e.requiredCount}
+              </span>
+              ${ldrName?`<span style="font-size:10px;color:var(--purple)">★${ldrName}</span>`:''}
+            </div>
+            <div id="pop_${e.id}" style="display:none;font-size:11px;color:var(--ink-mid);margin-top:4px;line-height:1.6">
+              ${confirmedNames.length ? confirmedNames.map(n=>`・${n}`).join('　') : '<span style="color:var(--ink-soft)">確定なし</span>'}
+            </div>
+          </div>
+        </div>
+      </td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  content.innerHTML = `
+    <div class="card no-hover" style="overflow-x:auto">
+      <table class="no-hover" style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--surface-2)">
+            <th style="padding:8px 10px;text-align:left;position:sticky;left:0;background:var(--surface-2);z-index:2;min-width:210px;border-right:1px solid var(--surface-3)">
+              <div style="display:flex;align-items:center;gap:6px">
+                <input type="checkbox" id="chk_all" style="accent-color:var(--accent)" ${window._checkedEvents.size===events.length&&events.length>0?'checked':''} onchange="toggleAllEvents(this.checked)" title="全選択/全解除">
+                <span style="font-size:12px;font-weight:500">イベント</span>
+                <button class="btn btn-sm btn-primary" onclick="openEventModal()" style="font-size:10px;padding:2px 8px;margin-left:auto">＋追加</button>
+              </div>
+              ${window._checkedEvents.size>0 ? `<div style="font-size:10px;color:var(--accent);margin-top:5px">${window._checkedEvents.size}件選択中 → 各スタッフ名の「リンク」ボタンからURL取得</div>` : '<div style="font-size:10px;color:var(--ink-soft);margin-top:5px">イベントをチェックするとリンクボタンが出ます</div>'}
+            </th>
+            ${staffHeaders}
+          </tr>
+        </thead>
+        <tbody>${eventRows || '<tr><td colspan="99" style="padding:32px;text-align:center;color:var(--ink-soft)">イベントがありません</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    ${(()=>{
+      // スタッフ別「候補中」イベント一覧
+      const rows = staffs.map(s => {
+        const candidateEvents = events.filter(e =>
+          e.staffAssignments?.some(a => a.staffId === s.id && a.status === 'candidate')
+        );
+        if (!candidateEvents.length) return `<tr>
+          <td style="padding:8px 12px;font-size:12px;font-weight:500;white-space:nowrap;border-right:1px solid var(--surface-3);color:var(--ink-soft)">${s.name}</td>
+          <td style="padding:8px 12px;font-size:11px;color:var(--ink-soft)">候補なし</td>
+        </tr>`;
+
+        const tags = candidateEvents.map(e => {
+          const parsed = parseEventName(e);
+          const d = new Date(e.date+'T00:00:00');
+          const days = ['日','月','火','水','木','金','土'];
+          const dateLabel = `${d.getMonth()+1}/${d.getDate()}(${days[d.getDay()]})`;
+          const label = [dateLabel, parsed.place, parsed.content].filter(Boolean).join(' ');
+          return `<span style="display:inline-block;background:var(--accent-light);color:var(--accent);border-radius:6px;padding:2px 8px;font-size:11px;margin:2px 4px 2px 0;white-space:nowrap">${label}</span>`;
+        }).join('');
+
+        return `<tr style="border-bottom:1px solid var(--surface-2)">
+          <td style="padding:8px 12px;font-size:12px;font-weight:500;white-space:nowrap;border-right:1px solid var(--surface-3);vertical-align:middle">
+            ${s.name}
+            <div style="font-size:10px;color:var(--ink-soft);font-weight:400">${candidateEvents.length}件</div>
+          </td>
+          <td style="padding:6px 10px;line-height:1.8">${tags}</td>
+        </tr>`;
+      }).join('');
+
+      return `<div style="margin-top:16px">
+        <div style="font-size:11px;font-weight:500;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;padding:0 2px">候補中イベント　スタッフ別</div>
+        <div style="background:var(--surface);border:1px solid var(--surface-3);border-radius:var(--radius);overflow:hidden">
+          <table style="width:100%;border-collapse:collapse">
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+    })()}`;
+}
+
+// スタッフ情報モーダル
+function openStaffInfoModal(staffId) {
+  const s = load(SK.staffs,[]).find(x=>x.id===staffId);
+  if (!s) return;
+  const rank = load(SK.ranks,[]).find(r=>r.id===s.rankId);
+  openModal(`<div class="modal">
+    <div class="modal-header">
+      <h3>${s.name}</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div class="av" style="width:44px;height:44px;font-size:16px">${s.name[0]}</div>
+        <div>
+          <div style="font-size:15px;font-weight:500">${s.name}</div>
+          <div style="font-size:12px;color:var(--ink-soft)">${s.kana||''}</div>
+          <span class="badge badge-blue" style="margin-top:4px">${rank?.label||''}</span>
+          ${s.contractSigned?'<span class="badge badge-green" style="margin-left:4px">契約済</span>':'<span class="badge badge-red" style="margin-left:4px">未契約</span>'}
+        </div>
+      </div>
+      <div class="info-row"><span class="info-key">住所</span><span>${s.address||'-'}</span></div>
+      <div class="info-row"><span class="info-key">最寄り駅</span><span>${s.station||'-'}</span></div>
+      <div class="info-row"><span class="info-key">電話番号</span><span>${s.phone||'-'}</span></div>
+      <div class="info-row"><span class="info-key">メール</span><span>${s.email||'-'}</span></div>
+      <div class="info-row"><span class="info-key">振込先</span><span style="font-size:12px">${s.bankName||'-'} ${s.branchName||''} ${s.accountType||''} ${s.accountNumber||''}</span></div>
+      <div class="info-row"><span class="info-key">口座名義</span><span>${s.accountHolder||'-'}</span></div>
+      ${s.notes?`<div style="margin-top:10px;font-size:12px;color:var(--ink-soft);background:var(--surface-2);padding:10px;border-radius:var(--radius-sm)">${s.notes}</div>`:''}
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">閉じる</button>
+      <button class="btn btn-primary" onclick="closeModal();openStaffModal(${s.id})">編集</button>
+    </div>
+  </div>`);
+}
+
+// スタッフ別リンク生成（チェックしたイベント＋そのスタッフID）
+function copyStaffSchedLink(staffId) {
+  const ids = [...(window._checkedEvents||[])];
+  if (!ids.length) return;
+  const url = `${getBaseUrl()}schedule_form.html?events=${ids.join(',')}&staff=${staffId}`;
+  navigator.clipboard?.writeText(url).then(()=>alert('リンクをコピーしました！\nスタッフに送ってください。'));
+}
+
+
+// イベント名を「場所」「内容」に分解
+function parseEventName(e) {
+  if (e.placeName !== undefined || e.content !== undefined) {
+    return { place: e.placeName||'', content: e.content||'' };
+  }
+  const name = e.name || '';
+  const colonIdx = name.indexOf('：');
+  if (colonIdx === -1) return { place: '', content: name };
+  const beforeColon = name.substring(0, colonIdx);
+  const content     = name.substring(colonIdx + 1);
+  const spaceIdx    = beforeColon.indexOf(' ');
+  const place       = spaceIdx === -1 ? beforeColon : beforeColon.substring(spaceIdx + 1);
+  return { place, content };
+}
+
+function togglePopNames(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleAllEvents(checked) {
+  const evs = load(SK.events,[]);
+  if (!window._checkedEvents) window._checkedEvents = new Set();
+  if (checked) evs.forEach(e=>window._checkedEvents.add(e.id));
+  else window._checkedEvents.clear();
+  updateScheduleLink();
+  renderPage();
+}
+
+function updateScheduleLink() {
+  const area  = document.getElementById('schedLinkArea');
+  const count = document.getElementById('schedLinkCount');
+  if (!area) return;
+  const ids = [...(window._checkedEvents||[])];
+  if (ids.length === 0) { area.style.display='none'; return; }
+  area.style.display = 'block';
+  if (count) count.textContent = `${ids.length}件選択中`;
+}
+
+function getBaseUrl() {
+  // file://でもhttp://でも正しくベースURLを取得
+  const p = location.pathname;
+  const dir = p.substring(0, p.lastIndexOf('/') + 1);
+  if (location.protocol === 'file:') {
+    // file://の場合はフォルダパスのみ
+    return `file://${dir}`;
+  }
+  return `${location.origin}${dir}`;
+}
+
+function copySchedLink() {
+  const ids = [...(window._checkedEvents||[])];
+  if (!ids.length) return;
+  const url = `${getBaseUrl()}schedule_form.html?events=${ids.join(',')}`;
+  navigator.clipboard?.writeText(url).then(()=>alert('コピーしました！\n\nlocalhostで起動中の場合はそのままLINEなどで共有できます。\nfile://で開いている場合は python3 -m http.server 8080 で起動してください。'));
+}
+
+// 出欠だけ変える（アサインは触らない）
+function setAttOnly(evId, staffId, next) {
+  const evs = load(SK.events,[]);
+  const ev  = evs.find(e=>e.id===evId);
+  if (!ev) return;
+  if (!ev.attendance) ev.attendance = {};
+  ev.attendance[staffId] = next;
+  // ×不参加・未定・未回答ならアサインも解除
+  if (next === 'ng' || next === 'unsure' || next === 'unknown') {
+    ev.staffAssignments = ev.staffAssignments.filter(a=>a.staffId!==staffId);
+  }
+  save(SK.events, evs);
+  renderPage();
+}
+
+// アサインだけ変える（出欠は触らない）
+function setAsgnOnly(evId, staffId, next) {
+  const evs = load(SK.events,[]);
+  const ev  = evs.find(e=>e.id===evId);
+  if (!ev) return;
+  const aIdx = ev.staffAssignments.findIndex(a=>a.staffId===staffId);
+  if (next === 'none') {
+    if (aIdx >= 0) ev.staffAssignments.splice(aIdx, 1);
+  } else if (next === 'candidate') {
+    if (aIdx >= 0) { ev.staffAssignments[aIdx].status='candidate'; ev.staffAssignments[aIdx].isLeader=false; }
+    else ev.staffAssignments.push({staffId, status:'candidate', isLeader:false});
+  } else if (next === 'confirmed') {
+    if (aIdx >= 0) { ev.staffAssignments[aIdx].status='confirmed'; ev.staffAssignments[aIdx].isLeader=false; }
+    else ev.staffAssignments.push({staffId, status:'confirmed', isLeader:false});
+  } else if (next === 'worked') {
+    if (aIdx >= 0) { ev.staffAssignments[aIdx].status='worked'; ev.staffAssignments[aIdx].isLeader=false; }
+    else ev.staffAssignments.push({staffId, status:'worked', isLeader:false});
+  } else if (next === 'leader') {
+    if (aIdx >= 0) { ev.staffAssignments[aIdx].status='worked'; ev.staffAssignments[aIdx].isLeader=true; }
+    else ev.staffAssignments.push({staffId, status:'worked', isLeader:true});
+  }
+  save(SK.events, evs);
+  renderPage();
+}
+
+// setCellStatus: ドロップダウンから直接ステータスを設定
+function setCellStatus(evId, staffId, next) {
+  const evs = load(SK.events,[]);
+  const ev  = evs.find(e=>e.id===evId);
+  if (!ev) return;
+
+  if (!ev.attendance) ev.attendance = {};
+
+  // 出欠系のときだけattendanceを更新（アサイン系は出欠を変えない）
+  const isAttStatus = ['unknown','ok','ng','unsure'].includes(next);
+  if (isAttStatus) {
+    ev.attendance[staffId] = next;
+  }
+
+  const aIdx = ev.staffAssignments.findIndex(a=>a.staffId===staffId);
+  if (next === 'unknown' || next === 'ng' || next === 'unsure') {
+    // 出欠をNG/未定/未回答にしたらアサインも解除
+    if (aIdx >= 0) ev.staffAssignments.splice(aIdx, 1);
+  } else if (next === 'ok') {
+    // 参加可にしただけではアサインはそのまま（解除しない）
+    if (aIdx < 0) { /* 何もしない */ }
+  } else if (next === 'candidate') {
+    if (aIdx >= 0) { ev.staffAssignments[aIdx].status='candidate'; ev.staffAssignments[aIdx].isLeader=false; }
+    else ev.staffAssignments.push({staffId, status:'candidate', isLeader:false});
+  } else if (next === 'confirmed') {
+    if (aIdx >= 0) { ev.staffAssignments[aIdx].status='confirmed'; ev.staffAssignments[aIdx].isLeader=false; }
+    else ev.staffAssignments.push({staffId, status:'confirmed', isLeader:false});
+  } else if (next === 'worked') {
+    if (aIdx >= 0) { ev.staffAssignments[aIdx].status='worked'; ev.staffAssignments[aIdx].isLeader=false; }
+    else ev.staffAssignments.push({staffId, status:'worked', isLeader:false});
+  } else if (next === 'leader') {
+    if (aIdx >= 0) { ev.staffAssignments[aIdx].status='worked'; ev.staffAssignments[aIdx].isLeader=true; }
+    else ev.staffAssignments.push({staffId, status:'worked', isLeader:true});
+  }
+
+  save(SK.events, evs);
+  renderPage();
+}
+
+
+function renderStaffing(content, right) {
+  const events = load(SK.events,[]);
+  const venues = load(SK.venues,[]);
+  const cats   = load(SK.cats,[]);
+  const staffs = load(SK.staffs,[]);
+  const ranks  = load(SK.ranks,[]);
+  if (!selectedEventId && events.length) selectedEventId = events[0].id;
+
+  // ── 右上：イベント追加ボタン ──
+  right.innerHTML = `<button class="btn btn-primary" onclick="openEventModal()">+ イベント追加</button>`;
+
+  // ── イベント一覧サマリー行 ──
+  const summaryRows = events.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(e=>{
+    const v    = venues.find(x=>x.id===e.venueId);
+    const c    = cats.find(x=>x.id===e.categoryId);
+    const cand = e.staffAssignments.filter(a=>a.status==='candidate').length;
+    const conf = e.staffAssignments.filter(a=>a.status==='confirmed'||a.status==='worked').length;
+    const wrkd = e.staffAssignments.filter(a=>a.status==='worked').length;
+    const need = e.requiredCount;
+    const pct  = Math.min(100, Math.round((conf / Math.max(need,1)) * 100));
+    const sel  = e.id === selectedEventId;
+    // リーダー名
+    const leaderAsgn = e.staffAssignments.find(a=>a.isLeader);
+    const leaderName = leaderAsgn ? (staffs.find(s=>s.id===leaderAsgn.staffId)?.name || '') : '';
+    return `<tr style="cursor:pointer;${sel?'background:var(--accent-light);':''}" onclick="selectedEventId=${e.id};renderPage()">
+      <td style="font-weight:500;white-space:nowrap;color:${sel?'var(--accent)':'var(--ink)'}">${e.date}</td>
+      <td style="font-size:12px;color:var(--ink-soft);white-space:nowrap">${v?.name||'-'}</td>
+      <td><span class="badge ${c?.color||'badge-gray'}" style="font-size:10px">${c?.name||'-'}</span></td>
+      <td style="text-align:center;font-weight:500">${need}名</td>
+      <td style="text-align:center"><span class="badge badge-amber">${cand}</span></td>
+      <td style="text-align:center"><span class="badge badge-blue">${conf}</span></td>
+      <td style="text-align:center"><span class="badge badge-green">${wrkd}</span></td>
+      <td style="font-size:12px;color:var(--purple);white-space:nowrap">${leaderName ? '★ '+leaderName : ''}</td>
+      <td style="min-width:90px">
+        <div style="height:5px;background:var(--surface-3);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${conf>=need?'var(--green)':'var(--accent)'};border-radius:3px"></div>
+        </div>
+        <div style="font-size:10px;color:var(--ink-soft);margin-top:2px;text-align:right">${conf}/${need}</div>
+      </td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" onclick="event.stopPropagation();openEventModal(${e.id})">編集</button>
+        <button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="event.stopPropagation();deleteEvent(${e.id})">削除</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const ev = events.find(e=>e.id===selectedEventId);
+
+  // ── 選択イベントの詳細エリア ──
+  let detailHtml = '';
+  if (ev) {
+    const venue  = venues.find(v=>v.id===ev.venueId);
+    const cat    = cats.find(c=>c.id===ev.categoryId);
+    const cand   = ev.staffAssignments.filter(a=>a.status==='candidate').length;
+    const conf   = ev.staffAssignments.filter(a=>a.status==='confirmed'||a.status==='worked').length;
+    const wrkd   = ev.staffAssignments.filter(a=>a.status==='worked').length;
+    const h      = calcEventHours(ev);
+    const leaderAsgn = ev.staffAssignments.find(a=>a.isLeader);
+    const leaderName = leaderAsgn ? (staffs.find(s=>s.id===leaderAsgn.staffId)?.name||'') : '';
+
+    detailHtml = `
+      <!-- 選択イベント ヘッダー -->
+      <div style="background:var(--accent-light);border:1px solid #b8d4f0;border-radius:var(--radius);padding:12px 18px;margin-bottom:12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--accent)">${ev.date}　${venue?.name||''}</div>
+          <div style="font-size:12px;color:var(--ink-mid);margin-top:2px">
+            <span class="badge ${cat?.color||'badge-gray'}" style="font-size:10px;margin-right:8px">${cat?.name||''}</span>
+            ${leaderName ? `<span style="color:var(--purple);font-weight:500">★ リーダー：${leaderName}</span>` : '<span style="color:var(--ink-soft)">リーダー未設定</span>'}
+          </div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:16px;align-items:center">
+          <div style="text-align:center"><div style="font-size:20px;font-weight:500;color:#7d4a00">${cand}</div><div style="font-size:10px;color:var(--ink-soft)">候補</div></div>
+          <div style="text-align:center"><div style="font-size:20px;font-weight:500;color:var(--accent)">${conf}</div><div style="font-size:10px;color:var(--ink-soft)">決定</div></div>
+          <div style="text-align:center"><div style="font-size:20px;font-weight:500;color:var(--green-dark)">${wrkd}</div><div style="font-size:10px;color:var(--ink-soft)">稼働済</div></div>
+          <div style="text-align:center"><div style="font-size:20px;font-weight:500">${ev.requiredCount}</div><div style="font-size:10px;color:var(--ink-soft)">必要</div></div>
+          <button class="btn btn-sm" onclick="changeRequired(${ev.id})">人数変更</button>
+        </div>
+      </div>
+
+      <!-- 運営時間 -->
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-header"><h3>運営時間・予習時間</h3></div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+            ${['opStart:開始時刻:time','opEnd:終了時刻:time','opBreak:休憩（分）:number','studyHours:予習時間(h):number'].map(f=>{
+              const [key,label,type]=f.split(':');
+              return `<div class="form-group" style="margin:0">
+                <label class="form-label">${label}</label>
+                <input type="${type}" class="form-control" value="${ev[key]||0}"
+                  ${type==='number'?'min="0" step="'+(key==='studyHours'?'0.5':'1')+'"':''}
+                  onchange="updateEv(${ev.id},'${key}',${type==='time'?'this.value':'parseFloat(this.value)||0'});renderPage()">
+              </div>`;
+            }).join('')}
+          </div>
+          <div style="font-size:12px;color:var(--ink-mid);margin-top:8px">
+            運営 <strong>${h.opHours.toFixed(1)}時間</strong>　スタッフ事前 <strong>${h.studyHours}時間</strong>　リーダー事前 <strong>${ev.ldrStudyHours ?? h.studyHours}時間</strong>
+            ${h.opHours>8?'<span style="color:var(--red);margin-left:8px">⚠ 運営8h超（超過+25%）</span>':''}
+            ${h.studyHours>8?'<span style="color:var(--red);margin-left:8px">⚠ 予習8h超（超過+25%）</span>':''}
+          </div>
+        </div>
+      </div>
+
+      <!-- スタッフ一覧 -->
+      <div class="card">
+        <div class="card-header">
+          <h3>スタッフ一覧</h3>
+          <span style="font-size:11px;color:var(--ink-soft)">出欠▼で切替　参加可のみアクション可</span>
+        </div>
+        <div id="attList"></div>
+      </div>`;
+  }
+
+  content.innerHTML = `
+    <!-- イベント一覧 + 編集 -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">
+        <h3>イベント一覧　<span style="font-size:11px;color:var(--ink-soft);font-weight:400">行をクリックで調整画面に切替</span></h3>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>日付</th><th>会場</th><th>カテゴリ</th>
+            <th style="text-align:center">必要</th><th style="text-align:center">候補</th>
+            <th style="text-align:center">決定</th><th style="text-align:center">稼働</th>
+            <th>リーダー</th><th>進捗</th><th>操作</th>
+          </tr></thead>
+          <tbody>${summaryRows}</tbody>
+        </table>
+      </div>
+    </div>
+    ${detailHtml}`;
+
+  if (ev) renderAttList(ev, staffs, ranks);
+}
+
+function renderAttList(ev, staffs, ranks) {
+  if (!ranks) ranks = load(SK.ranks,[]);
+  const el = document.getElementById('attList');
+  if (!el) return;
+
+  const attLabels  = { unknown:'未回答', ok:'○ 参加可', ng:'× 参加不可', unsure:'△ 未定' };
+  const attStyles  = {
+    unknown: 'background:var(--surface-3);color:var(--ink-soft);border-color:var(--ink-faint)',
+    ok:      'background:var(--green-light);color:var(--green-dark);border-color:#a3d9b1',
+    ng:      'background:var(--red-light);color:var(--red-dark);border-color:#f5b0ab',
+    unsure:  'background:var(--yellow-light);color:#7d4a00;border-color:#ffcc80',
+  };
+  const actionLabels = { none:'未候補', candidate:'候補中', confirmed:'参加決定', worked:'稼働済 ✓' };
+  const actionStyles = {
+    none:      'background:var(--surface-3);color:var(--ink-soft);border-color:var(--ink-faint)',
+    candidate: 'background:var(--yellow-light);color:#7d4a00;border-color:#ffcc80',
+    confirmed: 'background:var(--accent-light);color:var(--accent);border-color:#90bfe8',
+    worked:    'background:var(--green-light);color:var(--green-dark);border-color:#a3d9b1',
+  };
+
+  el.innerHTML = staffs.map(s=>{
+    const rank    = ranks.find(r=>r.id===s.rankId);
+    const att     = ev.attendance?.[s.id] || 'unknown';
+    const asgn    = ev.staffAssignments.find(a=>a.staffId===s.id);
+    const aStatus = asgn?.status || 'none';
+    const isLeader = asgn?.isLeader || false;
+
+    // リーダーバッジ（名前横）
+    const leaderBadge = isLeader
+      ? `<span style="display:inline-flex;align-items:center;padding:1px 7px;background:var(--purple-light);color:var(--purple);border:1px solid #b3b2f5;border-radius:20px;font-size:10px;font-weight:500;margin-left:6px">★ リーダー</span>`
+      : '';
+
+    // アクションドロップダウン（参加可のみ）
+    let actionHtml = '';
+    if (att === 'ok') {
+      const menuId = `aMenu_${ev.id}_${s.id}`;
+      const leaderToggleLabel = isLeader ? 'リーダー解除' : 'リーダーに設定';
+      const showLeaderToggle  = aStatus === 'candidate' || aStatus === 'confirmed' || aStatus === 'worked';
+
+      actionHtml = `
+        <div style="display:flex;align-items:center;gap:6px;margin-left:6px">
+          <!-- アクション選択 -->
+          <div style="position:relative">
+            <button onclick="toggleDropdown('${menuId}',event)"
+              style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid;${actionStyles[aStatus]};font-family:inherit;white-space:nowrap">
+              ${actionLabels[aStatus]} ▾
+            </button>
+            <div id="${menuId}" class="dropdown-menu" style="display:none;position:fixed;background:var(--surface);border:1px solid var(--surface-3);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:999;min-width:120px;overflow:hidden">
+              ${['none','candidate','confirmed','worked'].map(st=>`
+                <div class="dd-item ${st===aStatus?'dd-active':''}" onclick="setAssignStatus(${ev.id},${s.id},'${st}');closeDropdowns()">
+                  ${actionLabels[st]}
+                </div>`).join('')}
+            </div>
+          </div>
+          <!-- リーダー設定（決定・稼働済のみ） -->
+          ${showLeaderToggle ? `
+            <button class="btn btn-sm" onclick="toggleLeader(${ev.id},${s.id})"
+              style="${isLeader?'background:var(--purple-light);color:var(--purple);border-color:var(--purple)':''}">
+              ${leaderToggleLabel}
+            </button>` : ''}
+        </div>`;
+    }
+
+    const attMenuId = `attMenu_${ev.id}_${s.id}`;
+    return `<div class="att-row">
+      <div class="av">${s.name[0]}</div>
+      <div style="flex:1;margin-left:8px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+        <span style="font-size:13px">${s.name}</span>
+        ${leaderBadge}
+        <span style="font-size:11px;color:var(--ink-soft);margin-left:4px">${rank?.label||''}</span>
+      </div>
+      <!-- 出欠ドロップダウン -->
+      <div style="position:relative;flex-shrink:0">
+        <button onclick="toggleDropdown('${attMenuId}',event)"
+          style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid;${attStyles[att]};font-family:inherit;white-space:nowrap">
+          ${attLabels[att]} ▾
+        </button>
+        <div id="${attMenuId}" class="dropdown-menu" style="display:none;position:fixed;background:var(--surface);border:1px solid var(--surface-3);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:999;min-width:130px;overflow:hidden">
+          ${['unknown','ok','ng','unsure'].map(st=>`
+            <div class="dd-item ${st===att?'dd-active':''}" onclick="setAtt(${ev.id},${s.id},'${st}');closeDropdowns()">
+              ${attLabels[st]}
+            </div>`).join('')}
+        </div>
+      </div>
+      ${actionHtml}
+    </div>`;
+  }).join('');
+}
+
+// ── ドロップダウン制御 ──
+function toggleDropdown(id, e) {
+  e.stopPropagation();
+  const menu = document.getElementById(id);
+  if (!menu) return;
+  const isOpen = menu.style.display === 'block';
+  closeDropdowns();
+  if (!isOpen) {
+    const btn = e.currentTarget;
+    const rect = btn.getBoundingClientRect();
+    // 先に表示して高さを取得
+    menu.style.visibility = 'hidden';
+    menu.style.display = 'block';
+    const mh = menu.offsetHeight;
+    const mw = menu.offsetWidth;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    // 上下
+    if (spaceBelow < mh + 8 && rect.top > mh + 8) {
+      menu.style.top = (rect.top - mh - 4) + 'px';
+    } else {
+      menu.style.top = (rect.bottom + 4) + 'px';
+    }
+    // 左右（画面外にはみ出さない）
+    const left = Math.min(rect.left, window.innerWidth - mw - 8);
+    menu.style.left = Math.max(4, left) + 'px';
+    menu.style.visibility = 'visible';
+  }
+}
+function closeDropdowns() {
+  document.querySelectorAll('.dropdown-menu').forEach(m=>m.style.display='none');
+}
+document.addEventListener('click', closeDropdowns);
+
+// ── 出欠セット ──
+function setAtt(evId, staffId, status) {
+  const evs = load(SK.events,[]);
+  const ev  = evs.find(e=>e.id===evId);
+  if (!ev.attendance) ev.attendance = {};
+  ev.attendance[staffId] = status;
+  if (status === 'ng') {
+    ev.staffAssignments = ev.staffAssignments.filter(a=>a.staffId!==staffId);
+  }
+  save(SK.events, evs);
+  renderPage();
+}
+
+// ── アサインステータスセット ──
+function setAssignStatus(evId, staffId, status) {
+  const evs = load(SK.events,[]);
+  const ev  = evs.find(e=>e.id===evId);
+  if (status === 'none') {
+    ev.staffAssignments = ev.staffAssignments.filter(a=>a.staffId!==staffId);
+  } else {
+    const existing = ev.staffAssignments.find(a=>a.staffId===staffId);
+    if (existing) { existing.status = status; }
+    else { ev.staffAssignments.push({ staffId, status, isLeader: false }); }
+  }
+  save(SK.events, evs);
+  renderPage();
+}
+
+
+// =====================================================
+// STAFFS
+// =====================================================
+function renderStaffs(content, right) {
+  right.innerHTML = `<button class="btn btn-primary" onclick="openStaffModal()">+ スタッフ追加</button><button class="btn" style="margin-left:8px" onclick="window.open(getBaseUrl()+'staff_register.html','_blank')">📋 スタッフ登録フォーム</button><button class="btn" style="margin-left:8px" onclick="window.open(getBaseUrl()+'bank_register.html','_blank')">💳 振込先登録フォーム</button>`;
+  // このページのタブは 'list' と 'pending' のみ。他ページのactiveTabが残っていたらリセット
+  if (!['list','pending','pendingBank'].includes(activeTab)) activeTab = 'list';
+  const pending=load(SK.pending,[]);
+  const pendingBank = load(SK.pendingBank,[]);
+
+  const tabs=[
+    {id:'list', label:'スタッフ一覧'},
+    {id:'pending', label:`登録申請${pending.length?` (${pending.length})`:''}` },
+    {id:'pendingBank', label:`振込先登録${pendingBank.length?` (${pendingBank.length})`:''}` },
+  ];
+  let html = `<div class="tab-bar">${tabs.map(t=>`<div class="tab ${activeTab===t.id?'active':''}" onclick="activeTab='${t.id}';renderPage()">${t.label}</div>`).join('')}</div>`;
+
+  if (activeTab==='list') {
+    const staffs=load(SK.staffs,[]), ranks=load(SK.ranks,[]);
+    html += `<div class="card"><div class="card-body" style="padding:0"><table>
+      <thead><tr><th>名前</th><th>ランク</th><th>住所</th><th>最寄駅</th><th>連絡先</th><th>業務委託</th><th>操作</th></tr></thead>
+      <tbody>${staffs.map(s=>{
+        const rank=ranks.find(r=>r.id===s.rankId);
+        return `<tr>
+          <td><div style="display:flex;align-items:center;gap:8px"><div class="av">${s.name[0]}</div><div><div>${s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${s.kana||''}</div></div></div></td>
+          <td><span class="badge badge-blue">${rank?.label||''}</span></td>
+          <td style="font-size:12px;color:var(--ink-soft)">${s.address||'-'}</td>
+          <td style="font-size:12px">${s.station||'-'}</td>
+          <td style="font-size:12px">${s.phone||'-'}</td>
+          <td>${s.contractSigned?'<span class="badge badge-green">契約済</span>':'<span class="badge badge-red">未契約</span>'}</td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-sm" onclick="openStaffModal(${s.id})">編集</button>
+            <button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="deleteStaff(${s.id})">削除</button>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div></div>`;
+  }
+
+  if (activeTab==='pending') {
+    if (pending.length===0) {
+      html += '<div class="card"><div class="empty-state">承認待ちの登録申請はありません</div></div>';
+    } else {
+      html += pending.map(p => {
+        const daySkills = (p.daySkills||[]).join('、') || '-';
+        const planSkills = (p.planSkills||[]).join('、') || '-';
+        const hasBankInfo = p.bankName || p.accountNumber;
+        return `<div class="card" style="margin-bottom:12px;overflow:hidden">
+          <div style="padding:14px 16px;border-bottom:1px solid var(--surface-3);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div>
+              <span style="font-size:16px;font-weight:500">${p.name}</span>
+              <span style="font-size:12px;color:var(--ink-soft);margin-left:8px">${p.kana||''}</span>
+              <span style="font-size:11px;color:var(--ink-soft);margin-left:12px">${new Date(p.submittedAt).toLocaleString('ja-JP')}</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-sm btn-success" onclick="approvePending(${p.id})">✓ 承認してスタッフ登録</button>
+              <button class="btn btn-sm btn-danger" onclick="rejectPending(${p.id})">却下</button>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;font-size:12px">
+            <div style="padding:10px 16px;border-bottom:1px solid var(--surface-2);border-right:1px solid var(--surface-2)"><span style="color:var(--ink-soft)">年齢</span>　${p.age||'-'}歳　${p.blood||''}</div>
+            <div style="padding:10px 16px;border-bottom:1px solid var(--surface-2)"><span style="color:var(--ink-soft)">職業</span>　${p.job||'-'}</div>
+            <div style="padding:10px 16px;border-bottom:1px solid var(--surface-2);border-right:1px solid var(--surface-2)"><span style="color:var(--ink-soft)">電話</span>　${p.phone||'-'}</div>
+            <div style="padding:10px 16px;border-bottom:1px solid var(--surface-2)"><span style="color:var(--ink-soft)">メール</span>　${p.email||'-'}</div>
+            <div style="padding:10px 16px;border-bottom:1px solid var(--surface-2);border-right:1px solid var(--surface-2)"><span style="color:var(--ink-soft)">住所</span>　${p.address||'-'}</div>
+            <div style="padding:10px 16px;border-bottom:1px solid var(--surface-2)"><span style="color:var(--ink-soft)">最寄駅</span>　${p.station||'-'}　${p.stationTime||''}</div>
+            <div style="padding:10px 16px;border-bottom:1px solid var(--surface-2);border-right:1px solid var(--surface-2)"><span style="color:var(--ink-soft)">車通勤</span>　${p.carCommute||'-'}　／　免許：${p.hasLicense||'-'}</div>
+            <div style="padding:10px 16px;border-bottom:1px solid var(--surface-2)"><span style="color:var(--ink-soft)">希望</span>　${p.involvement||'-'}</div>
+            <div style="padding:10px 16px;border-bottom:1px solid var(--surface-2);border-right:1px solid var(--surface-2)"><span style="color:var(--ink-soft)">日曜</span>　${p.sundayAvail||'-'}</div>
+            <div style="padding:10px 16px;border-bottom:1px solid var(--surface-2)"><span style="color:var(--ink-soft)">土曜</span>　${p.saturdayAvail||'-'}</div>
+            <div style="padding:10px 16px;border-bottom:1px solid var(--surface-2);grid-column:1/-1"><span style="color:var(--ink-soft)">当日スキル</span>　${daySkills}</div>
+            <div style="padding:10px 16px;border-bottom:1px solid var(--surface-2);grid-column:1/-1"><span style="color:var(--ink-soft)">企画スキル</span>　${planSkills}</div>
+            ${p.strengths?`<div style="padding:10px 16px;border-bottom:1px solid var(--surface-2);grid-column:1/-1"><span style="color:var(--ink-soft)">強み</span>　${p.strengths}</div>`:''}
+            ${p.reason?`<div style="padding:10px 16px;border-bottom:1px solid var(--surface-2);grid-column:1/-1"><span style="color:var(--ink-soft)">志望理由</span>　${p.reason}</div>`:''}
+            <div style="padding:10px 16px;border-bottom:1px solid var(--surface-2);grid-column:1/-1;${hasBankInfo?'':'color:var(--ink-soft)'}">
+              <span style="color:var(--ink-soft)">振込先</span>　${hasBankInfo ? `${p.bankName||''} ${p.branchName||''} ${p.accountType||''} ${p.accountNumber||''} ${p.accountHolder||''}` : '未記入'}
+            </div>
+            ${p.notes?`<div style="padding:10px 16px;grid-column:1/-1"><span style="color:var(--ink-soft)">備考</span>　${p.notes}</div>`:''}
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  if (activeTab === 'pendingBank') {
+    const pendingBank = load(SK.pendingBank, []);
+    const staffs2 = load(SK.staffs, []);
+    if (pendingBank.length === 0) {
+      html += '<div class="card"><div class="empty-state">振込先の登録申請はありません</div></div>';
+    } else {
+      html += pendingBank.map(b => {
+        // Try to find matching staff by name + birthday
+        const bFullName = (b.lastName||'') + ' ' + (b.firstName||'') || b.name||'';
+        const matched = staffs2.find(s =>
+          s.lastName && b.lastName
+            ? s.lastName === b.lastName && s.firstName === b.firstName && s.birthday === b.birthday
+            : s.name === (b.name || bFullName.trim()) && s.birthday === b.birthday
+        );
+        const matchHtml = matched
+          ? `<span style="color:var(--green,#34c759);font-weight:500">✓ ${matched.name}（スタッフID:${matched.id}）と一致</span>`
+          : `<span style="color:var(--red,#ff3b30)">⚠ 一致するスタッフが見つかりません（名前・生年月日を確認してください）</span>`;
+        return `<div class="card" style="margin-bottom:12px;overflow:hidden">
+          <div style="padding:14px 16px;border-bottom:1px solid var(--surface-3);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div>
+              <span style="font-size:16px;font-weight:500">${bFullName.trim()}</span>
+              <span style="font-size:12px;color:var(--ink-soft);margin-left:8px">${b.birthday||''}</span>
+              <span style="font-size:11px;color:var(--ink-soft);margin-left:12px">${new Date(b.submittedAt).toLocaleString('ja-JP')}</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              ${matched
+                ? `<button class="btn btn-sm btn-success" onclick="applyBankInfo(${b.id})">✓ スタッフ情報に反映</button>`
+                : `<button class="btn btn-sm btn-primary" onclick="registerNewStaffFromBank(${b.id})">＋ 新規スタッフとして登録</button>`}
+              <button class="btn btn-sm btn-danger" onclick="rejectBankPending(${b.id})">削除</button>
+            </div>
+          </div>
+          <div style="padding:12px 16px;font-size:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>${matchHtml}</div>
+            <div></div>
+            <div><span style="color:var(--ink-soft)">銀行名</span>　${b.bankName}</div>
+            <div><span style="color:var(--ink-soft)">支店名</span>　${b.branchName}</div>
+            <div><span style="color:var(--ink-soft)">口座種別</span>　${b.accountType}</div>
+            <div><span style="color:var(--ink-soft)">口座番号</span>　${b.accountNumber}</div>
+            <div style="grid-column:1/-1"><span style="color:var(--ink-soft)">口座名義</span>　${b.accountHolder}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  content.innerHTML = html;
+}
+
+function approvePending(id) {
+  const pending=load(SK.pending,[]);
+  const p=pending.find(x=>x.id===id);
+  if (!p) return;
+  const staffs=load(SK.staffs,[]);
+  const newId = (staffs.length ? Math.max(...staffs.map(s=>s.id)) : 0) + 1;
+  staffs.push({
+    id: newId,
+    name: p.name, kana: p.kana, lastName: p.lastName||'', firstName: p.firstName||'', rankId: 1,
+    address: p.address, lat: p.lat, lng: p.lng,
+    phone: p.phone, email: p.email,
+    birthday: p.birthday, age: p.age, blood: p.blood,
+    job: p.job, carCommute: p.carCommute, hasLicense: p.hasLicense,
+    station: p.station, stationTime: p.stationTime,
+    involvement: p.involvement, sundayAvail: p.sundayAvail, saturdayAvail: p.saturdayAvail,
+    daySkills: p.daySkills, planSkills: p.planSkills,
+    strengths: p.strengths, interests: p.interests,
+    weaknesses: p.weaknesses, dislikes: p.dislikes, pcSkills: p.pcSkills,
+    reason: p.reason, experience: p.experience,
+    bankName: p.bankName, branchName: p.branchName,
+    accountType: p.accountType, accountNumber: p.accountNumber, accountHolder: p.accountHolder,
+    notes: p.notes,
+    contractSigned: false,
+  });
+  save(SK.staffs, staffs);
+  save(SK.pending, pending.filter(x=>x.id!==id));
+  renderSidebar();
+  renderPage();
+}
+
+function rejectPending(id) {
+  if (!confirm('この申請を却下しますか？')) return;
+  save(SK.pending, load(SK.pending,[]).filter(x=>x.id!==id));
+  renderSidebar();
+  renderPage();
+}
+
+function applyBankInfo(id) {
+  const pendingBank = load(SK.pendingBank, []);
+  const b = pendingBank.find(x => x.id === id);
+  if (!b) return;
+  const staffs = load(SK.staffs, []);
+  const staff = staffs.find(s =>
+    s.lastName && b.lastName
+      ? s.lastName === b.lastName && s.firstName === b.firstName && s.birthday === b.birthday
+      : s.name === (b.name || ((b.lastName||'') + ' ' + (b.firstName||'')).trim()) && s.birthday === b.birthday
+  );
+  if (!staff) { alert('一致するスタッフが見つかりません'); return; }
+  Object.assign(staff, {
+    bankName: b.bankName,
+    branchName: b.branchName,
+    accountType: b.accountType,
+    accountNumber: b.accountNumber,
+    accountHolder: b.accountHolder,
+  });
+  save(SK.staffs, staffs);
+  save(SK.pendingBank, pendingBank.filter(x => x.id !== id));
+  renderPage();
+}
+
+function registerNewStaffFromBank(id) {
+  const pendingBank = load(SK.pendingBank, []);
+  const b = pendingBank.find(x => x.id === id);
+  if (!b) return;
+  const name = ((b.lastName||'') + ' ' + (b.firstName||'')).trim() || b.name || '';
+  if (!confirm(`「${name}」を新規スタッフとして登録しますか？`)) return;
+  const staffs = load(SK.staffs, []);
+  const ranks = load(SK.ranks, []);
+  const defaultRankId = ranks.length > 0 ? ranks[0].id : 1;
+  const newStaff = {
+    id: Date.now(),
+    lastName: b.lastName || '',
+    firstName: b.firstName || '',
+    name,
+    birthday: b.birthday || '',
+    phone: b.phone || '',
+    email: b.email || '',
+    address: b.address || '',
+    rankId: defaultRankId,
+    bankName: b.bankName || '',
+    branchName: b.branchName || '',
+    accountType: b.accountType || '',
+    accountNumber: b.accountNumber || '',
+    accountHolder: b.accountHolder || '',
+  };
+  staffs.push(newStaff);
+  save(SK.staffs, staffs);
+  save(SK.pendingBank, pendingBank.filter(x => x.id !== id));
+  renderSidebar();
+  renderPage();
+}
+
+function rejectBankPending(id) {
+  if (!confirm('この振込先登録を削除しますか？')) return;
+  save(SK.pendingBank, load(SK.pendingBank, []).filter(x => x.id !== id));
+  renderPage();
+}
+
+// =====================================================
+// VENUES
+// =====================================================
+function renderVenues(content, right) {
+  right.innerHTML = `<button class="btn btn-primary" onclick="openVenueModal()">+ 会場追加</button>`;
+  const venues=load(SK.venues,[]);
+  content.innerHTML = `<div class="card"><div class="card-body" style="padding:0"><table>
+    <thead><tr><th>会場名</th><th>住所</th><th>座標</th><th>操作</th></tr></thead>
+    <tbody>${venues.map(v=>`<tr>
+      <td style="font-weight:500">${v.name}</td>
+      <td style="font-size:12px;color:var(--ink-soft)">${v.address}</td>
+      <td style="font-size:11px;color:var(--ink-soft)">${v.lat||'-'}, ${v.lng||'-'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" onclick="openVenueModal(${v.id})">編集</button>
+        <button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="deleteVenue(${v.id})">削除</button>
+      </td>
+    </tr>`).join('')}</tbody>
+  </table></div></div>`;
+}
+
+// =====================================================
+// CATEGORIES
+// =====================================================
+function renderCategories(content, right) {
+  right.innerHTML = `<button class="btn btn-primary" onclick="openCatModal()">+ カテゴリ追加</button>`;
+  const cats  = load(SK.cats,[]);
+  const ranks = load(SK.ranks,[]);
+
+  const catCards = cats.map(c => {
+    // 一般スタッフの基本当日運営時間を算出
+    const baseOp     = timeToHours(c.opStart, c.opEnd, c.opBreak||0);
+    const baseTotal  = (c.studyHours||0) + baseOp;
+    // リーダーの基本当日運営時間
+    const ldrBaseOp  = timeToHours(c.ldrOpStart, c.ldrOpEnd, c.ldrOpBreak||0);
+    const ldrTotal   = (c.ldrStudyHours||0) + ldrBaseOp;
+    const ldrStudyR  = roundHalfHour(c.ldrStudyHours||1);
+    const ldrBaseOpR = roundHalfHour(ldrBaseOp||7);
+    const ldrHourly  = Math.floor(calcHourlyRate(c.leaderDailyWage||0, ldrStudyR, ldrBaseOpR));
+
+    const rankRows = ranks.map(r => {
+      const dw      = (c.rankWages && (c.rankWages[r.id] || c.rankWages[String(r.id)])) || 0;
+      const bStudy  = roundHalfHour(c.studyHours || 1);
+      const bOp     = roundHalfHour(baseOp || 7);
+      const hourly  = Math.floor(calcHourlyRate(dw, bStudy, bOp));
+      // 計算式テキスト（分母の計算を正しく表示）
+      const effOp   = bOp <= 8 ? bOp : 8 + 1.25*(bOp-8);
+      const denom   = (bStudy + effOp).toFixed(2);
+      const formula = dw
+        ? `日給 ${dw.toLocaleString()}円 ÷ (事前${bStudy}h + 当日${bOp.toFixed(1)}h${bOp>8?' ※8hを超えた'+( bOp-8).toFixed(1)+'hは×1.25で計算':''}) = 時給 ¥${hourly.toLocaleString()}`
+        : '日給が未設定です';
+      const fid = `frmla_${c.id}_${r.id}`;
+      return `<tr style="${dw===0?'background:var(--red-light);':''}">
+        <td><span class="badge badge-blue" style="font-size:11px">${r.label}</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" class="form-control" style="width:100px;${dw===0?'border-color:var(--red);':''}" value="${dw}"
+              onchange="saveCatRankWage(${c.id},${r.id},parseInt(this.value)||0)">
+            <span style="font-size:12px;color:var(--ink-soft)">円/日</span>
+            ${dw===0?'<span style="font-size:11px;color:var(--red-dark);font-weight:500">⚠ 未入力→支払いが0円になります</span>':''}
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:${dw===0?'var(--red-dark)':'var(--accent)'};font-weight:500">${dw===0?'未設定':'¥'+hourly.toLocaleString()}</span>
+            ${dw>0?`<button class="btn btn-sm" style="font-size:10px;padding:2px 7px" onclick="showFormula('${fid}',this)">計算式</button>`:''}
+          </div>
+          <div id="${fid}" style="display:none;font-size:11px;color:var(--ink-soft);margin-top:4px;line-height:1.6;background:var(--surface-2);border-radius:6px;padding:6px 10px;max-width:360px">
+            ${formula}
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+
+    // ランク別日給 read-only 表示
+    const rankRowsReadOnly = ranks.map(r => {
+      const dw     = (c.rankWages && (c.rankWages[r.id] || c.rankWages[String(r.id)])) || 0;
+      const bStudy = roundHalfHour(c.studyHours || 1);
+      const bOp    = roundHalfHour(baseOp || 7);
+      const hourly = Math.floor(calcHourlyRate(dw, bStudy, bOp));
+      return `<tr style="${dw===0?'background:var(--red-light);':''}">
+        <td><span class="badge badge-blue" style="font-size:11px">${r.label}</span></td>
+        <td style="font-weight:500">${dw===0?'<span style="color:var(--red-dark)">未設定</span>':'¥'+dw.toLocaleString()+'円/日'}</td>
+        <td style="color:${dw===0?'var(--red-dark)':'var(--accent)'};font-weight:500">${dw===0?'-':'¥'+hourly.toLocaleString()+'/h'}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <h3><span class="badge ${c.color}" style="margin-right:8px">${c.name}</span></h3>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm btn-primary" onclick="openCatEditModal(${c.id})">編集</button>
+          <button class="btn btn-sm" onclick="openCatModal(${c.id})">名前・色</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteCat(${c.id})">削除</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+          <div>
+            <div style="font-size:11px;font-weight:500;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">一般スタッフ</div>
+            <div style="font-size:13px;color:var(--ink-mid);line-height:2">
+              <div>事前準備: <strong>${c.studyHours||0}h</strong></div>
+              <div>当日: <strong>${c.opStart||'-'}〜${c.opEnd||'-'}</strong>　休憩 ${c.opBreak||0}分</div>
+              <div style="font-size:11px;color:var(--ink-soft)">当日 ${baseOp.toFixed(1)}h　合計 ${baseTotal.toFixed(1)}h</div>
+            </div>
+          </div>
+          <div style="background:var(--purple-light);border-radius:var(--radius-sm);padding:10px;border:1px solid #d4d3f8">
+            <div style="font-size:11px;font-weight:500;color:var(--purple);margin-bottom:8px">★ リーダー</div>
+            <div style="font-size:13px;color:var(--ink-mid);line-height:2">
+              <div>事前準備: <strong>${c.ldrStudyHours!=null?c.ldrStudyHours:c.studyHours||0}h</strong></div>
+              <div>当日: <strong>${c.ldrOpStart||c.opStart||'-'}〜${c.ldrOpEnd||c.opEnd||'-'}</strong></div>
+              <div>日給: <strong style="color:var(--purple)">¥${(c.leaderDailyWage||0).toLocaleString()}</strong>　時給 ¥${ldrHourly.toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+        <table style="margin-bottom:0">
+          <thead><tr><th>ランク</th><th>日給</th><th>自動算出時給</th></tr></thead>
+          <tbody>${rankRowsReadOnly}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  // 交通費支給規定テーブル
+  const transportCard = `
+    <div class="card" style="margin-top:16px">
+      <div class="card-header">
+        <h3>交通費支給規定</h3>
+        <span style="font-size:11px;color:var(--ink-soft)">月の合計移動距離（片道×稼働回数）に基づき支給</span>
+      </div>
+      <div class="card-body" style="padding:0">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--surface-3)">
+          ${TRANSPORT_TABLE.map(([min,max,amt],i)=>`
+            <div style="padding:7px 14px;border-bottom:1px solid var(--surface-3);border-right:${(i+1)%4===0?'none':'1px solid var(--surface-3)'}; font-size:12px;display:flex;justify-content:space-between;align-items:center;${amt===0?'color:var(--ink-soft)':''}">
+              <span>${min}〜${max}km未満</span>
+              <span style="font-weight:500">${amt===0?'支給なし':'¥'+amt.toLocaleString()}</span>
+            </div>`).join('')}
+          <div style="padding:7px 14px;font-size:12px;display:flex;justify-content:space-between;align-items:center;background:var(--accent-light);border-right:none">
+            <span style="color:var(--accent)">100km以上</span>
+            <span style="font-weight:500;color:var(--accent)">¥2,000（上限）</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  content.innerHTML = (catCards || '<div class="card"><div class="empty-state">カテゴリがありません</div></div>') + transportCard;
+}
+
+function showFormula(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const isOpen = el.style.display === 'block';
+  el.style.display = isOpen ? 'none' : 'block';
+  btn.textContent = isOpen ? '計算式' : '閉じる';
+}
+
+function saveCatField(catId, field, val) {
+  const cats = load(SK.cats,[]);
+  const c = cats.find(x=>x.id===catId);
+  if (c) {
+    c[field] = val;
+    // 一般時間を変えたとき、リーダー時間が未設定なら同期
+    const syncMap = { opStart:'ldrOpStart', opEnd:'ldrOpEnd', opBreak:'ldrOpBreak', studyHours:'ldrStudyHours' };
+    if (syncMap[field] && (c[syncMap[field]] == null)) {
+      c[syncMap[field]] = val;
+    }
+  }
+  save(SK.cats, cats);
+  renderPage();
+}
+
+function saveCatRankWage(catId, rankId, wage) {
+  const cats  = load(SK.cats,[]);
+  const ranks = load(SK.ranks,[]);
+  const c = cats.find(x=>x.id===catId);
+  if (c) {
+    if (!c.rankWages) c.rankWages = {};
+    c.rankWages[String(rankId)] = wage;
+
+    // 入力したランクが最低ランク（level=1）の場合、
+    // 未入力（0または未定義）の他ランクに同じ値を自動セット
+    const inputRank = ranks.find(r=>r.id===rankId);
+    if (inputRank && inputRank.level === 1 && wage > 0) {
+      ranks.forEach(r => {
+        const key = String(r.id);
+        const existing = c.rankWages[key];
+        // 未入力(0/undefined/null)のランクだけ自動セット
+        if (existing === undefined || existing === null || existing === 0) {
+          c.rankWages[key] = wage;
+        }
+      });
+    }
+  }
+  save(SK.cats, cats);
+  renderPage();
+}
+
+function saveCatLeaderWage(catId, wage) {
+  const cats = load(SK.cats,[]);
+  const c = cats.find(x=>x.id===catId);
+  if (c) c.leaderDailyWage = wage;
+  save(SK.cats, cats);
+  renderPage();
+}
+
+function saveRankWage(rankId, wage) {
+  const ranks = load(SK.ranks,[]);
+  const r = ranks.find(x=>x.id===rankId);
+  if (r) r.dailyWage = wage;
+  save(SK.ranks, ranks);
+  renderPage();
+}
+
+function saveBaseHours(field, val) {
+  const base = load('staff_mgmt_base_hours', {studyHours:1, opHours:7});
+  base[field] = val;
+  save('staff_mgmt_base_hours', base);
+  renderPage();
+}
+
+// =====================================================
+// PAYMENT
+// =====================================================
+// paymentSelectedStaff: 選択中のスタッフID
+let paymentSelectedStaff = null;
+
+function staffTotalWithTransport(s, events, venues) {
+  const wevs = events.filter(e=>e.staffAssignments.some(a=>a.staffId===s.id&&a.status==='worked'));
+  let pay = 0;
+  wevs.forEach(e => { pay += calcPay(e, s.id).total; });
+  const months = [...new Set(wevs.map(e=>e.date.slice(0,7)))];
+  months.forEach(m => {
+    let dist = 0;
+    wevs.filter(e=>e.date.startsWith(m)).forEach(e=>{
+      const v=venues.find(x=>x.id===e.venueId);
+      if(v&&s.lat) dist += haversine(s.lat,s.lng,v.lat,v.lng);
+    });
+    pay += transportAmt(dist);
+  });
+  return pay;
+}
+
+
+function renderPayment(content, right) {
+  if (!['combined','event'].includes(activeTab)) activeTab = 'combined';
+  const events = load(SK.events,[]);
+  const venues = load(SK.venues,[]);
+  const cats   = load(SK.cats,[]);
+  const staffs = load(SK.staffs,[]);
+  const ranks  = load(SK.ranks,[]);
+
+  const tabs = [
+    { id:'combined', label:'スタッフ × 月別' },
+    { id:'event',    label:'イベント別' },
+  ];
+
+  right.innerHTML = '';
+
+  let body = '';
+
+  // ══════════════════════════════════════════
+  // スタッフ × 月別：マトリクス表 ＋ 選択スタッフの詳細
+  // ══════════════════════════════════════════
+  if (activeTab === 'combined') {
+    if (!paymentSelectedStaff && staffs.length) paymentSelectedStaff = staffs[0].id;
+
+    // ── 各スタッフの明細URL一覧 ──
+    const urlListHtml = staffs.map(s => {
+      const url = `${getBaseUrl()}payment_detail.html?staffId=${s.id}`;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--surface-3)">
+        <div class="av" style="background:var(--accent-light);color:var(--accent);font-size:11px;flex-shrink:0">${s.name[0]}</div>
+        <div style="font-size:13px;font-weight:500;min-width:100px">${s.name}</div>
+        <a href="${url}" target="_blank"
+           style="flex:1;font-size:11px;color:var(--ink-soft);text-decoration:none;
+                  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace">
+          ${url}
+        </a>
+        <button class="btn btn-sm" onclick="navigator.clipboard.writeText('${url}').then(()=>{this.textContent='✓ コピー済';setTimeout(()=>this.textContent='URLコピー',1500)})">URLコピー</button>
+        <a href="${url}" target="_blank" class="btn btn-sm">開く ↗</a>
+      </div>`;
+    }).join('');
+
+    const urlCardHtml = `
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+          <h3>各スタッフの明細URL</h3>
+          <span style="font-size:11px;color:var(--ink-soft)">クリックで開閉</span>
+        </div>
+        <div style="display:none;padding:0 16px">
+          ${urlListHtml}
+        </div>
+      </div>`;
+
+    // 稼働実績のある月を抽出
+    const months = [...new Set(
+      events.filter(e=>e.staffAssignments.some(a=>a.status==='worked'))
+            .map(e=>e.date.slice(0,7))
+    )].sort();
+
+    // マトリクス計算: month → staffId → { pay, trans, total, count }
+    const matrix = {};
+    const staffTotals = {};
+    const monthTotals = {};
+    let grandTotal = 0;
+    staffs.forEach(s => { staffTotals[s.id] = 0; });
+    months.forEach(m => {
+      monthTotals[m] = 0;
+      matrix[m] = {};
+      staffs.forEach(s => {
+        const wevs = events.filter(e=>
+          e.date.startsWith(m) &&
+          e.staffAssignments.some(a=>a.staffId===s.id&&a.status==='worked')
+        );
+        if (!wevs.length) { matrix[m][s.id] = null; return; }
+        let mPay = 0, mDist = 0;
+        wevs.forEach(e => {
+          const v = venues.find(x=>x.id===e.venueId);
+          mPay  += calcPay(e, s.id).total;
+          mDist += (v&&s.lat) ? haversine(s.lat,s.lng,v.lat,v.lng) : 0;
+        });
+        const trans  = transportAmt(mDist);
+        const mTotal = mPay + trans;
+        matrix[m][s.id] = { pay: mPay, trans, total: mTotal, count: wevs.length };
+        staffTotals[s.id] += mTotal;
+        monthTotals[m]    += mTotal;
+        grandTotal        += mTotal;
+      });
+    });
+
+    // マトリクス表 HTML
+    const headerCells = staffs.map(s => {
+      const active = paymentSelectedStaff === s.id;
+      return `<th style="text-align:center;padding:8px 10px;font-size:12px;white-space:nowrap;cursor:pointer;
+                         color:${active?'var(--accent)':'var(--ink)'};background:${active?'var(--accent-light)':'var(--surface-2)'}"
+              onclick="paymentSelectedStaff=${s.id};renderPage()">
+        ${s.name}
+        <a href="payment_detail.html?staffId=${s.id}" target="_blank"
+           onclick="event.stopPropagation()"
+           style="display:block;font-size:10px;color:var(--ink-soft);text-decoration:none;margin-top:2px;font-weight:400">
+          明細 ↗
+        </a>
+      </th>`;
+    }).join('');
+
+    const matrixRows = months.map(m => {
+      const [yr, mo] = m.split('-');
+      const label = `${yr}年${parseInt(mo)}月`;
+      const cells = staffs.map(s => {
+        const cell = matrix[m]?.[s.id];
+        const active = paymentSelectedStaff === s.id;
+        const bg = active ? 'var(--accent-light)' : 'var(--surface)';
+        if (!cell) return `<td style="text-align:center;color:var(--ink-faint);padding:8px 10px;background:${bg};font-size:12px;cursor:pointer"
+                              onclick="paymentSelectedStaff=${s.id};renderPage()">－</td>`;
+        return `<td style="text-align:center;padding:8px 10px;cursor:pointer;background:${bg};font-size:12px"
+                    onclick="paymentSelectedStaff=${s.id};renderPage()">
+          <div style="font-weight:500">¥${cell.total.toLocaleString()}</div>
+          <div style="font-size:10px;color:var(--ink-soft)">${cell.count}件</div>
+        </td>`;
+      }).join('');
+      return `<tr style="border-bottom:1px solid var(--surface-3)">
+        <td style="padding:8px 12px;font-size:12px;font-weight:500;white-space:nowrap;background:var(--surface-2)">${label}</td>
+        ${cells}
+        <td style="text-align:right;padding:8px 12px;font-size:12px;font-weight:500;background:var(--surface-2);white-space:nowrap">¥${monthTotals[m].toLocaleString()}</td>
+      </tr>`;
+    }).join('');
+
+    const totalCells = staffs.map(s =>
+      `<td style="text-align:center;padding:8px 10px;font-size:12px;font-weight:500;color:var(--accent)">¥${(staffTotals[s.id]||0).toLocaleString()}</td>`
+    ).join('');
+
+    const matrixHtml = months.length === 0 ? '' : `
+      <div class="card" style="margin-bottom:16px;overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr><th style="padding:8px 12px;font-size:12px;text-align:left;background:var(--surface-2)">月</th>
+              ${headerCells}
+              <th style="padding:8px 12px;font-size:12px;text-align:right;background:var(--surface-2)">月計</th>
+            </tr>
+          </thead>
+          <tbody>${matrixRows}</tbody>
+          <tfoot>
+            <tr style="background:var(--accent-light)">
+              <td style="padding:8px 12px;font-size:12px;font-weight:500">累計</td>
+              ${totalCells}
+              <td style="text-align:right;padding:8px 12px;font-size:13px;font-weight:500;color:var(--accent)">¥${grandTotal.toLocaleString()}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>`;
+
+    // 選択スタッフの詳細（月別イベント一覧）
+    let detailHtml = '';
+    const sel = staffs.find(s=>s.id===paymentSelectedStaff);
+    if (sel) {
+      const rank = ranks.find(r=>r.id===sel.rankId);
+      const wevs = events
+        .filter(e=>e.staffAssignments.some(a=>a.staffId===sel.id&&a.status==='worked'))
+        .slice().sort((a,b)=>a.date.localeCompare(b.date));
+      const byMonth = {};
+      wevs.forEach(e => {
+        const m = e.date.slice(0,7);
+        if (!byMonth[m]) byMonth[m] = [];
+        byMonth[m].push(e);
+      });
+      let grandPay = 0, grandTransport = 0;
+      const monthBlocks = Object.entries(byMonth).sort().map(([month, mes]) => {
+        let mPay = 0, mDist = 0;
+        const rows = mes.map(e => {
+          const v = venues.find(x=>x.id===e.venueId);
+          const c = cats.find(x=>x.id===e.categoryId);
+          const a = e.staffAssignments.find(x=>x.staffId===sel.id);
+          const p = calcPay(e, sel.id);
+          const dist = (v&&sel.lat) ? haversine(sel.lat,sel.lng,v.lat,v.lng) : 0;
+          const h = calcEventHours(e);
+          mPay += p.total; mDist += dist;
+          const roleCell = a?.isLeader ? '<span class="badge badge-purple" style="font-size:10px">リーダー</span>' : '';
+          const displayStudy = a?.isLeader ? (e.ldrStudyHours ?? h.studyHours) : h.studyHours;
+          const timeCell = `${h.opHours.toFixed(1)}h${displayStudy?'+'+displayStudy+'h':''}`;
+          return `<tr>
+            <td style="white-space:nowrap;font-weight:500">${e.date}</td>
+            <td style="font-size:12px;color:var(--ink-soft);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v?.name||'-'}</td>
+            <td><span class="badge ${c?.color||'badge-gray'}" style="font-size:10px">${c?.name||''}</span></td>
+            <td style="font-size:12px;text-align:center">${timeCell}</td>
+            <td style="text-align:center">${roleCell}</td>
+            <td style="text-align:right;font-weight:500">${p.total===0?'⚠ 未設定':'¥'+p.total.toLocaleString()}</td>
+          </tr>`;
+        }).join('');
+        const mTransport = transportAmt(mDist);
+        grandPay += mPay; grandTransport += mTransport;
+        const [yr, mo] = month.split('-');
+        const ml = `${yr}年${parseInt(mo)}月`;
+        return `
+          <div style="font-size:11px;font-weight:500;color:var(--ink-soft);padding:10px 12px 6px;
+                      background:var(--surface-2);border-bottom:1px solid var(--surface-3)">${ml}</div>
+          <table>
+            <thead><tr>
+              <th>日付</th><th>会場</th><th>カテゴリ</th>
+              <th style="text-align:center">時間</th><th style="text-align:center">役割</th>
+              <th style="text-align:right">給与</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+            <tfoot><tr style="background:var(--surface-2)">
+              <td colspan="4" style="font-size:12px;color:var(--ink-soft);padding:8px 12px">${mes.length}件 ／ ${mDist.toFixed(0)}km</td>
+              <td style="text-align:right;font-size:12px;color:var(--ink-soft);padding:8px 12px">交通費 ¥${mTransport.toLocaleString()}</td>
+              <td style="text-align:right;font-weight:500;padding:8px 12px;color:var(--accent)">¥${(mPay+mTransport).toLocaleString()}</td>
+            </tr></tfoot>
+          </table>`;
+      }).join('');
+      const gt = grandPay + grandTransport;
+      detailHtml = `
+        <div class="card" style="overflow:hidden">
+          <div style="padding:14px 16px;border-bottom:1px solid var(--surface-3);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="av" style="background:var(--accent);color:#fff">${sel.name[0]}</div>
+              <div><div style="font-size:15px;font-weight:500">${sel.name}</div>
+                <div style="font-size:12px;color:var(--ink-soft)">${rank?.label||''}</div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+              <div style="display:flex;gap:16px;text-align:right">
+                <div><div style="font-size:10px;color:var(--ink-soft)">給与累計</div><div style="font-size:16px;font-weight:500">¥${grandPay.toLocaleString()}</div></div>
+                <div><div style="font-size:10px;color:var(--ink-soft)">交通費累計</div><div style="font-size:16px;font-weight:500">¥${grandTransport.toLocaleString()}</div></div>
+                <div style="border-left:1px solid var(--surface-3);padding-left:16px">
+                  <div style="font-size:10px;color:var(--ink-soft)">合計</div>
+                  <div style="font-size:20px;font-weight:500;color:var(--accent)">¥${gt.toLocaleString()}</div>
+                </div>
+              </div>
+              <a href="payment_detail.html?staffId=${sel.id}" target="_blank"
+                 style="padding:6px 12px;border-radius:var(--radius-sm);font-size:12px;
+                        background:var(--accent);color:#fff;text-decoration:none;white-space:nowrap">
+                明細ページを開く ↗
+              </a>
+            </div>
+          </div>
+          ${wevs.length===0 ? '<div class="empty-state" style="padding:32px">稼働履歴がありません</div>' : monthBlocks}
+        </div>`;
+    }
+
+    body = urlCardHtml + matrixHtml + detailHtml;
+  }
+
+  // ══════════════════════════════════════════
+  // イベント別
+  // ══════════════════════════════════════════
+  if (activeTab === 'event') {
+    body = events.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(e => {
+      const v   = venues.find(x=>x.id===e.venueId);
+      const c   = cats.find(x=>x.id===e.categoryId);
+      const ws  = e.staffAssignments.filter(a=>a.status==='worked');
+      let evTotal = 0;
+      const rows = ws.map(a => {
+        const s = staffs.find(x=>x.id===a.staffId);
+        const r = ranks.find(x=>x.id===s?.rankId);
+        const p = calcPay(e, a.staffId);
+        evTotal += p.total;
+        const roleLabel = a.isLeader
+          ? '<span class="badge badge-purple">リーダー</span>'
+          : `<span class="badge badge-blue" style="font-size:10px">${r?.name||'-'}</span>`;
+        const payDetail = a.isLeader
+          ? `<td style="text-align:right;font-weight:500">¥${p.total.toLocaleString()}</td><td style="text-align:right;color:var(--purple)">リーダー日給</td>`
+          : `<td style="text-align:right;font-weight:500">¥${p.total.toLocaleString()}</td><td style="text-align:right;color:var(--ink-soft)">-</td>`;
+        return `<tr>
+          <td>${s?.name||'-'}</td>
+          <td>${roleLabel}</td>
+          ${payDetail}
+          <td style="text-align:right;font-weight:500;${p.total===0?'color:var(--red-dark)':''}">${p.total===0?'⚠ 日給未設定':'¥'+p.total.toLocaleString()}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="card">
+        <div class="card-header">
+          <h3>${e.date}　${v?.name||''}　<span class="badge ${c?.color||'badge-gray'}" style="margin-left:4px">${c?.name||''}</span></h3>
+          <span class="pay-total">合計 ¥${evTotal.toLocaleString()}</span>
+        </div>
+        <div style="padding:0">
+          ${ws.length===0
+            ? '<div class="empty-state" style="padding:16px">稼働スタッフなし</div>'
+            : `<table>
+                <thead><tr><th>スタッフ</th><th>役割</th><th style="text-align:right">給与</th><th style="text-align:right">種別</th><th style="text-align:right">合計</th></tr></thead>
+                <tbody>${rows}</tbody>
+               </table>`}
+        </div>
+      </div>`;
+    }).join('') || '<div class="card"><div class="empty-state">イベントデータがありません</div></div>';
+  }
+
+  content.innerHTML = `
+    <div class="tab-bar">
+      ${tabs.map(t=>`<div class="tab ${activeTab===t.id?'active':''}" onclick="activeTab='${t.id}';renderPage()">${t.label}</div>`).join('')}
+    </div>
+    ${body}`;
+}
+
+// =====================================================
+// SETTINGS
+// =====================================================
+function renderSettings(content) {
+  const key = localStorage.getItem(SK.apikey) || '';
+  content.innerHTML = `
+    <div class="card">
+      <div class="card-header"><h3>Google Maps API 設定</h3></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--ink-soft);margin-bottom:16px;line-height:1.7">
+          住所のオートコンプリートと座標取得に Google Maps Platform の APIキーが必要です。<br>
+          <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--accent)">Google Cloud Console</a> で「Places API」と「Geocoding API」を有効にしてください。
+        </p>
+        <div class="form-group">
+          <label class="form-label">APIキー</label>
+          <input type="text" class="form-control" id="gmapsKey" value="${key}" placeholder="AIzaSy...">
+        </div>
+        <button class="btn btn-primary" onclick="saveApiKey()">保存して反映</button>
+        ${key ? '<button class="btn btn-danger" style="margin-left:8px" onclick="clearApiKey()">削除</button>' : ''}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>外部フォームのリンク</h3></div>
+      <div class="card-body">
+        <div class="setting-row">
+          <div><div class="setting-label">スタッフ登録フォーム</div><div class="setting-hint">スタッフが自分で情報を登録するフォームです</div></div>
+          <div class="copy-link" style="width:260px">
+            <span class="link-text">staff_register.html</span>
+            <button class="btn btn-sm" onclick="copyLink('staff_register.html')">コピー</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-label">日程調整フォーム（汎用）</div><div class="setting-hint">イベントを選んで回答するフォームです</div></div>
+          <div class="copy-link" style="width:260px">
+            <span class="link-text">schedule_form.html</span>
+            <button class="btn btn-sm" onclick="copyLink('schedule_form.html')">コピー</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>データ管理</h3></div>
+      <div class="card-body">
+        <button class="btn" onclick="exportData()">データをエクスポート（JSON）</button>
+        <button class="btn btn-danger" style="margin-left:8px" onclick="clearAllData()">全データをリセット</button>
+      </div>
+    </div>`;
+}
+
+function saveApiKey() {
+  const k = document.getElementById('gmapsKey').value.trim();
+  localStorage.setItem(SK.apikey, k);
+  initMaps();
+  alert('保存しました。ページを再読み込みすると反映されます。');
+}
+function clearApiKey() {
+  if (!confirm('APIキーを削除しますか？')) return;
+  localStorage.removeItem(SK.apikey);
+  renderPage();
+}
+function exportData() {
+  const data = {};
+  Object.values(SK).forEach(k => { data[k] = load(k, null); });
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `staff_mgmt_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+function clearAllData() {
+  if (!confirm('全データをリセットします。元に戻せません。よろしいですか？')) return;
+  Object.values(SK).forEach(k => localStorage.removeItem(k));
+  location.reload();
+}
+
+// =====================================================
+// MODALS - EVENT
+// =====================================================
+function openModal(html) {
+  document.getElementById('modalContainer').innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">${html}</div>`;
+}
+function closeModal() { document.getElementById('modalContainer').innerHTML = ''; }
+
+function openEventModal(id) {
+  const ev    = id ? load(SK.events,[]).find(e=>e.id===id) : null;
+  const venues = load(SK.venues,[]);
+  const cats   = load(SK.cats,[]);
+
+  // 会場新規登録から戻ってきた場合、入力途中のデータを復元
+  const pd = window._pendingEventFormData || null;
+  window._pendingEventFormData = null;
+
+  const initCat = ev ? cats.find(c=>c.id===ev.categoryId) : cats[0];
+  const initOpStart  = pd?.start    ?? ev?.opStart    ?? initCat?.opStart    ?? '10:00';
+  const initOpEnd    = pd?.end      ?? ev?.opEnd      ?? initCat?.opEnd      ?? '18:00';
+  const initOpBreak  = pd?.brk      ?? ev?.opBreak    ?? initCat?.opBreak    ?? 0;
+  const initStudy    = pd?.study    ?? ev?.studyHours ?? initCat?.studyHours ?? 1;
+  const initLdrStudy = pd?.ldrStudy ?? ev?.ldrStudyHours ?? initCat?.ldrStudyHours ?? initStudy;
+  const initCatId    = pd?.catId    ?? ev?.categoryId ?? initCat?.id;
+  const initVenueId  = pd?.venueId  ?? ev?.venueId    ?? null;
+  const initDate     = pd?.date     ?? ev?.date       ?? '';
+  const initContent  = pd?.content  ?? ev?.content    ?? (ev ? parseEventName(ev).content : '');
+  const initReq      = pd?.req      ?? ev?.requiredCount ?? 3;
+
+  // "＋ 新規登録" ボタン押下時に現在の入力値を退避するスニペット
+  const saveFormState = `window._pendingEventFormData={date:document.getElementById('f_date').value,content:document.getElementById('f_content').value,venueId:parseInt(document.getElementById('f_venue').value)||null,catId:parseInt(document.getElementById('f_cat').value)||null,req:document.getElementById('f_req').value,start:document.getElementById('f_start').value,end:document.getElementById('f_end').value,brk:document.getElementById('f_break').value,study:document.getElementById('f_study').value,ldrStudy:document.getElementById('f_ldr_study').value};`;
+
+  openModal(`<div class="modal">
+    <div class="modal-header"><h3>${ev?'イベント編集':'イベント追加'}</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">会場</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select class="form-control" id="f_venue" style="flex:1">
+            <option value="">-- 会場を選択 --</option>
+            ${venues.map(v=>`<option value="${v.id}" ${initVenueId===v.id?'selected':''}>${v.name}</option>`).join('')}
+          </select>
+          <button type="button" class="btn btn-sm" onclick="${saveFormState}window._afterVenueSave=()=>openEventModal(${id||'null'});openVenueModal()" style="white-space:nowrap;flex-shrink:0">＋ 新規登録</button>
+        </div>
+        ${venues.length===0?'<div style="font-size:11px;color:var(--ink-soft);margin-top:4px">会場が未登録です。「＋ 新規登録」から追加してください。</div>':''}
+      </div>
+      <div class="form-group"><label class="form-label">日付<span class="req">*</span></label>
+        <input type="date" class="form-control" id="f_date" value="${initDate}">
+      </div>
+      <div class="form-group"><label class="form-label">内容</label>
+        <input type="text" class="form-control" id="f_content" placeholder="例：食育プレミア（内容未定）" value="${initContent}">
+      </div>
+      <div class="form-group"><label class="form-label">カテゴリ<span class="req">*</span></label>
+        <select class="form-control" id="f_cat" onchange="applyEventCatDefaults()">${cats.map(c=>`<option value="${c.id}" ${initCatId===c.id?'selected':''}>${c.name}</option>`).join('')}</select>
+      </div>
+      <div class="form-group"><label class="form-label">必要人数</label>
+        <input type="number" class="form-control" id="f_req" value="${initReq}" min="1">
+      </div>
+      <hr style="margin:12px 0;border:none;border-top:1px solid var(--surface-3)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:500;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.06em">稼働時間</div>
+        <button type="button" class="btn btn-sm" onclick="applyEventCatDefaults()" style="font-size:10px;padding:2px 10px">↻ 支払金額登録のデフォルトを反映</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div class="form-group" style="margin:0"><label class="form-label">スタッフ 事前準備（h）</label>
+          <input type="number" class="form-control" id="f_study" value="${initStudy}" min="0" step="0.5">
+        </div>
+        <div class="form-group" style="margin:0"><label class="form-label">休憩（分）</label>
+          <input type="number" class="form-control" id="f_break" value="${initOpBreak}" min="0" oninput="calcOpHours()">
+        </div>
+        <div class="form-group" style="margin:0"><label class="form-label">開始時刻</label>
+          <input type="time" class="form-control" id="f_start" value="${initOpStart}" oninput="calcOpHours()">
+        </div>
+        <div class="form-group" style="margin:0"><label class="form-label">終了時刻</label>
+          <input type="time" class="form-control" id="f_end" value="${initOpEnd}" oninput="calcOpHours()">
+        </div>
+      </div>
+      <div id="f_op_hours_display" style="margin-bottom:12px;padding:8px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;font-weight:500;color:var(--accent)"></div>
+      <div style="background:var(--purple-light);border-radius:var(--radius-sm);padding:12px;border:1px solid #d4d3f8">
+        <div style="font-size:11px;font-weight:500;color:var(--purple);margin-bottom:8px">★ リーダー 事前準備時間（異なる場合のみ変更）</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="form-group" style="margin:0"><label class="form-label">リーダー 事前準備（h）</label>
+            <input type="number" class="form-control" id="f_ldr_study" value="${initLdrStudy}" min="0" step="0.5">
+          </div>
+          <div style="display:flex;align-items:flex-end;padding-bottom:2px">
+            <span style="font-size:11px;color:var(--ink-soft)">当日運営時間はスタッフと同じ</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveEvent(${id||'null'})">保存</button>
+    </div>
+  </div>`);
+  setTimeout(calcOpHours, 0);
+}
+
+// カテゴリ変更時に稼働時間を自動入力
+function applyEventCatDefaults() {
+  const catId = parseInt(document.getElementById('f_cat').value);
+  const cats  = load(SK.cats,[]);
+  const cat   = cats.find(c=>c.id===catId);
+  if (!cat) return;
+  if (cat.opStart)       document.getElementById('f_start').value     = cat.opStart;
+  if (cat.opEnd)         document.getElementById('f_end').value       = cat.opEnd;
+  if (cat.opBreak!=null) document.getElementById('f_break').value     = cat.opBreak;
+  if (cat.studyHours!=null) document.getElementById('f_study').value  = cat.studyHours;
+  const ldrStudy = cat.ldrStudyHours ?? cat.studyHours;
+  if (ldrStudy != null)  document.getElementById('f_ldr_study').value = ldrStudy;
+  calcOpHours();
+}
+
+// 当日運営時間を自動計算して表示
+function calcOpHours() {
+  const start = document.getElementById('f_start')?.value;
+  const end   = document.getElementById('f_end')?.value;
+  const brk   = parseInt(document.getElementById('f_break')?.value) || 0;
+  const disp  = document.getElementById('f_op_hours_display');
+  if (!disp) return;
+  if (!start || !end) { disp.textContent = ''; return; }
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  const totalMin = (eh * 60 + em) - (sh * 60 + sm) - brk;
+  if (totalMin <= 0) { disp.textContent = '⚠ 時間を確認してください'; disp.style.color = 'var(--red)'; return; }
+  disp.style.color = 'var(--accent)';
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  disp.textContent = `当日運営時間：${h}時間${m > 0 ? m + '分' : ''}`;
+}
+
+function saveEvent(id) {
+  const date = document.getElementById('f_date').value;
+  if (!date){ alert('日付を入力'); return; }
+  const venueId    = parseInt(document.getElementById('f_venue').value);
+  const categoryId = parseInt(document.getElementById('f_cat').value);
+  const req        = parseInt(document.getElementById('f_req').value);
+  const opStart     = document.getElementById('f_start').value;
+  const opEnd       = document.getElementById('f_end').value;
+  const opBreak     = parseInt(document.getElementById('f_break').value) || 0;
+  const studyHours  = parseFloat(document.getElementById('f_study').value) || 0;
+  const ldrStudyHours = parseFloat(document.getElementById('f_ldr_study').value) || 0;
+  const venues2     = load(SK.venues,[]);
+  const selVenue    = venues2.find(v=>v.id===venueId);
+  const placeName   = selVenue?.name || '';
+  const content     = document.getElementById('f_content')?.value.trim() || '';
+  // nameフィールドも更新（後方互換）
+  const d = new Date(date+'T00:00:00');
+  const days=['日','月','火','水','木','金','土'];
+  const dateStr = `${d.getMonth()+1}/${d.getDate()}(${days[d.getDay()]})`;
+  const name = placeName||content ? `${dateStr} ${placeName}${content?'：'+content:''}` : '';
+  const evs = load(SK.events,[]);
+  if (id) {
+    Object.assign(evs.find(e=>e.id===id), {date, venueId, categoryId, requiredCount:req, opStart, opEnd, opBreak, studyHours, ldrStudyHours, placeName, content, name});
+  } else {
+    const newId = (evs.length ? Math.max(...evs.map(e=>e.id)) : 0) + 1;
+    evs.push({id:newId, date, venueId, categoryId, requiredCount:req,
+      staffAssignments:[], attendance:{}, opStart, opEnd, opBreak, studyHours, ldrStudyHours, placeName, content, name});
+  }
+  save(SK.events, evs); closeModal(); renderPage();
+}
+function deleteEvent(id){
+  if(!confirm('削除しますか？'))return;
+  save(SK.events,load(SK.events,[]).filter(e=>e.id!==id)); renderPage();
+}
+
+// =====================================================
+// MODALS - STAFF
+// =====================================================
+function openStaffModal(id) {
+  const s=id?load(SK.staffs,[]).find(x=>x.id===id):null;
+  const ranks=load(SK.ranks,[]);
+  openModal(`<div class="modal modal-lg">
+    <div class="modal-header"><h3>${s?'スタッフ編集':'スタッフ追加'}</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">氏名<span class="req">*</span></label><input type="text" class="form-control" id="f_name" value="${s?.name||''}"></div>
+        <div class="form-group"><label class="form-label">フリガナ</label><input type="text" class="form-control" id="f_kana" value="${s?.kana||''}"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">ランク</label>
+          <select class="form-control" id="f_rank">${ranks.map(r=>`<option value="${r.id}" ${s?.rankId===r.id?'selected':''}>${r.label}</option>`).join('')}</select>
+        </div>
+        <div class="form-group"><label class="form-label">電話番号</label><input type="tel" class="form-control" id="f_phone" value="${s?.phone||''}"></div>
+      </div>
+
+      <div class="form-group"><label class="form-label">住所検索（Googleマップ）</label>
+        <div class="ac-wrap">
+          <input type="text" class="form-control" id="f_addrSearch" placeholder="住所を入力..." value="${s?.address||''}">
+          <div class="ac-list" id="f_addrSearch_list"></div>
+        </div>
+        ${!localStorage.getItem(SK.apikey)?'<div style="font-size:11px;color:var(--red);margin-top:4px">⚠ APIキー未設定。設定ページから入力してください。手動入力も可能です。</div>':''}
+      </div>
+      <div class="form-group" id="coordFieldStaff">
+        <label class="form-label">座標（自動取得 or 手動入力）</label>
+        <div class="grid-2">
+          <input type="number" class="form-control" id="f_lat" value="${s?.lat||''}" step="0.000001" placeholder="緯度 35.1709">
+          <input type="number" class="form-control" id="f_lng" value="${s?.lng||''}" step="0.000001" placeholder="経度 136.9073">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">最寄り駅</label><input type="text" class="form-control" id="f_station" value="${s?.station||''}"></div>
+        <div class="form-group"><label class="form-label">メールアドレス</label><input type="email" class="form-control" id="f_email" value="${s?.email||''}"></div>
+      </div>
+
+      <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:14px;margin:12px 0 14px">
+        <div style="font-size:11px;font-weight:500;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">振込先</div>
+        <div class="grid-2">
+          <div class="form-group" style="margin-bottom:8px"><label class="form-label">銀行名</label><input type="text" class="form-control" id="f_bank" value="${s?.bankName||''}"></div>
+          <div class="form-group" style="margin-bottom:8px"><label class="form-label">支店名</label><input type="text" class="form-control" id="f_branch" value="${s?.branchName||''}"></div>
+          <div class="form-group" style="margin-bottom:8px"><label class="form-label">口座種別</label>
+            <select class="form-control" id="f_actype">
+              <option value="">-</option>
+              <option value="普通" ${s?.accountType==='普通'?'selected':''}>普通</option>
+              <option value="当座" ${s?.accountType==='当座'?'selected':''}>当座</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:8px"><label class="form-label">口座番号</label><input type="text" class="form-control" id="f_acnum" value="${s?.accountNumber||''}"></div>
+        </div>
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">口座名義（カタカナ）</label><input type="text" class="form-control" id="f_acholder" value="${s?.accountHolder||''}"></div>
+      </div>
+
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="f_contract" ${s?.contractSigned?'checked':''}>
+          <span class="form-label" style="margin:0">業務委託契約済</span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveStaff(${id||'null'})">保存</button>
+    </div>
+  </div>`);
+
+  // setup address autocomplete after modal renders
+  setTimeout(() => {
+    setupAddressField('f_addrSearch', null, null, 'coordFieldStaff');
+    // When coords come from maps, fill lat/lng fields
+    const orig = window._pickPlace;
+    window._pickPlace = function(placeId, desc, inputId, displayId, coordId, coordFieldId) {
+      orig.call(this, placeId, desc, inputId, displayId, coordId, coordFieldId);
+      if (inputId === 'f_addrSearch' && _geocoder) {
+        _geocoder.geocode({placeId}, (results, status) => {
+          if (status==='OK' && results[0]) {
+            const loc = results[0].geometry.location;
+            document.getElementById('f_lat').value = loc.lat().toFixed(6);
+            document.getElementById('f_lng').value = loc.lng().toFixed(6);
+          }
+        });
+      }
+    };
+  }, 50);
+}
+
+function saveStaff(id) {
+  const name=document.getElementById('f_name').value.trim();
+  if (!name){alert('名前を入力');return;}
+  const staffs=load(SK.staffs,[]);
+  const addrSearch = document.getElementById('f_addrSearch').value.trim();
+  const data = {
+    name, kana:document.getElementById('f_kana').value.trim(),
+    rankId:parseInt(document.getElementById('f_rank').value),
+    phone:document.getElementById('f_phone').value.trim(),
+    email:document.getElementById('f_email').value.trim(),
+    address:addrSearch,
+    lat:parseFloat(document.getElementById('f_lat').value)||null,
+    lng:parseFloat(document.getElementById('f_lng').value)||null,
+    station:document.getElementById('f_station').value.trim(),
+    bankName:document.getElementById('f_bank').value.trim(),
+    branchName:document.getElementById('f_branch').value.trim(),
+    accountType:document.getElementById('f_actype').value,
+    accountNumber:document.getElementById('f_acnum').value.trim(),
+    accountHolder:document.getElementById('f_acholder').value.trim(),
+    contractSigned:document.getElementById('f_contract').checked,
+  };
+  if (id) { Object.assign(staffs.find(s=>s.id===id), data); }
+  else {
+    const newId=(staffs.length?Math.max(...staffs.map(s=>s.id)):0)+1;
+    staffs.push({id:newId,...data});
+  }
+  save(SK.staffs,staffs); closeModal(); renderPage();
+}
+function deleteStaff(id){
+  if(!confirm('削除しますか？'))return;
+  save(SK.staffs,load(SK.staffs,[]).filter(s=>s.id!==id)); renderPage();
+}
+
+// =====================================================
+// MODALS - VENUE
+// =====================================================
+function openVenueModal(id) {
+  const v=id?load(SK.venues,[]).find(x=>x.id===id):null;
+  openModal(`<div class="modal">
+    <div class="modal-header"><h3>${v?'会場編集':'会場追加'}</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">会場名<span class="req">*</span></label><input type="text" class="form-control" id="f_vname" value="${v?.name||''}"></div>
+      <div class="form-group"><label class="form-label">住所検索（Googleマップ）</label>
+        <div class="ac-wrap">
+          <input type="text" class="form-control" id="f_vaddrSearch" placeholder="住所を入力..." value="${v?.address||''}">
+          <div class="ac-list" id="f_vaddrSearch_list"></div>
+        </div>
+        ${!localStorage.getItem(SK.apikey)?'<div style="font-size:11px;color:var(--red);margin-top:4px">⚠ APIキー未設定。手動入力も可能です。</div>':''}
+      </div>
+      <div class="form-group" id="vCoordField">
+        <label class="form-label">座標（自動取得 or 手動入力）</label>
+        <div class="grid-2">
+          <input type="number" class="form-control" id="f_vlat" value="${v?.lat||''}" step="0.000001" placeholder="緯度">
+          <input type="number" class="form-control" id="f_vlng" value="${v?.lng||''}" step="0.000001" placeholder="経度">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveVenue(${id||'null'})">保存</button>
+    </div>
+  </div>`);
+
+  setTimeout(() => {
+    setupAddressField('f_vaddrSearch', null, null, 'vCoordField');
+    const orig = window._pickPlace;
+    window._pickPlace = function(placeId, desc, inputId, displayId, coordId, coordFieldId) {
+      orig.call(this, placeId, desc, inputId, displayId, coordId, coordFieldId);
+      if (inputId === 'f_vaddrSearch' && _geocoder) {
+        _geocoder.geocode({placeId}, (results, status) => {
+          if (status==='OK' && results[0]) {
+            const loc = results[0].geometry.location;
+            document.getElementById('f_vlat').value = loc.lat().toFixed(6);
+            document.getElementById('f_vlng').value = loc.lng().toFixed(6);
+          }
+        });
+      }
+    };
+  }, 50);
+}
+
+function saveVenue(id) {
+  const name=document.getElementById('f_vname').value.trim();
+  if(!name){alert('会場名を入力');return;}
+  const vs=load(SK.venues,[]);
+  const data={name,address:document.getElementById('f_vaddrSearch').value.trim(),lat:parseFloat(document.getElementById('f_vlat').value)||null,lng:parseFloat(document.getElementById('f_vlng').value)||null};
+  if(id){ Object.assign(vs.find(x=>x.id===id),data); }
+  else{ const newId=(vs.length?Math.max(...vs.map(x=>x.id)):0)+1; vs.push({id:newId,...data}); }
+  save(SK.venues,vs);
+  closeModal();
+  renderPage();
+  if (window._afterVenueSave) {
+    const cb = window._afterVenueSave;
+    window._afterVenueSave = null;
+    setTimeout(cb, 50);
+  }
+}
+function deleteVenue(id){
+  if(!confirm('削除しますか？'))return;
+  save(SK.venues,load(SK.venues,[]).filter(x=>x.id!==id)); renderPage();
+}
+
+// =====================================================
+// MODALS - CATEGORY EDIT (詳細編集モーダル)
+// =====================================================
+function openCatEditModal(catId) {
+  const c = load(SK.cats,[]).find(x=>x.id===catId);
+  if (!c) return;
+  const ranks = load(SK.ranks,[]);
+
+  const rankInputs = ranks.map(r => {
+    const dw = (c.rankWages && (c.rankWages[r.id] || c.rankWages[String(r.id)])) || 0;
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span class="badge badge-blue" style="font-size:11px;min-width:80px">${r.label}</span>
+      <input type="number" class="form-control" style="width:110px" id="cew_rank_${r.id}" value="${dw}" min="0">
+      <span style="font-size:12px;color:var(--ink-soft)">円/日</span>
+    </div>`;
+  }).join('');
+
+  openModal(`<div class="modal" style="max-width:520px">
+    <div class="modal-header"><h3>${c.name}　編集</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-body">
+      <div style="font-size:11px;font-weight:500;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">一般スタッフ　基本稼働時間</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div class="form-group" style="margin:0"><label class="form-label">事前準備（h）</label>
+          <input type="number" class="form-control" id="cew_study" value="${c.studyHours||0}" min="0" step="0.5"></div>
+        <div class="form-group" style="margin:0"><label class="form-label">休憩（分）</label>
+          <input type="number" class="form-control" id="cew_break" value="${c.opBreak||0}" min="0"></div>
+        <div class="form-group" style="margin:0"><label class="form-label">開始時刻</label>
+          <input type="time" class="form-control" id="cew_start" value="${c.opStart||''}"></div>
+        <div class="form-group" style="margin:0"><label class="form-label">終了時刻</label>
+          <input type="time" class="form-control" id="cew_end" value="${c.opEnd||''}"></div>
+      </div>
+
+      <div style="font-size:11px;font-weight:500;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">ランク別日給</div>
+      ${rankInputs}
+
+      <hr style="margin:12px 0;border:none;border-top:1px solid var(--surface-3)">
+      <div style="background:var(--purple-light);border-radius:var(--radius-sm);padding:12px;border:1px solid #d4d3f8">
+        <div style="font-size:11px;font-weight:500;color:var(--purple);margin-bottom:10px">★ リーダー</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div class="form-group" style="margin:0"><label class="form-label">事前準備（h）</label>
+            <input type="number" class="form-control" id="cew_ldr_study" value="${c.ldrStudyHours!=null?c.ldrStudyHours:c.studyHours||0}" min="0" step="0.5"></div>
+          <div class="form-group" style="margin:0"><label class="form-label">休憩（分）</label>
+            <input type="number" class="form-control" id="cew_ldr_break" value="${c.ldrOpBreak!=null?c.ldrOpBreak:c.opBreak||0}" min="0"></div>
+          <div class="form-group" style="margin:0"><label class="form-label">開始時刻</label>
+            <input type="time" class="form-control" id="cew_ldr_start" value="${c.ldrOpStart||c.opStart||''}"></div>
+          <div class="form-group" style="margin:0"><label class="form-label">終了時刻</label>
+            <input type="time" class="form-control" id="cew_ldr_end" value="${c.ldrOpEnd||c.opEnd||''}"></div>
+        </div>
+        <div class="form-group" style="margin:0"><label class="form-label">リーダー日給（円/日）</label>
+          <input type="number" class="form-control" style="width:140px" id="cew_ldr_wage" value="${c.leaderDailyWage||0}" min="0"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveCatEditModal(${catId})">保存</button>
+    </div>
+  </div>`);
+}
+
+function saveCatEditModal(catId) {
+  const cats  = load(SK.cats,[]);
+  const ranks = load(SK.ranks,[]);
+  const c = cats.find(x=>x.id===catId);
+  if (!c) return;
+
+  c.studyHours    = parseFloat(document.getElementById('cew_study').value)    || 0;
+  c.opBreak       = parseInt(document.getElementById('cew_break').value)       || 0;
+  c.opStart       = document.getElementById('cew_start').value;
+  c.opEnd         = document.getElementById('cew_end').value;
+  c.ldrStudyHours = parseFloat(document.getElementById('cew_ldr_study').value) || 0;
+  c.ldrOpBreak    = parseInt(document.getElementById('cew_ldr_break').value)   || 0;
+  c.ldrOpStart    = document.getElementById('cew_ldr_start').value;
+  c.ldrOpEnd      = document.getElementById('cew_ldr_end').value;
+  c.leaderDailyWage = parseInt(document.getElementById('cew_ldr_wage').value)  || 0;
+
+  if (!c.rankWages) c.rankWages = {};
+  ranks.forEach(r => {
+    const val = parseInt(document.getElementById(`cew_rank_${r.id}`)?.value) || 0;
+    c.rankWages[r.id]         = val;
+    c.rankWages[String(r.id)] = val;
+  });
+
+  save(SK.cats, cats);
+  closeModal();
+  renderPage();
+}
+
+// =====================================================
+// MODALS - CATEGORY
+// =====================================================
+function openCatModal(id) {
+  const c=id?load(SK.cats,[]).find(x=>x.id===id):null;
+  const colors=['badge-green','badge-purple','badge-amber','badge-blue','badge-red','badge-gray'];
+  openModal(`<div class="modal">
+    <div class="modal-header"><h3>${c?'カテゴリ編集':'カテゴリ追加'}</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">カテゴリ名<span class="req">*</span></label><input type="text" class="form-control" id="f_cname" value="${c?.name||''}"></div>
+      <div class="form-group"><label class="form-label">バッジカラー</label>
+        <select class="form-control" id="f_cc">${colors.map(cl=>`<option value="${cl}" ${c?.color===cl?'selected':''}>${cl}</option>`).join('')}</select>
+      </div>
+      <p style="font-size:12px;color:var(--ink-soft);margin-top:8px">※基本稼働時間・日給はカテゴリ設定画面で直接入力できます</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveCat(${id||'null'})">保存</button>
+    </div>
+  </div>`);
+}
+function saveCat(id) {
+  const name=document.getElementById('f_cname').value.trim();
+  if(!name){alert('名前を入力');return;}
+  const cs=load(SK.cats,[]);
+  const ranks=load(SK.ranks,[]);
+  const data={name,color:document.getElementById('f_cc').value};
+  if(id){
+    Object.assign(cs.find(x=>x.id===id),data);
+  } else {
+    const newId=(cs.length?Math.max(...cs.map(x=>x.id)):0)+1;
+    const rankWages={};
+    ranks.forEach(r=>{ rankWages[r.id]=0; });
+    cs.push({id:newId,...data,
+      studyHours:1, opStart:'10:00', opEnd:'17:00', opBreak:0,
+      rankWages, leaderDailyWage:0,
+      ldrStudyHours:1, ldrOpStart:'10:00', ldrOpEnd:'17:00', ldrOpBreak:0
+    });
+  }
+  save(SK.cats,cs); closeModal(); renderPage();
+}
+function deleteCat(id){
+  if(!confirm('削除しますか？'))return;
+  save(SK.cats,load(SK.cats,[]).filter(x=>x.id!==id)); renderPage();
+}
+
+// =====================================================
+// STAFFING ACTIONS
+// =====================================================
+function updateEv(id, field, val) {
+  const evs=load(SK.events,[]), ev=evs.find(e=>e.id===id);
+  if(ev) ev[field]=val;
+  save(SK.events,evs);
+}
+function changeRequired(id){
+  const evs=load(SK.events,[]),ev=evs.find(e=>e.id===id);
+  const v=prompt('必要人数:',ev.requiredCount);
+  if(v!==null){const n=parseInt(v);if(!isNaN(n)&&n>0){ev.requiredCount=n;save(SK.events,evs);}}
+  renderPage();
+}
+function cycleAtt(evId, staffId){
+  const evs=load(SK.events,[]),ev=evs.find(e=>e.id===evId);
+  const cycle={ok:'ng',ng:'unknown',unknown:'ok',unsure:'ok'};
+  ev.attendance[staffId]=cycle[ev.attendance[staffId]||'unknown'];
+  save(SK.events,evs); renderPage();
+}
+function toggleCand(evId,staffId){
+  const evs=load(SK.events,[]),ev=evs.find(e=>e.id===evId);
+  const idx=ev.staffAssignments.findIndex(a=>a.staffId===staffId);
+  if(idx>=0)ev.staffAssignments.splice(idx,1);
+  else ev.staffAssignments.push({staffId,status:'candidate',isLeader:false});
+  save(SK.events,evs); renderPage();
+}
+function toggleConf(evId,staffId){
+  const evs=load(SK.events,[]),ev=evs.find(e=>e.id===evId);
+  const a=ev.staffAssignments.find(x=>x.staffId===staffId);
+  if(a)a.status=a.status==='confirmed'?'candidate':'confirmed';
+  save(SK.events,evs); renderPage();
+}
+function toggleLeader(evId,staffId){
+  const evs=load(SK.events,[]),ev=evs.find(e=>e.id===evId);
+  const a=ev.staffAssignments.find(x=>x.staffId===staffId);
+  if(a)a.isLeader=!a.isLeader;
+  save(SK.events,evs); renderPage();
+}
+function toggleWorked(evId,staffId){
+  const evs=load(SK.events,[]),ev=evs.find(e=>e.id===evId);
+  const a=ev.staffAssignments.find(x=>x.staffId===staffId);
+  if(a)a.status=a.status==='worked'?'confirmed':'worked';
+  save(SK.events,evs); renderPage();
+}
+
+// =====================================================
+// INIT
+// =====================================================
+initMaps();
+renderSidebar();
+renderPage();
+</script>
+</body>
+</html>

@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>日程調整フォーム</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1c1c1e;
+    --ink-mid: #48484a;
+    --ink-soft: #8e8e93;
+    --surface: #ffffff;
+    --surface-2: #f2f2f7;
+    --surface-3: #e5e5ea;
+    --accent: #1a6bbf;
+    --green: #34c759;
+    --green-light: #e8f8ed;
+    --green-dark: #1e7e34;
+    --red: #ff3b30;
+    --red-light: #fff0ef;
+    --red-dark: #c0392b;
+    --yellow: #ff9500;
+    --yellow-light: #fff8ec;
+    --radius: 14px;
+    --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--surface-2);
+    color: var(--ink);
+    min-height: 100vh;
+    padding-bottom: 60px;
+  }
+
+  .hero {
+    background: var(--accent);
+    padding: 36px 24px 28px;
+    color: #fff;
+    text-align: center;
+  }
+  .hero .label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    opacity: 0.7;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    font-weight: 400;
+  }
+  .hero h1 { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; margin-bottom: 6px; }
+  .hero p { font-size: 13px; opacity: 0.8; font-weight: 300; }
+
+  .container {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 24px 16px;
+  }
+
+  .section {
+    background: var(--surface);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 16px;
+    border: 1px solid var(--surface-3);
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid var(--surface-2);
+    background: var(--surface-2);
+  }
+  .field {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--surface-2);
+  }
+  .field:last-child { border-bottom: none; }
+  .field-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-mid);
+    margin-bottom: 10px;
+  }
+  .field-label .req { color: var(--red); margin-left: 2px; }
+
+  select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--surface-3);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-family: inherit;
+    background: var(--surface-2);
+    color: var(--ink);
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238e8e93' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+    cursor: pointer;
+  }
+  select:focus { outline: none; border-color: var(--accent); background-color: var(--surface); box-shadow: 0 0 0 3px rgba(26,107,191,0.12); }
+
+  /* イベントカード */
+  .event-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    border: 1px solid var(--surface-3);
+    overflow: hidden;
+  }
+  .event-card-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--surface-2);
+  }
+  .event-date-label {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 2px;
+  }
+  .event-meta {
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-weight: 300;
+  }
+  .event-question {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-mid);
+    padding: 12px 16px 8px;
+  }
+  .avail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding: 0 16px 16px;
+  }
+  .avail-btn {
+    border: 2px solid var(--surface-3);
+    border-radius: var(--radius-sm);
+    padding: 14px 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--surface);
+    user-select: none;
+  }
+  .avail-btn:hover { border-color: var(--ink-soft); }
+  .avail-btn .avail-icon { font-size: 24px; margin-bottom: 4px; }
+  .avail-btn .avail-text { font-size: 12px; font-weight: 500; color: var(--ink-mid); }
+
+  .avail-btn.selected-ok { border-color: var(--green); background: var(--green-light); }
+  .avail-btn.selected-ok .avail-text { color: var(--green-dark); }
+  .avail-btn.selected-ng { border-color: var(--red); background: var(--red-light); }
+  .avail-btn.selected-ng .avail-text { color: var(--red-dark); }
+  .avail-btn.selected-unsure { border-color: var(--yellow); background: var(--yellow-light); }
+  .avail-btn.selected-unsure .avail-text { color: #7d4a00; }
+
+  textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--surface-3);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-family: inherit;
+    background: var(--surface-2);
+    color: var(--ink);
+    min-height: 80px;
+    resize: vertical;
+    line-height: 1.6;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(26,107,191,0.12); }
+
+  .btn-submit {
+    width: 100%;
+    padding: 15px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-top: 8px;
+  }
+  .btn-submit:hover { background: #155a9e; }
+
+  /* success */
+  .success-screen { display: none; text-align: center; padding: 60px 24px; }
+  .success-screen.show { display: block; }
+  .success-icon { width: 64px; height: 64px; background: var(--green-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 20px; }
+  .success-screen h2 { font-size: 20px; font-weight: 500; margin-bottom: 8px; }
+  .success-screen p { font-size: 14px; color: var(--ink-soft); font-weight: 300; line-height: 1.8; }
+
+  .result-list { margin: 16px 0; text-align: left; }
+  .result-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+  .result-date { font-weight: 500; color: var(--ink); }
+  .result-badge { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .badge-ok { background: var(--green-light); color: var(--green-dark); }
+  .badge-ng { background: var(--red-light); color: var(--red-dark); }
+  .badge-unsure { background: var(--yellow-light); color: #7d4a00; }
+
+  .form-wrap.hide { display: none; }
+
+  .no-event {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--ink-soft);
+  }
+  .no-event .icon { font-size: 32px; margin-bottom: 12px; }
+  .no-event p { font-size: 14px; font-weight: 300; line-height: 1.7; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="label">Schedule Form</div>
+  <h1>日程調整フォーム</h1>
+  <p>各イベント日の参加可否をお知らせください</p>
+</div>
+
+<div class="container">
+
+  <div id="noEventState" class="no-event" style="display:none">
+    <div class="icon">📭</div>
+    <p>現在回答できるイベントがありません。<br>URLを確認してください。</p>
+  </div>
+
+  <div class="form-wrap" id="formWrap">
+
+    <!-- スタッフ選択 -->
+    <div class="section" id="staffSection">
+      <div class="section-label">スタッフ確認</div>
+      <div class="field">
+        <div class="field-label">あなたのお名前<span class="req">*</span></div>
+        <select id="staffSelect" onchange="onStaffChange()">
+          <option value="">選択してください</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- イベントカード（JSで生成） -->
+    <div id="eventCards"></div>
+
+    <!-- コメント -->
+    <div class="section">
+      <div class="section-label">コメント</div>
+      <div class="field">
+        <div class="field-label">連絡事項（任意）</div>
+        <textarea id="comment" placeholder="遅刻・早退の予定、連絡事項などがあればご記入ください"></textarea>
+      </div>
+    </div>
+
+    <button class="btn-submit" onclick="submitSchedule()">回答を送信する</button>
+  </div>
+
+  <!-- success -->
+  <div class="success-screen" id="successScreen">
+    <div class="success-icon">✓</div>
+    <h2>回答を受け付けました</h2>
+    <div class="result-list" id="resultList"></div>
+    <p>ありがとうございます。<br>内容はスタッフ調整画面に反映されます。</p>
+  </div>
+
+</div>
+
+<script>
+const STORAGE_KEY_EVENTS   = 'staff_mgmt_events';
+const STORAGE_KEY_STAFFS   = 'staff_mgmt_staffs';
+const STORAGE_KEY_VENUES   = 'staff_mgmt_venues';
+const STORAGE_KEY_SCHEDULE = 'staff_mgmt_schedule_responses';
+const STORAGE_KEY_CATS     = 'staff_mgmt_categories';
+
+function load(key, def) {
+  try { return JSON.parse(localStorage.getItem(key)) || def; } catch { return def; }
+}
+
+let events = [];
+let staffs = [];
+let venues = [];
+let cats   = [];
+let targetEventIds = [];
+// eventId → 'ok'|'ng'|'unsure'
+const selectedAvails = {};
+
+function init() {
+  events = load(STORAGE_KEY_EVENTS, []);
+  staffs = load(STORAGE_KEY_STAFFS, []);
+  venues = load(STORAGE_KEY_VENUES, []);
+  cats   = load(STORAGE_KEY_CATS, []);
+
+  const params = new URLSearchParams(location.search);
+  const eventsParam = params.get('events') || params.get('event');
+  const staffParam  = params.get('staff');
+
+  if (eventsParam) {
+    targetEventIds = eventsParam.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    // 存在するイベントのみ
+    targetEventIds = targetEventIds.filter(id => events.find(e => e.id === id));
+  }
+
+  if (targetEventIds.length === 0) {
+    document.getElementById('noEventState').style.display = 'block';
+    document.getElementById('formWrap').style.display = 'none';
+    return;
+  }
+
+  buildStaffSelector();
+  buildEventCards();
+
+  if (staffParam) {
+    const sel = document.getElementById('staffSelect');
+    sel.value = staffParam;
+    onStaffChange();
+  }
+}
+
+function buildStaffSelector() {
+  const sel = document.getElementById('staffSelect');
+  sel.innerHTML = '<option value="">選択してください</option>';
+  staffs.forEach(s => {
+    sel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+  });
+}
+
+function buildEventCards() {
+  const container = document.getElementById('eventCards');
+  container.innerHTML = '';
+  targetEventIds.forEach(id => {
+    const ev = events.find(e => e.id === id);
+    if (!ev) return;
+    const v = venues.find(v => v.id === ev.venueId);
+    const c = cats.find(c => c.id === ev.categoryId);
+    const meta = [v?.name, c?.name].filter(Boolean).join('・');
+
+    const card = document.createElement('div');
+    card.className = 'event-card';
+    card.id = `card-${id}`;
+    card.innerHTML = `
+      <div class="event-card-header">
+        <div class="event-date-label">${formatDate(ev.date)}</div>
+        ${meta ? `<div class="event-meta">${meta}</div>` : ''}
+      </div>
+      <div class="event-question">このイベントに参加できますか？</div>
+      <div class="avail-grid">
+        <div class="avail-btn" id="btn-${id}-ok" onclick="selectAvail(${id},'ok')">
+          <div class="avail-icon">○</div>
+          <div class="avail-text">参加できる</div>
+        </div>
+        <div class="avail-btn" id="btn-${id}-ng" onclick="selectAvail(${id},'ng')">
+          <div class="avail-icon">×</div>
+          <div class="avail-text">参加できない</div>
+        </div>
+        <div class="avail-btn" id="btn-${id}-unsure" onclick="selectAvail(${id},'unsure')">
+          <div class="avail-icon">△</div>
+          <div class="avail-text">未定・要確認</div>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function formatDate(dateStr) {
+  // "2025-04-01" → "4月1日（火）"
+  const d = new Date(dateStr + 'T00:00:00');
+  const days = ['日','月','火','水','木','金','土'];
+  return `${d.getMonth()+1}月${d.getDate()}日（${days[d.getDay()]}）`;
+}
+
+function selectAvail(eventId, val) {
+  selectedAvails[eventId] = val;
+  ['ok','ng','unsure'].forEach(v => {
+    const btn = document.getElementById(`btn-${eventId}-${v}`);
+    if (btn) btn.className = 'avail-btn' + (v === val ? ' selected-' + v : '');
+  });
+}
+
+function onStaffChange() {
+  const staffId = parseInt(document.getElementById('staffSelect').value);
+  if (!staffId) return;
+  // 既回答があれば自動選択
+  const responses = load(STORAGE_KEY_SCHEDULE, []);
+  targetEventIds.forEach(id => {
+    const existing = responses.find(r => r.staffId === staffId && r.eventId === id);
+    if (existing) selectAvail(id, existing.status);
+  });
+}
+
+function submitSchedule() {
+  const staffId = parseInt(document.getElementById('staffSelect').value);
+  if (!staffId) { alert('お名前を選択してください'); return; }
+
+  const unanswered = targetEventIds.filter(id => !selectedAvails[id]);
+  if (unanswered.length > 0) {
+    alert('すべてのイベント日の参加可否を選択してください');
+    return;
+  }
+
+  const comment = document.getElementById('comment').value.trim();
+  let responses = load(STORAGE_KEY_SCHEDULE, []);
+  let evs = load(STORAGE_KEY_EVENTS, []);
+
+  targetEventIds.forEach(id => {
+    const status = selectedAvails[id];
+    responses = responses.filter(r => !(r.staffId === staffId && r.eventId === id));
+    responses.push({ staffId, eventId: id, status, comment, answeredAt: new Date().toISOString() });
+
+    // attendance更新
+    const map = { ok: 'ok', ng: 'ng', unsure: 'unknown' };
+    const ev = evs.find(e => e.id === id);
+    if (ev) {
+      if (!ev.attendance) ev.attendance = {};
+      ev.attendance[staffId] = map[status];
+    }
+  });
+
+  localStorage.setItem(STORAGE_KEY_SCHEDULE, JSON.stringify(responses));
+  localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify(evs));
+
+  showSuccess();
+}
+
+function showSuccess() {
+  document.getElementById('formWrap').classList.add('hide');
+  const screen = document.getElementById('successScreen');
+  screen.classList.add('show');
+
+  const labelMap = { ok: { cls: 'badge-ok', text: '○ 参加できる' }, ng: { cls: 'badge-ng', text: '× 参加できない' }, unsure: { cls: 'badge-unsure', text: '△ 未定・要確認' } };
+  const list = document.getElementById('resultList');
+  list.innerHTML = targetEventIds.map(id => {
+    const ev = events.find(e => e.id === id);
+    const info = labelMap[selectedAvails[id]];
+    return `<div class="result-row"><span class="result-date">${formatDate(ev.date)}</span><span class="result-badge ${info.cls}">${info.text}</span></div>`;
+  }).join('');
+}
+
+init();
+</script>
+</body>
+</html>

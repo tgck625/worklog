@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>こだわりんスタッフ申請フォーム</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1c1c1e;
+    --ink-mid: #48484a;
+    --ink-soft: #8e8e93;
+    --ink-faint: #c7c7cc;
+    --surface: #ffffff;
+    --surface-2: #f2f2f7;
+    --surface-3: #e5e5ea;
+    --accent: #1a6bbf;
+    --accent-light: #e8f1fb;
+    --green: #34c759;
+    --green-light: #e8f8ed;
+    --red: #ff3b30;
+    --red-light: #fff0ef;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans JP', sans-serif; background: var(--surface-2); color: var(--ink); min-height: 100vh; padding: 0 0 60px; }
+
+  .page-header { background: var(--surface); border-bottom: 1px solid var(--surface-3); padding: 32px 24px 24px; text-align: center; }
+  .page-header .logo { font-size: 11px; font-weight: 500; letter-spacing: 0.1em; color: var(--ink-soft); text-transform: uppercase; margin-bottom: 6px; }
+  .page-header h1 { font-size: 20px; font-weight: 500; letter-spacing: -0.02em; }
+  .page-header p { font-size: 13px; color: var(--ink-soft); margin-top: 6px; font-weight: 300; }
+
+  .container { max-width: 600px; margin: 0 auto; padding: 24px 16px; }
+
+  .section { background: var(--surface); border-radius: var(--radius); overflow: hidden; margin-bottom: 16px; border: 1px solid var(--surface-3); }
+  .section-label { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: var(--ink-soft); text-transform: uppercase; padding: 14px 16px 10px; border-bottom: 1px solid var(--surface-2); background: var(--surface-2); }
+  .field { padding: 0 16px; border-bottom: 1px solid var(--surface-2); }
+  .field:last-child { border-bottom: none; }
+  .field-inner { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; }
+  .field-label { font-size: 13px; font-weight: 500; color: var(--ink-mid); min-width: 130px; padding-top: 9px; flex-shrink: 0; }
+  .field-label .req { color: var(--red); margin-left: 2px; font-size: 11px; }
+  .field-input { flex: 1; }
+
+  input[type="text"], input[type="tel"], input[type="email"], input[type="date"], input[type="number"], select, textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid var(--surface-3); border-radius: var(--radius-sm);
+    font-size: 14px; font-family: inherit; background: var(--surface-2); color: var(--ink);
+    transition: border-color 0.15s, background 0.15s; -webkit-appearance: none; appearance: none;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(26,107,191,0.1); }
+  textarea { min-height: 80px; resize: vertical; line-height: 1.6; }
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238e8e93' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+  .hint { font-size: 11px; color: var(--ink-soft); margin-top: 5px; font-weight: 300; }
+
+  /* Radio / Checkbox groups */
+  .choices { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
+  .choice-item { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+  .choice-item input[type="radio"], .choice-item input[type="checkbox"] { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; cursor: pointer; }
+  .choice-item span { font-size: 14px; line-height: 1.5; }
+  .choices-horizontal { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 4px 0; }
+
+  /* PC skill grid */
+  .skill-grid { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .skill-grid th { padding: 8px 10px; background: var(--surface-2); color: var(--ink-soft); font-weight: 500; text-align: center; font-size: 11px; border: 1px solid var(--surface-3); }
+  .skill-grid th:first-child { text-align: left; }
+  .skill-grid td { padding: 8px 10px; border: 1px solid var(--surface-3); text-align: center; }
+  .skill-grid td:first-child { text-align: left; font-weight: 500; }
+  .skill-grid input[type="radio"] { accent-color: var(--accent); width: 15px; height: 15px; }
+
+  /* Submit */
+  .submit-wrap { padding: 20px 0 0; }
+  .btn-submit { width: 100%; padding: 15px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 500; font-family: inherit; cursor: pointer; transition: background 0.15s; }
+  .btn-submit:hover { background: #155a9e; }
+  .btn-submit:disabled { background: var(--ink-faint); cursor: not-allowed; }
+
+  /* Success */
+  .success-screen { display: none; text-align: center; padding: 60px 24px; }
+  .success-screen.show { display: block; }
+  .success-icon { width: 64px; height: 64px; background: var(--green-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 20px; }
+  .success-screen h2 { font-size: 20px; font-weight: 500; margin-bottom: 8px; }
+  .success-screen p { font-size: 14px; color: var(--ink-soft); font-weight: 300; line-height: 1.7; }
+  .form-wrap.hide { display: none; }
+  .notice { font-size: 12px; color: var(--ink-soft); text-align: right; margin-bottom: 8px; font-weight: 300; }
+  .notice span { color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="logo">Kodawarin Staff</div>
+  <h1>スタッフ申請フォーム</h1>
+  <p>ご応募ありがとうございます。以下の内容をご記入ください。</p>
+</div>
+
+<div class="container">
+  <div class="form-wrap" id="formWrap">
+    <p class="notice"><span>*</span> は必須項目です</p>
+
+    <!-- ① 基本情報 -->
+    <div class="section">
+      <div class="section-label">基本情報</div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">お名前<span class="req">*</span></div>
+        <div class="field-input" style="display:flex;gap:8px">
+          <input type="text" id="lastName" placeholder="田中" autocomplete="family-name" style="flex:1">
+          <input type="text" id="firstName" placeholder="美咲" autocomplete="given-name" style="flex:1">
+        </div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">フリガナ<span class="req">*</span></div>
+        <div class="field-input" style="display:flex;gap:8px">
+          <input type="text" id="lastKana" placeholder="タナカ" style="flex:1">
+          <input type="text" id="firstKana" placeholder="ミサキ" style="flex:1">
+        </div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">ご年齢<span class="req">*</span></div>
+        <div class="field-input"><input type="number" id="age" placeholder="25" min="15" max="99" style="width:80px"></div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">生年月日</div>
+        <div class="field-input"><input type="date" id="birthday"></div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">血液型</div>
+        <div class="field-input">
+          <div class="choices-horizontal">
+            <label class="choice-item"><input type="radio" name="blood" value="A"><span>A型</span></label>
+            <label class="choice-item"><input type="radio" name="blood" value="B"><span>B型</span></label>
+            <label class="choice-item"><input type="radio" name="blood" value="AB"><span>AB型</span></label>
+            <label class="choice-item"><input type="radio" name="blood" value="O"><span>O型</span></label>
+            <label class="choice-item"><input type="radio" name="blood" value="わからない"><span>わからない</span></label>
+          </div>
+        </div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">現在の職業<span class="req">*</span></div>
+        <div class="field-input">
+          <div class="choices">
+            <label class="choice-item"><input type="radio" name="job" value="正社員・契約社員"><span>正社員・契約社員</span></label>
+            <label class="choice-item"><input type="radio" name="job" value="パート"><span>パート</span></label>
+            <label class="choice-item"><input type="radio" name="job" value="学生"><span>学生</span></label>
+            <label class="choice-item"><input type="radio" name="job" value="特に仕事はしていない"><span>特に仕事はしていない</span></label>
+            <label class="choice-item"><input type="radio" name="job" value="other_job"><span>その他：<input type="text" id="jobOther" placeholder="ご記入ください" style="width:160px;margin-left:6px;display:inline-block" onclick="document.querySelector('[name=job][value=other_job]').checked=true"></span></label>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ② 連絡先 -->
+    <div class="section">
+      <div class="section-label">連絡先</div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">電話番号<span class="req">*</span></div>
+        <div class="field-input"><input type="tel" id="phone" placeholder="090-0000-0000" autocomplete="tel"></div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">メールアドレス</div>
+        <div class="field-input"><input type="email" id="email" placeholder="example@mail.com" autocomplete="email"></div>
+      </div></div>
+    </div>
+
+    <!-- ③ 住所・アクセス -->
+    <div class="section">
+      <div class="section-label">住所・アクセス</div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">ご住所<span class="req">*</span></div>
+        <div class="field-input">
+          <input type="text" id="address" placeholder="愛知県名古屋市..." autocomplete="street-address">
+          <div class="hint">普段住まわれている場所のご住所をご記入ください</div>
+        </div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">最寄り駅<span class="req">*</span></div>
+        <div class="field-input">
+          <input type="text" id="station" placeholder="例：名古屋駅（JR東海道線）">
+          <div class="hint">路線名も含めて入力してください</div>
+        </div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">駅からの時間</div>
+        <div class="field-input">
+          <select id="stationTime">
+            <option value="">選択してください</option>
+            <option>5分以内</option><option>10分以内</option><option>15分以内</option>
+            <option>20分以内</option><option>20分以上</option>
+          </select>
+        </div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">お車の利用<span class="req">*</span></div>
+        <div class="field-input">
+          <div class="choices">
+            <label class="choice-item"><input type="radio" name="car" value="可能"><span>はい（車で来られます）</span></label>
+            <label class="choice-item"><input type="radio" name="car" value="日による"><span>日による</span></label>
+            <label class="choice-item"><input type="radio" name="car" value="不可能"><span>いいえ（車は使えません）</span></label>
+          </div>
+        </div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">運転免許証</div>
+        <div class="field-input">
+          <div class="choices-horizontal">
+            <label class="choice-item"><input type="radio" name="license" value="あり"><span>あり</span></label>
+            <label class="choice-item"><input type="radio" name="license" value="なし"><span>なし</span></label>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ④ 関わり方・動機 -->
+    <div class="section">
+      <div class="section-label">関わり方・志望動機</div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">希望する関わり方<span class="req">*</span></div>
+        <div class="field-input">
+          <div class="hint" style="margin-bottom:8px">★ 関わり方によって次からの質問が変わります</div>
+          <div class="choices">
+            <label class="choice-item"><input type="radio" name="involvement" value="企画運営から"><span>イベントの企画・運営（準備段階）から興味がある</span></label>
+            <label class="choice-item"><input type="radio" name="involvement" value="当日のみ"><span>イベント当日のみの運営を希望</span></label>
+          </div>
+        </div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">興味を持ったきっかけ<span class="req">*</span></div>
+        <div class="field-input"><textarea id="reason" placeholder="きっかけや理由をご記入ください"></textarea></div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">活かせそうな経験<span class="req">*</span></div>
+        <div class="field-input"><textarea id="experience" placeholder="例）保育士として園で働いた経験があり、どうしたら子どもたちの気づきや学び、発見に繋げられるかの問いかけを考えていました。"></textarea></div>
+      </div></div>
+    </div>
+
+    <!-- ⑤ スケジュール -->
+    <div class="section">
+      <div class="section-label">スケジュール</div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">日曜日</div>
+        <div class="field-input">
+          <select id="sundayAvail">
+            <option value="">選択してください</option>
+            <option>毎週参加できる</option>
+            <option>月3回程度参加できる</option>
+            <option>月2回程度参加できる</option>
+            <option>月1回程度参加できる</option>
+            <option>2〜3ヶ月に1回程度</option>
+            <option>参加が難しい</option>
+          </select>
+        </div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">土曜日</div>
+        <div class="field-input">
+          <select id="saturdayAvail">
+            <option value="">選択してください</option>
+            <option>毎週参加できる</option>
+            <option>月3回程度参加できる</option>
+            <option>月2回程度参加できる</option>
+            <option>月1回程度参加できる</option>
+            <option>2〜3ヶ月に1回程度</option>
+            <option>参加が難しい</option>
+          </select>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ⑥ スキル・適性 -->
+    <div class="section">
+      <div class="section-label">スキル・適性</div>
+      <div class="field"><div class="field-inner" style="flex-direction:column;gap:8px">
+        <div class="field-label" style="padding-top:0;min-width:auto">当日業務でできること（複数選択可）<span class="req">*</span></div>
+        <div class="field-input" style="width:100%">
+          <div class="choices">
+            <label class="choice-item"><input type="checkbox" name="daySkill" value="大人への接客"><span>大人への接客</span></label>
+            <label class="choice-item"><input type="checkbox" name="daySkill" value="子どもへの対応"><span>子どもへの対応・教える</span></label>
+            <label class="choice-item"><input type="checkbox" name="daySkill" value="料理を作る・教える"><span>料理を作る・教える</span></label>
+            <label class="choice-item"><input type="checkbox" name="daySkill" value="SNS投稿"><span>SNS投稿（写真撮影含む）</span></label>
+            <label class="choice-item"><input type="checkbox" name="daySkill" value="会場設営・撤収"><span>会場設営・撤収</span></label>
+            <label class="choice-item"><input type="checkbox" name="daySkill" value="スタッフリーダー"><span>スタッフのまとめ役（リーダー）</span></label>
+            <label class="choice-item"><input type="checkbox" name="daySkill" value="レジ・金銭管理"><span>レジ・金銭管理</span></label>
+            <label class="choice-item"><input type="checkbox" name="daySkill" value="体験コンテンツ補助"><span>体験コンテンツの補助・説明</span></label>
+          </div>
+        </div>
+      </div></div>
+      <div class="field"><div class="field-inner" style="flex-direction:column;gap:8px">
+        <div class="field-label" style="padding-top:0;min-width:auto">企画・運営でできること（複数選択可）<span class="req">*</span></div>
+        <div class="field-input" style="width:100%">
+          <div class="choices">
+            <label class="choice-item"><input type="checkbox" name="planSkill" value="企画の立案"><span>企画の立案</span></label>
+            <label class="choice-item"><input type="checkbox" name="planSkill" value="マニュアル作成"><span>マニュアル作成</span></label>
+            <label class="choice-item"><input type="checkbox" name="planSkill" value="デザイン"><span>デザイン（チラシ・バナー等）</span></label>
+            <label class="choice-item"><input type="checkbox" name="planSkill" value="SNSマーケティング"><span>SNSマーケティング</span></label>
+            <label class="choice-item"><input type="checkbox" name="planSkill" value="写真・動画編集"><span>写真・動画編集</span></label>
+            <label class="choice-item"><input type="checkbox" name="planSkill" value="ライティング・文章"><span>ライティング・文章作成</span></label>
+            <label class="choice-item"><input type="checkbox" name="planSkill" value="スケジュール管理"><span>スケジュール・進行管理</span></label>
+            <label class="choice-item"><input type="checkbox" name="planSkill" value="採購・仕入れ"><span>採購・仕入れ</span></label>
+          </div>
+        </div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">得意なこと・強み</div>
+        <div class="field-input"><textarea id="strengths" placeholder="自由にご記入ください"></textarea></div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">好きなこと・興味</div>
+        <div class="field-input"><textarea id="interests" placeholder="趣味・関心ごとなど"></textarea></div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">苦手なこと</div>
+        <div class="field-input"><textarea id="weaknesses" placeholder="正直にご記入ください"></textarea></div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">興味の薄いこと</div>
+        <div class="field-input"><textarea id="dislikes" placeholder="あれば教えてください"></textarea></div>
+      </div></div>
+      <!-- PCツールグリッド -->
+      <div class="field"><div class="field-inner" style="flex-direction:column;gap:8px">
+        <div class="field-label" style="padding-top:0;min-width:auto">PCツールの使用状況</div>
+        <div class="field-input" style="width:100%;overflow-x:auto">
+          <table class="skill-grid">
+            <thead><tr>
+              <th>ツール</th>
+              <th>使えない</th>
+              <th>少し使える</th>
+              <th>得意</th>
+            </tr></thead>
+            <tbody id="pcSkillBody"></tbody>
+          </table>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ⑦ 誓約 -->
+    <div class="section">
+      <div class="section-label">誓約事項</div>
+      <div class="field"><div class="field-inner" style="align-items:flex-start">
+        <div class="field-input">
+          <div style="font-size:13px;line-height:1.9;color:var(--ink-mid);background:var(--surface-2);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px">
+            Lawin株式会社が所有する業務を遂行するにあたり、以下の点を必ずお守りください。<br>
+            1. 業務上知り得た弊社の秘密情報、機密情報について一切使用もしくは第三者に開示、漏えいしないこと。<br>
+            2. 業務上知り得た個人情報について、一切使用もしくは第三者に開示、漏えいしないこと。<br>
+            3. 弊社の諸規則を遵守し、誠実に業務すること。<br>
+            4. 故意又は重大な過失により弊社に損害を与えた場合は、弊社の被った損害についてこれを賠償すること。<br>
+            5. 弊社の書面による事前の許可を得ることなく、次の行為を行わないこと。<br>
+            &emsp;① 弊社と競業関係に立つ事業者に在籍、就職若しくは役員に就任すること。<br>
+            &emsp;② 弊社と競業関係に立つ事業者の提携先企業に就職若しくは役員に就任すること。<br>
+            &emsp;③ 自ら開業し、弊社と競業関係に立つ事業を行うこと。
+          </div>
+          <label class="choice-item" style="align-items:center">
+            <input type="checkbox" id="pledge" style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0">
+            <span style="font-size:14px;font-weight:500;color:var(--ink)">上記について誓約します。<span class="req">*</span></span>
+          </label>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ⑧ 備考 -->
+    <div class="section">
+      <div class="section-label">備考</div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">その他・備考</div>
+        <div class="field-input"><textarea id="notes" placeholder="連絡事項があれば記入してください"></textarea></div>
+      </div></div>
+    </div>
+
+    <div class="submit-wrap">
+      <button class="btn-submit" id="submitBtn" onclick="submitForm()">送信する</button>
+    </div>
+  </div>
+
+  <!-- success -->
+  <div class="success-screen" id="successScreen">
+    <div class="success-icon">✓</div>
+    <h2>送信が完了しました</h2>
+    <p>ご応募ありがとうございます。<br>内容を確認の上、担当者よりご連絡します。<br>ご不明な点はお気軽にお問い合わせください。</p>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY_STAFF_PENDING = 'staff_mgmt_pending_registrations';
+
+// PCツールグリッド生成
+const PC_TOOLS = ['Excel / スプレッドシート', 'Word / ドキュメント', 'Canva', 'Illustrator / Photoshop', '写真編集', '動画編集'];
+const SKILL_LEVELS = ['使えない', '少し使える', '得意'];
+const tbody = document.getElementById('pcSkillBody');
+PC_TOOLS.forEach((tool, i) => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${tool}</td>` + SKILL_LEVELS.map((lv, j) =>
+    `<td><input type="radio" name="pc_${i}" value="${lv}"></td>`
+  ).join('');
+  tbody.appendChild(tr);
+});
+
+function getChecked(name) {
+  return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(el => el.value);
+}
+function getRadio(name) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  return el ? el.value : '';
+}
+function getPcSkills() {
+  const result = {};
+  PC_TOOLS.forEach((tool, i) => {
+    const el = document.querySelector(`input[name="pc_${i}"]:checked`);
+    result[tool] = el ? el.value : '';
+  });
+  return result;
+}
+
+function submitForm() {
+  const lastName  = document.getElementById('lastName').value.trim();
+  const firstName = document.getElementById('firstName').value.trim();
+  const lastKana  = document.getElementById('lastKana').value.trim();
+  const firstKana = document.getElementById('firstKana').value.trim();
+  const name = lastName + ' ' + firstName;
+  const kana = lastKana + ' ' + firstKana;
+  const age  = document.getElementById('age').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  const address = document.getElementById('address').value.trim();
+  const station = document.getElementById('station').value.trim();
+  const job = getRadio('job');
+  const car = getRadio('car');
+  const involvement = getRadio('involvement');
+  const pledge = document.getElementById('pledge').checked;
+
+  if (!lastName)    { alert('姓（苗字）を入力してください'); document.getElementById('lastName').focus(); return; }
+  if (!firstName)   { alert('名（名前）を入力してください'); document.getElementById('firstName').focus(); return; }
+  if (!lastKana)    { alert('フリガナ（姓）を入力してください'); document.getElementById('lastKana').focus(); return; }
+  if (!firstKana)   { alert('フリガナ（名）を入力してください'); document.getElementById('firstKana').focus(); return; }
+  if (!age)         { alert('ご年齢を入力してください'); document.getElementById('age').focus(); return; }
+  if (!phone)       { alert('電話番号を入力してください'); document.getElementById('phone').focus(); return; }
+  if (!address)     { alert('ご住所を入力してください'); document.getElementById('address').focus(); return; }
+  if (!station)     { alert('最寄り駅を入力してください'); document.getElementById('station').focus(); return; }
+  if (!job)         { alert('現在の職業を選択してください'); return; }
+  if (!car)         { alert('お車の利用を選択してください'); return; }
+  if (!involvement) { alert('希望する関わり方を選択してください'); return; }
+
+  const daySkills = getChecked('daySkill');
+  const planSkills = getChecked('planSkill');
+  if (daySkills.length === 0)  { alert('当日業務でできることを1つ以上選択してください'); return; }
+  if (planSkills.length === 0) { alert('企画・運営でできることを1つ以上選択してください'); return; }
+
+  const reason = document.getElementById('reason').value.trim();
+  const experience = document.getElementById('experience').value.trim();
+  if (!reason)      { alert('興味を持ったきっかけをご記入ください'); document.getElementById('reason').focus(); return; }
+  if (!experience)  { alert('活かせそうな経験をご記入ください'); document.getElementById('experience').focus(); return; }
+  if (!pledge)      { alert('誓約事項への同意が必要です'); return; }
+
+  const jobOther = document.getElementById('jobOther').value.trim();
+
+  const data = {
+    id: Date.now(),
+    submittedAt: new Date().toISOString(),
+    status: 'pending',
+    lastName, firstName, name, kana,
+    age: parseInt(age),
+    birthday: document.getElementById('birthday').value,
+    blood: getRadio('blood'),
+    job: job === 'other_job' ? (jobOther || 'その他') : job,
+    phone,
+    email: document.getElementById('email').value.trim(),
+    address, station,
+    stationTime: document.getElementById('stationTime').value,
+    carCommute: car,
+    hasLicense: getRadio('license'),
+    involvement,
+    reason, experience,
+    sundayAvail: document.getElementById('sundayAvail').value,
+    saturdayAvail: document.getElementById('saturdayAvail').value,
+    daySkills, planSkills,
+    strengths: document.getElementById('strengths').value.trim(),
+    interests: document.getElementById('interests').value.trim(),
+    weaknesses: document.getElementById('weaknesses').value.trim(),
+    dislikes: document.getElementById('dislikes').value.trim(),
+    pcSkills: getPcSkills(),
+    notes: document.getElementById('notes').value.trim(),
+    pledgeSigned: true,
+    contractSigned: false,
+  };
+
+  const pending = JSON.parse(localStorage.getItem(STORAGE_KEY_STAFF_PENDING) || '[]');
+  pending.push(data);
+  localStorage.setItem(STORAGE_KEY_STAFF_PENDING, JSON.stringify(pending));
+
+  document.getElementById('formWrap').classList.add('hide');
+  document.getElementById('successScreen').classList.add('show');
+}
+</script>
+</body>
+</html>

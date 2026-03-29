@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>データインポート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans JP', sans-serif; background: #f2f2f7; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .card { background: #fff; border-radius: 16px; padding: 32px 28px; max-width: 420px; width: 100%; border: 1px solid #e5e5ea; text-align: center; }
+  h1 { font-size: 18px; font-weight: 500; margin-bottom: 8px; }
+  p { font-size: 13px; color: #8e8e93; line-height: 1.7; margin-bottom: 24px; }
+  .btn { display: block; width: 100%; padding: 14px; background: #1a6bbf; color: #fff; border: none; border-radius: 12px; font-size: 15px; font-weight: 500; font-family: inherit; cursor: pointer; transition: background 0.15s; }
+  .btn:hover { background: #155a9e; }
+  .btn:disabled { background: #e5e5ea; color: #8e8e93; cursor: not-allowed; }
+  .btn-danger { background: #ff3b30; margin-top: 10px; }
+  .btn-danger:hover { background: #c0392b; }
+  .result { margin-top: 20px; padding: 14px 16px; border-radius: 10px; font-size: 13px; line-height: 1.7; display: none; }
+  .result.ok { background: #e8f8ed; color: #1e7e34; }
+  .result.err { background: #fff0ef; color: #c0392b; }
+  .back { display: inline-block; margin-top: 20px; font-size: 13px; color: #1a6bbf; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>データインポート</h1>
+  <p>スプレッドシート「スタッフ出席表」の内容をインポートします。<br>スタッフ7名・イベント44件。</p>
+  <button class="btn" id="importBtn" onclick="runImport()">インポート実行（上書き）</button>
+  <button class="btn btn-danger" onclick="clearAll()">全データ削除</button>
+
+  <hr style="margin:20px 0;border:none;border-top:1px solid #e5e5ea">
+  <p style="font-size:13px;color:#555;margin-bottom:10px">サイト移行・バックアップ用</p>
+  <button class="btn" style="background:#34c759" onclick="exportData()">📤 全データをJSONでエクスポート</button>
+  <div style="margin-top:10px">
+    <label style="display:block;font-size:13px;color:#555;margin-bottom:6px">📥 JSONファイルからインポート（上書き）</label>
+    <input type="file" id="jsonFile" accept=".json" style="font-size:13px;width:100%">
+    <button class="btn" style="margin-top:8px;background:#555" onclick="importFromJson()">インポート実行</button>
+  </div>
+
+  <div class="result" id="result"></div>
+  <a href="/eventstaff-shift/" class="back">← トップに戻る</a>
+</div>
+
+<script>
+// ○=ok, ×=ng  スタッフ順: 小林知世,井嶋大智,水野陸弥,濱光基,柘植まち子,加門侑扶,三輪寛美
+const RAW_EVENTS = [
+  ["4/12(日) CBCハウジング長久手：食育プレミア（内容未定）","2026-04-12","○×○○○×○"],
+  ["4/25(土) イオンモール扶桑：きな粉餅","2026-04-25","××○×○×○"],
+  ["4/26(日) イオンモール扶桑：絵付体験","2026-04-26","○×○○○××"],
+  ["5/3(日) CBCハウジング名駅北：食育プレミア（内容未定）","2026-05-03","○○○○○×○"],
+  ["5/10(日) NH日進：マルシェ","2026-05-10","○○×○○××"],
+  ["5/17(日) CBCハウジング蟹江：マルシェ①","2026-05-17","×○×○○×○"],
+  ["5/24(日) ナゴヤハウジングセンター春日井：マルシェ","2026-05-24","○○○○○××"],
+  ["5/31(日) NH日進：マルシェ","2026-05-31","○×× ○○×○"],
+  ["6/7(日) CBCハウジング蟹江：食育プレミア（内容未定）","2026-06-07","○○×○○××"],
+  ["6/14(日) CBCハウジング蟹江：食育プレミア（内容未定）","2026-06-14","×○××○×○"],
+  ["6/14(日) 土岐HG：食育プレミア（内容未定）","2026-06-14","×○○×○×○"],
+  ["6/20(土) イオンモール扶桑：コースター","2026-06-20","×○○○○××"],
+  ["6/21(日) イオンモール扶桑：器づくり","2026-06-21","○○○○○××"],
+  ["6/28(日) CBCハウジング名駅北：食育プレミア（採蜜体験）","2026-06-28","×○○○××○"],
+  ["6/28(日) 土岐HG：食育プレミア（内容未定）","2026-06-28","×○○○××○"],
+  ["7/24(金) イオンモール扶桑：トウモロコシ","2026-07-24","××○○○×○"],
+  ["7/25(土) イオンモール扶桑：ポップコーン","2026-07-25","×○○○○×○"],
+  ["7/26(日) イオンモール扶桑：採蜜体験","2026-07-26","○○○○○×○"],
+  ["9/6(日) CBCハウジング長久手：食育プレミア（内容未定）","2026-09-06","○○○○○○○"],
+  ["9/13(日) CBCハウジング長久手：食育プレミア（内容未定）","2026-09-13","○○○○○○×"],
+  ["9/19(土) イオンモール扶桑：メロンパン","2026-09-19","×○○○○×○"],
+  ["9/20(日) イオンモール扶桑：メロンパン","2026-09-20","○○○○○×○"],
+  ["9/27(日) CBCハウジング名駅北：マルシェ①","2026-09-27","○○○○○××"],
+  ["10/3(土) イオンモール扶桑：栗きんとん","2026-10-03","×○○○○×○"],
+  ["10/4(日) イオンモール扶桑：栗きんとん","2026-10-04","×○○○○×○"],
+  ["10/4(日) ナゴヤハウジングセンター春日井：マルシェ","2026-10-04","×○○○○×○"],
+  ["10/18(日) CBCハウジング蟹江：プレミア④","2026-10-18","×○×○○×○"],
+  ["11/8(土) CBCハウジング長久手：マルシェ①","2026-11-08","×○○○○○○"],
+  ["11/15(土) CBCハウジング蟹江：マルシェ②","2026-11-15","×○×○○××"],
+  ["11/22(日) CBCハウジング長久手：食育プレミア（内容未定）","2026-11-22","○○○○○○○"],
+  ["11/29(日) CBCハウジング蟹江：食育プレミア（内容未定）","2026-11-29","○○×○○××"],
+  ["12/19(土) イオンモール扶桑：アイシング","2026-12-19","×○○○○×○"],
+  ["12/20(日) イオンモール扶桑：練り切り","2026-12-20","○○○○○×○"],
+  ["12/21(月) イオンモール扶桑：鰹節削り","2026-12-21","××○○○×○"],
+  ["12/22(火) イオンモール扶桑：お豆腐","2026-12-22","××○○○×○"],
+  ["12/23(水) イオンモール扶桑：竹プリン","2026-12-23","××○○○×○"],
+  ["2027年1/17(日) CBCハウジング蟹江：マルシェ③","2027-01-17","○○×○○×○"],
+  ["2027年1/17(日) CBCハウジング長久手：マルシェ②","2027-01-17","○○○○○○○"],
+  ["2027年1/31(日) CBCハウジング蟹江：マルシェ③","2027-01-31","○○×○○×○"],
+  ["2027年1/31(日) CBCハウジング長久手：マルシェ②","2027-01-31","○○○○○○○"],
+  ["2027年3/7(日) CBCハウジング名駅北：マルシェ②","2027-03-07","×○○○○××"],
+  ["2027年3/14(日) CBCハウジング名駅北：食育プレミア（内容未定）","2027-03-14","○○○○○×○"],
+  ["2027年3/21(日) CBCハウジング長久手：マルシェ③","2027-03-21","×○○○○××"],
+  ["2027年3/28(日) CBCハウジング長久手：食育プレミア（内容未定）","2027-03-28","○○○○○×○"]
+];
+
+const STAFFS = [
+  {id:1, name:"小林知世",  kana:"", rankId:1, address:"", contractSigned:false},
+  {id:2, name:"井嶋大智",  kana:"", rankId:1, address:"", contractSigned:false},
+  {id:3, name:"水野　陸弥",kana:"", rankId:1, address:"", contractSigned:false},
+  {id:4, name:"濱光基",    kana:"", rankId:1, address:"", contractSigned:false},
+  {id:5, name:"柘植まち子",kana:"", rankId:1, address:"", contractSigned:false},
+  {id:6, name:"加門侑扶",  kana:"", rankId:1, address:"", contractSigned:false},
+  {id:7, name:"三輪　寛美",kana:"", rankId:1, address:"", contractSigned:false}
+];
+
+function parseAttendance(str) {
+  // スペース除去して7文字に
+  const chars = str.replace(/\s/g,'').split('');
+  const att = {};
+  chars.forEach((c, i) => {
+    att[i + 1] = c === '○' ? 'ok' : c === '×' ? 'ng' : 'unknown';
+  });
+  return att;
+}
+
+function runImport() {
+  const btn = document.getElementById('importBtn');
+  const res = document.getElementById('result');
+  btn.disabled = true;
+  btn.textContent = '処理中...';
+
+  try {
+    // スタッフを上書き保存
+    localStorage.setItem('staff_mgmt_staffs', JSON.stringify(STAFFS));
+
+    // イベント生成
+    const events = RAW_EVENTS.map((row, i) => ({
+      id: i + 1,
+      name: row[0],
+      date: row[1],
+      venueId: null,
+      categoryId: null,
+      requiredCount: 3,
+      staffAssignments: [],
+      attendance: parseAttendance(row[2]),
+      opStart: "10:00",
+      opEnd: "17:00",
+      opBreak: 0,
+      studyHours: 0,
+      ldrStudyHours: 0
+    }));
+    localStorage.setItem('staff_mgmt_events', JSON.stringify(events));
+
+    res.className = 'result ok';
+    res.style.display = 'block';
+    res.innerHTML = `✅ インポート完了！<br>スタッフ: ${STAFFS.length}名<br>イベント: ${events.length}件`;
+    btn.textContent = '完了';
+  } catch(e) {
+    res.className = 'result err';
+    res.style.display = 'block';
+    res.textContent = 'エラー: ' + e.message;
+    btn.disabled = false;
+    btn.textContent = 'インポート実行（上書き）';
+  }
+}
+
+const ALL_KEYS = ['staff_mgmt_staffs','staff_mgmt_events','staff_mgmt_venues','staff_mgmt_categories','staff_mgmt_schedule_responses','staff_mgmt_ranks','staff_mgmt_pending_registrations'];
+
+function exportData() {
+  const data = {};
+  ALL_KEYS.forEach(k => {
+    const v = localStorage.getItem(k);
+    if (v) data[k] = JSON.parse(v);
+  });
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `eventstaff_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+function importFromJson() {
+  const file = document.getElementById('jsonFile').files[0];
+  const res = document.getElementById('result');
+  if (!file) { alert('JSONファイルを選択してください'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      Object.entries(data).forEach(([k, v]) => localStorage.setItem(k, JSON.stringify(v)));
+      res.className = 'result ok';
+      res.style.display = 'block';
+      res.innerHTML = `✅ インポート完了！<br>${Object.keys(data).length}キーを読み込みました`;
+    } catch(err) {
+      res.className = 'result err';
+      res.style.display = 'block';
+      res.textContent = 'エラー: ' + err.message;
+    }
+  };
+  reader.readAsText(file);
+}
+
+function clearAll() {
+  if (!confirm('全データを削除しますか？')) return;
+  ALL_KEYS.forEach(k => localStorage.removeItem(k));
+  const res = document.getElementById('result');
+  res.className = 'result ok';
+  res.style.display = 'block';
+  res.textContent = '🗑️ 全データを削除しました';
+}
+</script>
+</body>
+</html>

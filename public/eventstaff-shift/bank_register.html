@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>振込先情報の登録</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1c1c1e; --ink-mid: #48484a; --ink-soft: #8e8e93; --ink-faint: #c7c7cc;
+    --surface: #fff; --surface-2: #f2f2f7; --surface-3: #e5e5ea;
+    --accent: #1a6bbf; --red: #ff3b30; --radius: 12px; --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans JP', sans-serif; background: var(--surface-2); color: var(--ink); min-height: 100vh; padding: 0 0 60px; }
+  .page-header { background: var(--surface); border-bottom: 1px solid var(--surface-3); padding: 32px 24px 24px; text-align: center; }
+  .page-header .logo { font-size: 11px; font-weight: 500; letter-spacing: 0.1em; color: var(--ink-soft); text-transform: uppercase; margin-bottom: 6px; }
+  .page-header h1 { font-size: 20px; font-weight: 500; }
+  .page-header p { font-size: 13px; color: var(--ink-soft); margin-top: 6px; font-weight: 300; line-height: 1.7; }
+  .container { max-width: 560px; margin: 0 auto; padding: 24px 16px; }
+  .section { background: var(--surface); border-radius: var(--radius); overflow: hidden; margin-bottom: 16px; border: 1px solid var(--surface-3); }
+  .section-label { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: var(--ink-soft); text-transform: uppercase; padding: 14px 16px 10px; border-bottom: 1px solid var(--surface-2); background: var(--surface-2); }
+  .field { padding: 0 16px; border-bottom: 1px solid var(--surface-2); }
+  .field:last-child { border-bottom: none; }
+  .field-inner { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; }
+  .field-label { font-size: 13px; font-weight: 500; color: var(--ink-mid); min-width: 110px; padding-top: 9px; flex-shrink: 0; }
+  .field-label .req { color: var(--red); margin-left: 2px; font-size: 11px; }
+  .field-input { flex: 1; }
+  input[type="text"], input[type="date"], select {
+    width: 100%; padding: 9px 12px; border: 1px solid var(--surface-3); border-radius: var(--radius-sm);
+    font-size: 14px; font-family: inherit; background: var(--surface-2); color: var(--ink);
+    transition: border-color 0.15s; -webkit-appearance: none; appearance: none;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(26,107,191,0.1); }
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238e8e93' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+  .hint { font-size: 11px; color: var(--ink-soft); margin-top: 5px; }
+  .notice { font-size: 12px; color: var(--ink-soft); text-align: right; margin-bottom: 8px; }
+  .notice span { color: var(--red); }
+  .submit-wrap { padding: 20px 0 0; }
+  .btn-submit { width: 100%; padding: 15px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 500; font-family: inherit; cursor: pointer; transition: background 0.15s; }
+  .btn-submit:hover { background: #155a9e; }
+  .btn-submit:disabled { background: var(--ink-faint); cursor: not-allowed; }
+  .success-screen { display: none; text-align: center; padding: 60px 24px; }
+  .success-screen.show { display: block; }
+  .success-icon { width: 64px; height: 64px; background: #e8f8ed; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 20px; }
+  .success-screen h2 { font-size: 20px; font-weight: 500; margin-bottom: 8px; }
+  .success-screen p { font-size: 14px; color: var(--ink-soft); font-weight: 300; line-height: 1.7; }
+  .form-wrap.hide { display: none; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="logo">Kodawarin Staff</div>
+  <h1>振込先情報の登録</h1>
+  <p>採用が決定した方は、こちらのフォームに<br>振込先情報をご登録ください。</p>
+</div>
+
+<div class="container">
+  <div class="form-wrap" id="formWrap">
+    <p class="notice"><span>*</span> は必須項目です</p>
+
+    <!-- 本人確認 -->
+    <div class="section">
+      <div class="section-label">本人確認</div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">お名前<span class="req">*</span></div>
+        <div class="field-input">
+          <div style="display:flex;gap:8px">
+            <input type="text" id="lastName" placeholder="田中" autocomplete="family-name" style="flex:1">
+            <input type="text" id="firstName" placeholder="美咲" autocomplete="given-name" style="flex:1">
+          </div>
+          <div class="hint">申請フォームにご記入いただいた氏名と同じ名前を入力してください</div>
+        </div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">生年月日<span class="req">*</span></div>
+        <div class="field-input">
+          <input type="date" id="birthday">
+          <div class="hint">本人確認のため使用します</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 振込先 -->
+    <div class="section">
+      <div class="section-label">振込先情報</div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">銀行名<span class="req">*</span></div>
+        <div class="field-input"><input type="text" id="bankName" placeholder="例：三菱UFJ銀行"></div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">支店名<span class="req">*</span></div>
+        <div class="field-input"><input type="text" id="branchName" placeholder="例：名古屋支店"></div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">口座種別<span class="req">*</span></div>
+        <div class="field-input">
+          <select id="accountType">
+            <option value="">選択してください</option>
+            <option>普通</option><option>当座</option>
+          </select>
+        </div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">口座番号<span class="req">*</span></div>
+        <div class="field-input"><input type="text" id="accountNumber" placeholder="1234567" maxlength="10" inputmode="numeric"></div>
+      </div></div>
+      <div class="field"><div class="field-inner">
+        <div class="field-label">口座名義<span class="req">*</span></div>
+        <div class="field-input">
+          <input type="text" id="accountHolder" placeholder="タナカ ミサキ（カタカナ）">
+          <div class="hint">通帳に記載されている通りカタカナで入力してください</div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="submit-wrap">
+      <button class="btn-submit" onclick="submitBank()">登録する</button>
+    </div>
+  </div>
+
+  <div class="success-screen" id="successScreen">
+    <div class="success-icon">✓</div>
+    <h2>登録が完了しました</h2>
+    <p>振込先情報を受け付けました。<br>内容確認後、担当者よりご連絡します。</p>
+  </div>
+</div>
+
+<script>
+const SK_PENDING_BANK = 'staff_mgmt_pending_bank';
+
+function submitBank() {
+  const lastName  = document.getElementById('lastName').value.trim();
+  const firstName = document.getElementById('firstName').value.trim();
+  const birthday = document.getElementById('birthday').value;
+  const bankName = document.getElementById('bankName').value.trim();
+  const branchName = document.getElementById('branchName').value.trim();
+  const accountType = document.getElementById('accountType').value;
+  const accountNumber = document.getElementById('accountNumber').value.trim();
+  const accountHolder = document.getElementById('accountHolder').value.trim();
+
+  if (!lastName)      { alert('姓（苗字）を入力してください'); return; }
+  if (!firstName)     { alert('名（名前）を入力してください'); return; }
+  if (!birthday)      { alert('生年月日を入力してください'); return; }
+  if (!bankName)      { alert('銀行名を入力してください'); return; }
+  if (!branchName)    { alert('支店名を入力してください'); return; }
+  if (!accountType)   { alert('口座種別を選択してください'); return; }
+  if (!accountNumber) { alert('口座番号を入力してください'); return; }
+  if (!accountHolder) { alert('口座名義を入力してください'); return; }
+
+  const data = {
+    id: Date.now(),
+    submittedAt: new Date().toISOString(),
+    lastName, firstName, birthday,
+    bankName, branchName, accountType, accountNumber, accountHolder,
+  };
+
+  const list = JSON.parse(localStorage.getItem(SK_PENDING_BANK) || '[]');
+  list.push(data);
+  localStorage.setItem(SK_PENDING_BANK, JSON.stringify(list));
+
+  document.getElementById('formWrap').classList.add('hide');
+  document.getElementById('successScreen').classList.add('show');
+}
+</script>
+</body>
+</html>
