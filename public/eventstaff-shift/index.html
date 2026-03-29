@@ -2000,6 +2000,23 @@ function renderPayment(content, right) {
 
   right.innerHTML = '';
 
+  // ── 各スタッフの明細URL一覧（常時表示） ──
+  const urlListHtml = staffs.map(s => {
+    const url = getBaseUrl() + 'payment_detail.html?staffId=' + s.id;
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--surface-3)">'
+      + '<div class="av" style="background:var(--accent-light);color:var(--accent);font-size:11px;flex-shrink:0">' + s.name[0] + '</div>'
+      + '<div style="font-size:13px;font-weight:500;min-width:100px">' + s.name + '</div>'
+      + '<a href="' + url + '" target="_blank" style="flex:1;font-size:11px;color:var(--ink-soft);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace">' + url + '</a>'
+      + '<button class="btn btn-sm" onclick="var u=\'' + url + '\';navigator.clipboard.writeText(u).then(function(){var b=event.target;b.textContent=\'✓ コピー済\';setTimeout(function(){b.textContent=\'URLコピー\'},1500)})">URLコピー</button>'
+      + '<a href="' + url + '" target="_blank" class="btn btn-sm">開く ↗</a>'
+      + '</div>';
+  }).join('');
+
+  const urlCardHtml = '<div class="card" style="margin-bottom:16px">'
+    + '<div class="card-header"><h3>各スタッフの明細URL</h3></div>'
+    + '<div style="padding:0 16px">' + (urlListHtml || '<div style="padding:12px;color:var(--ink-soft);font-size:13px">スタッフが登録されていません</div>') + '</div>'
+    + '</div>';
+
   let body = '';
 
   // ══════════════════════════════════════════
@@ -2007,33 +2024,6 @@ function renderPayment(content, right) {
   // ══════════════════════════════════════════
   if (activeTab === 'combined') {
     if (!paymentSelectedStaff && staffs.length) paymentSelectedStaff = staffs[0].id;
-
-    // ── 各スタッフの明細URL一覧 ──
-    const urlListHtml = staffs.map(s => {
-      const url = `${getBaseUrl()}payment_detail.html?staffId=${s.id}`;
-      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--surface-3)">
-        <div class="av" style="background:var(--accent-light);color:var(--accent);font-size:11px;flex-shrink:0">${s.name[0]}</div>
-        <div style="font-size:13px;font-weight:500;min-width:100px">${s.name}</div>
-        <a href="${url}" target="_blank"
-           style="flex:1;font-size:11px;color:var(--ink-soft);text-decoration:none;
-                  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace">
-          ${url}
-        </a>
-        <button class="btn btn-sm" onclick="navigator.clipboard.writeText('${url}').then(()=>{this.textContent='✓ コピー済';setTimeout(()=>this.textContent='URLコピー',1500)})">URLコピー</button>
-        <a href="${url}" target="_blank" class="btn btn-sm">開く ↗</a>
-      </div>`;
-    }).join('');
-
-    const urlCardHtml = `
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-header" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
-          <h3>各スタッフの明細URL</h3>
-          <span style="font-size:11px;color:var(--ink-soft)">クリックで開閉</span>
-        </div>
-        <div style="display:none;padding:0 16px">
-          ${urlListHtml}
-        </div>
-      </div>`;
 
     // 稼働実績のある月を抽出
     const months = [...new Set(
@@ -2219,7 +2209,7 @@ function renderPayment(content, right) {
         </div>`;
     }
 
-    body = urlCardHtml + matrixHtml + detailHtml;
+    body = matrixHtml + detailHtml;
   }
 
   // ══════════════════════════════════════════
@@ -2266,7 +2256,7 @@ function renderPayment(content, right) {
     }).join('') || '<div class="card"><div class="empty-state">イベントデータがありません</div></div>';
   }
 
-  content.innerHTML = `
+  content.innerHTML = urlCardHtml + `
     <div class="tab-bar">
       ${tabs.map(t=>`<div class="tab ${activeTab===t.id?'active':''}" onclick="activeTab='${t.id}';renderPage()">${t.label}</div>`).join('')}
     </div>
