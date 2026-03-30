@@ -2780,7 +2780,7 @@ function buildStaffPaymentUrl(staffId) {
 }
 
 function renderPayment(content, right) {
-  if (!['combined','event'].includes(activeTab)) activeTab = 'combined';
+  if (!['combined','event','billing'].includes(activeTab)) activeTab = 'combined';
   const events = load(SK.events,[]);
   const venues = load(SK.venues,[]);
   const cats   = load(SK.cats,[]);
@@ -2846,6 +2846,7 @@ function renderPayment(content, right) {
   const tabs = [
     { id:'combined', label:'スタッフ × 月別' },
     { id:'event',    label:'イベント別' },
+    { id:'billing',  label:'請求管理' },
   ];
 
   let body = '';
@@ -3056,19 +3057,24 @@ function renderPayment(content, right) {
         </div>`;
     }
 
-    // 請求管理セクション
+    body = matrixHtml + detailHtml;
+  }
+
+  // ══════════════════════════════════════════
+  // 請求管理タブ
+  // ══════════════════════════════════════════
+  if (activeTab === 'billing') {
     const billingStatuses = load(SK.billing, {});
     const billingPin = localStorage.getItem(SK.billingPin) || '';
-    let billingHtml = '<div class="card" style="margin-top:16px;overflow:hidden">'
-      + '<div style="padding:12px 16px;background:var(--surface-2);border-bottom:1px solid var(--surface-3);font-size:13px;font-weight:500">請求管理</div>';
+    let billingBody = '';
     if (!_billingUnlocked) {
-      billingHtml += '<div style="padding:16px">'
-        + '<form onsubmit="verifyBillingPin();return false;" style="display:flex;align-items:center;gap:8px">'
-        + '<span style="font-size:12px;color:var(--ink-soft)">PINコードを入力</span>'
-        + '<input class="pin-input form-control" id="pinInput" type="password" inputmode="numeric" maxlength="12" placeholder="••••" autocomplete="off" style="width:100px;display:inline-block">'
-        + '<button type="submit" class="btn btn-sm btn-primary">確認</button>'
-        + (billingPin ? '' : '<span style="font-size:11px;color:var(--ink-soft)">（設定でPINを登録できます）</span>')
-        + '</form></div>';
+      billingBody = '<div class="card"><div style="padding:20px 16px">'
+        + '<form onsubmit="verifyBillingPin();return false;" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+        + '<span style="font-size:13px;color:var(--ink-soft)">PINコードを入力してください</span>'
+        + '<input class="pin-input form-control" id="pinInput" type="password" inputmode="numeric" maxlength="12" placeholder="••••" autocomplete="off" style="width:110px;display:inline-block">'
+        + '<button type="submit" class="btn btn-primary btn-sm">確認</button>'
+        + (billingPin ? '' : '<span style="font-size:11px;color:var(--ink-faint)">（設定でPINを登録できます）</span>')
+        + '</form></div></div>';
     } else {
       const allEvents = events.slice().sort((a,b) => a.date.localeCompare(b.date));
       const billingRows = allEvents.map(e => {
@@ -3086,14 +3092,14 @@ function renderPayment(content, right) {
           + '">' + (billed ? '請求済み' : '未請求') + '</div>'
           + '</div>';
       }).join('');
-      billingHtml += (billingRows || '<div style="padding:24px;text-align:center;color:var(--ink-soft);font-size:13px">イベントがありません</div>');
-      billingHtml += '<div style="padding:10px 16px;border-top:1px solid var(--surface-3);display:flex;justify-content:flex-end">'
+      billingBody = '<div class="card" style="overflow:hidden">'
+        + (billingRows || '<div class="empty-state" style="padding:32px">イベントがありません</div>')
+        + '</div>'
+        + '<div style="margin-top:8px;display:flex;justify-content:flex-end">'
         + '<button class="btn btn-sm" onclick="_billingUnlocked=false;renderPage()">🔒 ロック</button>'
         + '</div>';
     }
-    billingHtml += '</div>';
-
-    body = matrixHtml + detailHtml + billingHtml;
+    body = billingBody;
   }
 
   // ══════════════════════════════════════════
