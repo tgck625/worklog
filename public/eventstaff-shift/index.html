@@ -2749,7 +2749,7 @@ function buildStaffPaymentUrl(staffId) {
   });
   const payload = { name: s.name, rankLabel: rank?.label||'', totalPay, totalTransport, months: monthsData };
   const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-  return location.origin + '/eventstaff-shift/payment_detail.html?d=' + encoded;
+  return location.origin + '/eventstaff-shift/payment_detail.html?d=' + encodeURIComponent(encoded);
 }
 
 function renderPayment(content, right) {
