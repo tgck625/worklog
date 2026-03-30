@@ -90,24 +90,24 @@ function render() {
     return;
   }
 
-  document.title = '支払い明細 - ' + data.name;
+  document.title = '支払い明細 - ' + data.n;
 
-  var monthBlocks = (data.months || []).map(function(m) {
-    var parts = m.month.split('-');
+  var monthBlocks = (data.ms || []).map(function(m) {
+    var parts = m.mo.split('-');
     var monthLabel = parts[0] + '年' + parseInt(parts[1]) + '月';
-    var mPay = m.events.reduce(function(s, e) { return s + e.pay; }, 0);
-    var mTotal = mPay + m.transport;
+    var mPay = m.ev.reduce(function(s, e) { return s + e.p; }, 0);
+    var mTotal = mPay + m.tr;
 
-    var rows = m.events.map(function(e) {
-      var roleCell = e.role === 'leader'
+    var rows = m.ev.map(function(e) {
+      var roleCell = e.rl === 'leader'
         ? '<span class="badge badge-purple" style="font-size:10px">リーダー</span>'
         : '<span class="badge badge-blue" style="font-size:10px">スタッフ</span>';
-      var payCell = e.pay === 0 ? '<span style="color:var(--red-dark)">⚠ 未設定</span>' : '¥' + e.pay.toLocaleString();
-      var timeCell = e.op.toFixed(1) + 'h' + (e.study ? '+' + e.study + 'h' : '');
+      var payCell = e.p === 0 ? '<span style="color:var(--red-dark)">⚠ 未設定</span>' : '¥' + e.p.toLocaleString();
+      var timeCell = e.o.toFixed(1) + 'h' + (e.s ? '+' + e.s + 'h' : '');
       return '<tr>'
-        + '<td style="white-space:nowrap;font-weight:500">' + e.date + '</td>'
-        + '<td style="font-size:12px;color:var(--ink-soft);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + e.venue + '</td>'
-        + '<td><span class="badge ' + e.catColor + '" style="font-size:10px">' + e.cat + '</span></td>'
+        + '<td style="white-space:nowrap;font-weight:500">' + e.dt + '</td>'
+        + '<td style="font-size:12px;color:var(--ink-soft);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + e.v + '</td>'
+        + '<td><span class="badge ' + e.cc + '" style="font-size:10px">' + e.c + '</span></td>'
         + '<td style="font-size:12px;text-align:center">' + timeCell + '</td>'
         + '<td style="text-align:center">' + roleCell + '</td>'
         + '<td style="text-align:right;font-weight:500">' + payCell + '</td>'
@@ -116,37 +116,37 @@ function render() {
 
     return '<div class="card">'
       + '<div class="month-header">'
-      + '<span>' + monthLabel + '\u3000<span style="color:var(--ink-faint);font-weight:400">' + m.events.length + '件 \uff0f ' + m.dist + 'km</span></span>'
+      + '<span>' + monthLabel + '\u3000<span style="color:var(--ink-faint);font-weight:400">' + m.ev.length + '件 \uff0f ' + m.d + 'km</span></span>'
       + '<span class="month-total">\uffe5' + mTotal.toLocaleString() + '</span>'
       + '</div>'
       + '<table>'
       + '<thead><tr><th>日付</th><th>会場</th><th>カテゴリ</th><th style="text-align:center">時間</th><th style="text-align:center">役割</th><th style="text-align:right">給与</th></tr></thead>'
       + '<tbody>' + rows + '</tbody>'
       + '<tfoot><tr>'
-      + '<td colspan="4" style="padding:8px 12px">交通費（' + m.dist + 'km）</td>'
-      + '<td style="text-align:right;padding:8px 12px">\uffe5' + m.transport.toLocaleString() + '</td>'
+      + '<td colspan="4" style="padding:8px 12px">交通費（' + m.d + 'km）</td>'
+      + '<td style="text-align:right;padding:8px 12px">\uffe5' + m.tr.toLocaleString() + '</td>'
       + '<td style="text-align:right;font-weight:500;padding:8px 12px;color:var(--accent)">\uffe5' + mTotal.toLocaleString() + '</td>'
       + '</tr></tfoot>'
       + '</table></div>';
   }).join('');
 
-  var gt = data.totalPay + data.totalTransport;
+  var gt = data.tp + data.tt;
 
   root.innerHTML = '<div class="page-header">'
     + '<div class="header-left">'
-    + '<div class="av">' + data.name[0] + '</div>'
-    + '<div><div class="staff-name">' + data.name + '</div><div class="staff-rank">' + (data.rankLabel || '').trim() + '</div></div>'
+    + '<div class="av">' + data.n[0] + '</div>'
+    + '<div><div class="staff-name">' + data.n + '</div><div class="staff-rank">' + (data.r || '').trim() + '</div></div>'
     + '</div>'
     + '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
     + '<div class="totals">'
-    + '<div class="total-item"><div class="total-label">給与累計</div><div class="total-value">\uffe5' + data.totalPay.toLocaleString() + '</div></div>'
-    + '<div class="total-item"><div class="total-label">交通費累計</div><div class="total-value">\uffe5' + data.totalTransport.toLocaleString() + '</div></div>'
+    + '<div class="total-item"><div class="total-label">給与累計</div><div class="total-value">\uffe5' + data.tp.toLocaleString() + '</div></div>'
+    + '<div class="total-item"><div class="total-label">交通費累計</div><div class="total-value">\uffe5' + data.tt.toLocaleString() + '</div></div>'
     + '<div class="total-item divider"><div class="total-label">合計</div><div class="total-value accent">\uffe5' + gt.toLocaleString() + '</div></div>'
     + '</div>'
     + '<div class="print-hide"><button class="btn btn-primary" onclick="window.print()">\ud83d\udda8 印刷</button></div>'
     + '</div>'
     + '</div>'
-    + (data.months.length === 0
+    + (data.ms.length === 0
       ? '<div class="card"><div class="empty">稼働履歴がありません</div></div>'
       : monthBlocks);
 }
