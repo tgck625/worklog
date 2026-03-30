@@ -2032,7 +2032,7 @@ function renderPayment(content, right) {
       totalPay, totalTransport, months
     };
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-    return getBaseUrl() + 'payment_detail.html?d=' + encoded;
+    return getBaseUrl() + 'payment_detail.html?d=' + encodeURIComponent(encoded);
   }
 
   const urlListHtml = staffs.map(s => {
