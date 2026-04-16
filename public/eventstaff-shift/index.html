@@ -413,6 +413,7 @@ const SK = {
   payStatus: 'staff_mgmt_pay_status',
   billing:   'staff_mgmt_billing',
   billingPin:'staff_mgmt_billing_pin',
+  makerPayments:'staff_mgmt_maker_payments',
 };
 
 // =====================================================
@@ -2781,6 +2782,29 @@ function buildStaffPaymentUrl(staffId) {
   return location.origin + '/eventstaff-shift/payment_detail.html?d=' + encodeURIComponent(encoded);
 }
 
+window._formMakers = [];
+function renderMakerChips() {
+  const list = document.getElementById('f_makers_list');
+  if (!list) return;
+  list.innerHTML = (window._formMakers||[]).map((m,i) =>
+    '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:var(--accent-light);color:var(--accent);border-radius:20px;font-size:12px;font-weight:500">'
+    + m + '<button type="button" onclick="removeMakerFromForm(' + i + ')" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:14px;line-height:1;padding:0 0 1px 2px">×</button></span>'
+  ).join('');
+}
+function addMakerToForm() {
+  const input = document.getElementById('f_maker_input');
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) return;
+  if (!(window._formMakers||[]).includes(name)) (window._formMakers = window._formMakers||[]).push(name);
+  input.value = '';
+  renderMakerChips();
+}
+function removeMakerFromForm(i) {
+  (window._formMakers||[]).splice(i, 1);
+  renderMakerChips();
+}
+
 function renderBilling(content, right) {
   right.innerHTML = '';
   const events = load(SK.events,[]);
@@ -3552,6 +3576,16 @@ function openEventModal(id) {
           </div>
         </div>
       </div>
+      <hr style="margin:12px 0;border:none;border-top:1px solid var(--surface-3)">
+      <div style="margin-bottom:4px">
+        <div style="font-size:11px;font-weight:500;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">作り手</div>
+        <div id="f_makers_list" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px;margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="form-control" id="f_maker_input" placeholder="作り手の名前を入力" style="flex:1"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();addMakerToForm();}">
+          <button type="button" class="btn btn-sm" onclick="addMakerToForm()" style="white-space:nowrap">＋ 追加</button>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       ${ev ? `<button class="btn btn-danger" onclick="if(confirm('このイベントを削除しますか？')){{closeModal();deleteEvent(${id});}}">削除</button><div style="flex:1"></div>` : ''}
@@ -3559,7 +3593,8 @@ function openEventModal(id) {
       <button class="btn btn-primary" onclick="saveEvent(${id||'null'})">保存</button>
     </div>
   </div>`);
-  setTimeout(calcOpHours, 0);
+  window._formMakers = ev?.makers ? [...ev.makers] : [];
+  setTimeout(() => { calcOpHours(); renderMakerChips(); }, 0);
 }
 
 // カテゴリ変更時に稼働時間を自動入力
@@ -3611,6 +3646,7 @@ function saveEvent(id) {
   const selVenue    = venues2.find(v=>v.id===venueId);
   const placeName   = selVenue?.name || '';
   const content     = document.getElementById('f_content')?.value.trim() || '';
+  const makers      = window._formMakers ? [...window._formMakers] : [];
   // nameフィールドも更新（後方互換）
   const d = new Date(date+'T00:00:00');
   const days=['日','月','火','水','木','金','土'];
@@ -3618,11 +3654,11 @@ function saveEvent(id) {
   const name = placeName||content ? `${dateStr} ${placeName}${content?'：'+content:''}` : '';
   const evs = load(SK.events,[]);
   if (id) {
-    Object.assign(evs.find(e=>e.id===id), {date, venueId, categoryId, requiredCount:req, opStart, opEnd, opBreak, studyHours, ldrStudyHours, placeName, content, name});
+    Object.assign(evs.find(e=>e.id===id), {date, venueId, categoryId, requiredCount:req, opStart, opEnd, opBreak, studyHours, ldrStudyHours, placeName, content, name, makers});
   } else {
     const newId = (evs.length ? Math.max(...evs.map(e=>e.id)) : 0) + 1;
     evs.push({id:newId, date, venueId, categoryId, requiredCount:req,
-      staffAssignments:[], attendance:{}, opStart, opEnd, opBreak, studyHours, ldrStudyHours, placeName, content, name});
+      staffAssignments:[], attendance:{}, opStart, opEnd, opBreak, studyHours, ldrStudyHours, placeName, content, name, makers});
   }
   save(SK.events, evs);
   const syncedEv = evs.find(e => e.id === (id || Math.max(...evs.map(e=>e.id))));
