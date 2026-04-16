@@ -1539,6 +1539,7 @@ function renderStaffingByStaff(content, right) {
                 return `<div style="font-size:11px;color:var(--ink-soft)">📅 ${dateLabel}</div>
                   ${parsed.place?`<div style="font-size:11px;font-weight:500;color:var(--ink)">📍 ${parsed.place}</div>`:''}
                   ${parsed.content?`<div style="font-size:11px;color:var(--accent)">✦ ${parsed.content}</div>`:''}
+                  ${(e.makers&&e.makers.length)?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">${e.makers.map(m=>'<span style="font-size:10px;padding:1px 8px;background:var(--accent-light);color:var(--accent);border-radius:10px">'+m+'</span>').join('')}</div>`:''}
                   ${c?`<span class="badge ${c.color||'badge-gray'}" style="font-size:10px;margin-top:3px">${c.name}</span>`:''}`;
               })()}
             </div>
@@ -1887,7 +1888,10 @@ function renderStaffing(content, right) {
       const leaderAsgn = e.staffAssignments.find(a=>a.isLeader);
       const leaderName = leaderAsgn ? (staffs.find(s=>s.id===leaderAsgn.staffId)?.name || '') : '';
       return `<tr style="cursor:pointer;${sel?'background:var(--accent-light);':''}" onclick="selectedEventId=${e.id};renderPage()">
-        <td style="font-weight:500;white-space:nowrap;color:${sel?'var(--accent)':'var(--ink)'}">　${e.date}</td>
+        <td style="font-weight:500;color:${sel?'var(--accent)':'var(--ink)'}">
+          <div style="white-space:nowrap">　${e.date}</div>
+          ${(e.makers&&e.makers.length)?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px;padding-left:6px">${e.makers.map(m=>'<span style="font-size:10px;padding:1px 8px;background:var(--accent-light);color:var(--accent);border-radius:10px">'+m+'</span>').join('')}</div>`:''}
+        </td>
         <td style="font-size:12px;color:var(--ink-soft);white-space:nowrap">${v?.name||'-'}</td>
         <td><span class="badge ${c?.color||'badge-gray'}" style="font-size:10px">${c?.name||'-'}</span></td>
         <td style="text-align:center;font-weight:500">${need}名</td>
