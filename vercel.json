@@ -3,6 +3,7 @@
     { "source": "/eventstaff-shift", "destination": "/eventstaff-shift/", "permanent": false }
   ],
   "rewrites": [
+    { "source": "/distribution-list", "destination": "/distribution-list.html" },
     { "source": "/((?!eventstaff-shift).*)", "destination": "/index.html" }
   ]
 }
