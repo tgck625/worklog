@@ -1,0 +1,8 @@
+{
+  "redirects": [
+    { "source": "/eventstaff-shift", "destination": "/eventstaff-shift/", "permanent": false }
+  ],
+  "rewrites": [
+    { "source": "/((?!eventstaff-shift).*)", "destination": "/index.html" }
+  ]
+}
