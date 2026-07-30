@@ -586,6 +586,13 @@ function calcPay(ev, staffId) {
     baseOp    = timeToHours(cat.opStart, cat.opEnd, cat.opBreak||0) || 7;
   }
 
+  // ── 業務委託スタッフ ＋ 項目金額ベースの事前準備がある場合 ──
+  const cpItems = cat.contractPrepItems || [];
+  if (staff.contractSigned && cpItems.length > 0) {
+    const contractStudyPay = cpItems.reduce((s,ci)=>s+(ci.amount||0), 0);
+    return { hourly: 0, studyPay: contractStudyPay, opPay: dailyWage, total: contractStudyPay + dailyWage, dailyWage, missingWage: dailyWage === 0, isLeader: isLeaderRole, isContractPrep: true, contractPrepItems: cpItems };
+  }
+
   const baseStudyR = roundHalfHour(baseStudy);
   const baseOpR    = roundHalfHour(baseOp);
   const hourly     = calcHourlyRate(dailyWage, baseStudyR, baseOpR);
@@ -1913,6 +1920,10 @@ function renderCategories(content, right) {
               <div>事前準備: <strong>${c.studyHours||0}h</strong></div>
               <div>当日: <strong>${c.opStart||'-'}〜${c.opEnd||'-'}</strong>　休憩 ${c.opBreak||0}分</div>
               <div style="font-size:11px;color:var(--ink-soft)">当日 ${baseOp.toFixed(1)}h　合計 ${baseTotal.toFixed(1)}h</div>
+              ${(c.contractPrepItems||[]).length ? `<div style="margin-top:4px;padding:4px 8px;background:var(--green-light,#e8f5e9);border-radius:4px;font-size:11px;color:var(--green-dark,#2e7d32)">
+                業務委託準備: ${(c.contractPrepItems||[]).map(ci=>`${ci.item} ¥${(ci.amount||0).toLocaleString()}`).join('、')}
+                <strong>（計 ¥${(c.contractPrepItems||[]).reduce((s,ci)=>s+(ci.amount||0),0).toLocaleString()}）</strong>
+              </div>` : ''}
             </div>
           </div>
           <div style="background:var(--purple-light);border-radius:var(--radius-sm);padding:10px;border:1px solid #d4d3f8">
@@ -2247,7 +2258,7 @@ function renderPayment(content, right) {
             <td><span class="badge ${c?.color||'badge-gray'}" style="font-size:10px">${c?.name||''}</span></td>
             <td style="font-size:12px;text-align:center">${timeCell}</td>
             <td style="text-align:center">${roleCell}</td>
-            <td style="text-align:right;font-weight:500">${p.total===0?'⚠ 未設定':'¥'+p.total.toLocaleString()}</td>
+            <td style="text-align:right;font-weight:500">${p.total===0?'⚠ 未設定':'¥'+p.total.toLocaleString()}${p.isContractPrep?`<div style="font-size:10px;color:var(--green-dark,#2e7d32)" title="${(p.contractPrepItems||[]).map(ci=>ci.item+' ¥'+ci.amount.toLocaleString()).join('、')}">委託準備 ¥${p.studyPay.toLocaleString()}</div>`:''}</td>
           </tr>`;
         }).join('');
         const mTransport = transportAmt(mDist);
@@ -2904,6 +2915,25 @@ function openCatEditModal(catId) {
           <input type="time" class="form-control" id="cew_end" value="${c.opEnd||''}"></div>
       </div>
 
+      <div style="background:var(--green-light,#e8f5e9);border-radius:var(--radius-sm);padding:12px;border:1px solid #c8e6c9;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:500;color:var(--green-dark,#2e7d32);margin-bottom:10px">業務委託　事前準備（項目・金額ベース）</div>
+        <div style="font-size:11px;color:var(--ink-soft);margin-bottom:8px">業務委託スタッフの場合、時給計算ではなくこちらの合計金額が事前準備代になります</div>
+        <div id="cew_contract_prep_rows">${(c.contractPrepItems||[]).map((item,i)=>`
+          <div class="contract-prep-row" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+            <input type="text" class="form-control cp-item" value="${esc(item.item||'')}" style="flex:1;min-width:100px" placeholder="項目名">
+            <input type="number" class="form-control cp-amount" value="${item.amount||0}" style="width:90px" min="0" placeholder="金額" oninput="calcContractPrepRate(this)">
+            <span style="font-size:11px;color:var(--ink-soft)">円</span>
+            <input type="number" class="form-control cp-hours" value="${item.estHours||0}" style="width:70px" min="0" step="0.5" placeholder="見込h" oninput="calcContractPrepRate(this)">
+            <span style="font-size:11px;color:var(--ink-soft)">h</span>
+            <span class="cp-hourly-display" style="font-size:11px;font-weight:500;color:var(--accent);min-width:80px">目安 ¥${item.estHours?(Math.round(item.amount/item.estHours)).toLocaleString():'-'}/h</span>
+            <button class="btn btn-sm btn-danger" onclick="this.closest('.contract-prep-row').remove();updateContractPrepTotal()" style="padding:2px 6px">×</button>
+          </div>`).join('')}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+          <button class="btn btn-sm" onclick="addContractPrepRow()" style="font-size:11px">＋ 項目追加</button>
+          <div id="cew_contract_prep_total" style="font-size:12px;font-weight:500;color:var(--green-dark,#2e7d32)"></div>
+        </div>
+      </div>
+
       <div style="font-size:11px;font-weight:500;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">ランク別日給</div>
       ${rankInputs}
 
@@ -2929,6 +2959,48 @@ function openCatEditModal(catId) {
       <button class="btn btn-primary" onclick="saveCatEditModal(${catId})">保存</button>
     </div>
   </div>`);
+  setTimeout(updateContractPrepTotal, 0);
+}
+
+function addContractPrepRow(item='', amount=0, estHours=0) {
+  const container = document.getElementById('cew_contract_prep_rows');
+  const div = document.createElement('div');
+  div.className = 'contract-prep-row';
+  div.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap';
+  div.innerHTML = `
+    <input type="text" class="form-control cp-item" value="${esc(String(item))}" style="flex:1;min-width:100px" placeholder="項目名">
+    <input type="number" class="form-control cp-amount" value="${amount}" style="width:90px" min="0" placeholder="金額" oninput="calcContractPrepRate(this)">
+    <span style="font-size:11px;color:var(--ink-soft)">円</span>
+    <input type="number" class="form-control cp-hours" value="${estHours}" style="width:70px" min="0" step="0.5" placeholder="見込h" oninput="calcContractPrepRate(this)">
+    <span style="font-size:11px;color:var(--ink-soft)">h</span>
+    <span class="cp-hourly-display" style="font-size:11px;font-weight:500;color:var(--accent);min-width:80px">目安 ¥-/h</span>
+    <button class="btn btn-sm btn-danger" onclick="this.closest('.contract-prep-row').remove();updateContractPrepTotal()" style="padding:2px 6px">×</button>`;
+  container.appendChild(div);
+  updateContractPrepTotal();
+}
+
+function calcContractPrepRate(el) {
+  const row = el.closest('.contract-prep-row');
+  const amount = parseFloat(row.querySelector('.cp-amount').value) || 0;
+  const hours = parseFloat(row.querySelector('.cp-hours').value) || 0;
+  const display = row.querySelector('.cp-hourly-display');
+  display.textContent = hours > 0 ? `目安 ¥${Math.round(amount / hours).toLocaleString()}/h` : '目安 ¥-/h';
+  updateContractPrepTotal();
+}
+
+function updateContractPrepTotal() {
+  const rows = document.querySelectorAll('#cew_contract_prep_rows .contract-prep-row');
+  let total = 0, totalHours = 0;
+  rows.forEach(row => {
+    total += parseFloat(row.querySelector('.cp-amount').value) || 0;
+    totalHours += parseFloat(row.querySelector('.cp-hours').value) || 0;
+  });
+  const el = document.getElementById('cew_contract_prep_total');
+  if (el) {
+    if (rows.length === 0) { el.textContent = ''; return; }
+    const avgRate = totalHours > 0 ? `（目安時給 ¥${Math.round(total / totalHours).toLocaleString()}/h）` : '';
+    el.textContent = `合計 ¥${total.toLocaleString()} ／ ${totalHours}h ${avgRate}`;
+  }
 }
 
 function saveCatEditModal(catId) {
@@ -2946,6 +3018,16 @@ function saveCatEditModal(catId) {
   c.ldrOpStart    = document.getElementById('cew_ldr_start').value;
   c.ldrOpEnd      = document.getElementById('cew_ldr_end').value;
   c.leaderDailyWage = parseInt(document.getElementById('cew_ldr_wage').value)  || 0;
+
+  // 業務委託 事前準備項目を保存
+  const cpRows = document.querySelectorAll('#cew_contract_prep_rows .contract-prep-row');
+  c.contractPrepItems = [];
+  cpRows.forEach(row => {
+    const item = row.querySelector('.cp-item').value.trim();
+    const amount = parseInt(row.querySelector('.cp-amount').value) || 0;
+    const estHours = parseFloat(row.querySelector('.cp-hours').value) || 0;
+    if (item || amount) c.contractPrepItems.push({ item, amount, estHours });
+  });
 
   if (!c.rankWages) c.rankWages = {};
   ranks.forEach(r => {
