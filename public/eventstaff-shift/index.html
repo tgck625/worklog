@@ -336,6 +336,7 @@ const SK = {
   pending:   'staff_mgmt_pending_registrations',
   pendingBank: 'staff_mgmt_pending_bank',
   apikey:    'staff_mgmt_gmaps_key',
+  makerPayments: 'staff_mgmt_maker_payments',
 };
 
 function load(key, def) {
@@ -404,6 +405,80 @@ function initDefaultData() {
 
 initDefaultData();
 
+// =====================================================
+// MAKER PAYMENT CONSTANTS & HELPERS
+// =====================================================
+const MAKER_ITEMS = ['講師費','ガソリン代','高速代','材料費','その他'];
+const MAKER_STATUSES = ['未確定','金額決定','請求書受領','振込済'];
+const MAKER_STATUS_COLORS = {'未確定':'#c7c7cc','金額決定':'#ff9500','請求書受領':'#1a6bbf','振込済':'#34c759'};
+
+function setMakerStatus(eventId, makerIdx, status) {
+  const ev = load(SK.events,[]).find(e=>e.id===eventId);
+  if (!ev) return;
+  const makerName = (ev.makers||[])[makerIdx]||'';
+  const payments = load(SK.makerPayments,[]);
+  let p = payments.find(x=>x.eventId===eventId&&x.makerName===makerName);
+  if (!p) {
+    p = {id:Date.now(),eventId,makerName,items:MAKER_ITEMS.map(l=>({label:l,unitPrice:0,quantity:0})),memo:'',status};
+    payments.push(p);
+  } else { p.status=status; }
+  save(SK.makerPayments,payments); renderPage();
+}
+
+function saveMakerItems(eventId, makerIdx) {
+  const ev = load(SK.events,[]).find(e=>e.id===eventId);
+  if (!ev) return;
+  const makerName = (ev.makers||[])[makerIdx]||'';
+  const payments = load(SK.makerPayments,[]);
+  let p = payments.find(x=>x.eventId===eventId&&x.makerName===makerName);
+  if (!p) {
+    p = {id:Date.now(),eventId,makerName,items:MAKER_ITEMS.map(l=>({label:l,unitPrice:0,quantity:0})),memo:'',status:'未確定'};
+    payments.push(p);
+  }
+  MAKER_ITEMS.forEach((label,i)=>{
+    const up  = parseFloat(document.getElementById('mkr_up_'+eventId+'_'+makerIdx+'_'+i)?.value)||0;
+    const qty = parseFloat(document.getElementById('mkr_qty_'+eventId+'_'+makerIdx+'_'+i)?.value)||0;
+    p.items[i]={label,unitPrice:up,quantity:qty};
+  });
+  p.memo = document.getElementById('mkr_memo_'+eventId+'_'+makerIdx)?.value||'';
+  save(SK.makerPayments,payments);
+  calcMakerTotal(eventId,makerIdx);
+}
+
+function calcMakerTotal(eventId, makerIdx) {
+  let total=0;
+  MAKER_ITEMS.forEach((l,i)=>{
+    const up  = parseFloat(document.getElementById('mkr_up_'+eventId+'_'+makerIdx+'_'+i)?.value)||0;
+    const qty = parseFloat(document.getElementById('mkr_qty_'+eventId+'_'+makerIdx+'_'+i)?.value)||0;
+    const sub = up*qty; total+=sub;
+    const el = document.getElementById('mkr_sub_'+eventId+'_'+makerIdx+'_'+i);
+    if(el) el.textContent='¥'+sub.toLocaleString();
+  });
+  const el = document.getElementById('mkr_total_'+eventId+'_'+makerIdx);
+  if(el) el.textContent='¥'+total.toLocaleString();
+}
+
+window._formMakers=[];
+function renderMakerChips() {
+  const list = document.getElementById('f_makers_list');
+  if(!list) return;
+  list.innerHTML = (window._formMakers||[]).map((m,i)=>
+    '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:var(--accent-light);color:var(--accent);border-radius:20px;font-size:12px;font-weight:500">'
+    +m+'<button type="button" onclick="removeMakerFromForm('+i+')" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:14px;line-height:1;padding:0 0 1px 2px">×</button></span>'
+  ).join('');
+}
+function addMakerToForm() {
+  const input=document.getElementById('f_maker_input');
+  if(!input) return;
+  const name=input.value.trim();
+  if(!name) return;
+  if(!(window._formMakers||[]).includes(name)) (window._formMakers=window._formMakers||[]).push(name);
+  input.value=''; renderMakerChips();
+}
+function removeMakerFromForm(i) {
+  (window._formMakers||[]).splice(i,1); renderMakerChips();
+}
+
 // データマイグレーション：rankWages のキーを文字列に統一
 // + ldrOpStart/ldrOpEnd/ldrOpBreak/ldrStudyHours が未設定なら一般時間で初期化
 (function migrateRankWages() {
@@ -430,17 +505,9 @@ initDefaultData();
 // =====================================================
 // HELPERS
 // =====================================================
-const TRANSPORT_TABLE = [
-  [0,5,0],[5,10,200],[10,15,300],[15,20,400],[20,25,500],
-  [25,30,600],[30,35,700],[35,40,800],[40,45,900],[45,50,1000],
-  [50,55,1100],[55,60,1200],[60,65,1300],[65,70,1400],[70,75,1500],
-  [75,80,1600],[80,85,1700],[85,90,1800],[90,95,1900],[95,100,2000],
-];
 function transportAmt(km) {
-  for (const [a,b,c] of TRANSPORT_TABLE) if (km>=a && km<b) return c;
-  // 規定の最大距離（100km）を超えた場合は最大額を返す
-  if (km >= 100) return 2000;
-  return 0;
+  // 往復距離 × 10円/km（小数点以下切り捨て）
+  return Math.floor(km * 10);
 }
 function haversine(lat1,lng1,lat2,lng2) {
   const R=6371, dL=(lat2-lat1)*Math.PI/180, dN=(lng2-lng1)*Math.PI/180;
@@ -1865,25 +1932,15 @@ function renderCategories(content, right) {
     </div>`;
   }).join('');
 
-  // 交通費支給規定テーブル
+  // 交通費支給規定
   const transportCard = `
     <div class="card" style="margin-top:16px">
       <div class="card-header">
         <h3>交通費支給規定</h3>
-        <span style="font-size:11px;color:var(--ink-soft)">月の合計移動距離（片道×稼働回数）に基づき支給</span>
       </div>
-      <div class="card-body" style="padding:0">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--surface-3)">
-          ${TRANSPORT_TABLE.map(([min,max,amt],i)=>`
-            <div style="padding:7px 14px;border-bottom:1px solid var(--surface-3);border-right:${(i+1)%4===0?'none':'1px solid var(--surface-3)'}; font-size:12px;display:flex;justify-content:space-between;align-items:center;${amt===0?'color:var(--ink-soft)':''}">
-              <span>${min}〜${max}km未満</span>
-              <span style="font-weight:500">${amt===0?'支給なし':'¥'+amt.toLocaleString()}</span>
-            </div>`).join('')}
-          <div style="padding:7px 14px;font-size:12px;display:flex;justify-content:space-between;align-items:center;background:var(--accent-light);border-right:none">
-            <span style="color:var(--accent)">100km以上</span>
-            <span style="font-weight:500;color:var(--accent)">¥2,000（上限）</span>
-          </div>
-        </div>
+      <div class="card-body">
+        <div style="font-size:14px;font-weight:500;color:var(--accent);margin-bottom:8px">往復距離 × 10円/km（小数点以下切り捨て）</div>
+        <div style="font-size:12px;color:var(--ink-soft)">月の合計往復距離に基づき支給　例）往復 123.2km → ¥1,232</div>
       </div>
     </div>`;
 
@@ -1977,7 +2034,7 @@ function staffTotalWithTransport(s, events, venues) {
     let dist = 0;
     wevs.filter(e=>e.date.startsWith(m)).forEach(e=>{
       const v=venues.find(x=>x.id===e.venueId);
-      if(v&&s.lat) dist += haversine(s.lat,s.lng,v.lat,v.lng);
+      if(v&&s.lat) dist += haversine(s.lat,s.lng,v.lat,v.lng) * 2;
     });
     pay += transportAmt(dist);
   });
@@ -1986,7 +2043,7 @@ function staffTotalWithTransport(s, events, venues) {
 
 
 function renderPayment(content, right) {
-  if (!['combined','event'].includes(activeTab)) activeTab = 'combined';
+  if (!['combined','event','maker'].includes(activeTab)) activeTab = 'combined';
   const events = load(SK.events,[]);
   const venues = load(SK.venues,[]);
   const cats   = load(SK.cats,[]);
@@ -1996,6 +2053,7 @@ function renderPayment(content, right) {
   const tabs = [
     { id:'combined', label:'スタッフ × 月別' },
     { id:'event',    label:'イベント別' },
+    { id:'maker',    label:'作り手 × イベント' },
   ];
 
   right.innerHTML = '';
@@ -2017,7 +2075,7 @@ function renderPayment(content, right) {
         const a = e.staffAssignments.find(x => x.staffId === s.id);
         const p = calcPay(e, s.id);
         const h = calcEventHours(e);
-        const dist = (v && s.lat) ? haversine(s.lat, s.lng, v.lat, v.lng) : 0;
+        const dist = (v && s.lat) ? haversine(s.lat, s.lng, v.lat, v.lng) * 2 : 0;
         mPay += p.total; mDist += dist;
         const displayStudy = a?.isLeader ? (e.ldrStudyHours ?? h.studyHours) : h.studyHours;
         return { date: e.date, venue: v?.name||'', cat: c?.name||'', catColor: c?.color||'badge-gray',
@@ -2083,7 +2141,7 @@ function renderPayment(content, right) {
         wevs.forEach(e => {
           const v = venues.find(x=>x.id===e.venueId);
           mPay  += calcPay(e, s.id).total;
-          mDist += (v&&s.lat) ? haversine(s.lat,s.lng,v.lat,v.lng) : 0;
+          mDist += (v&&s.lat) ? haversine(s.lat,s.lng,v.lat,v.lng) * 2 : 0;
         });
         const trans  = transportAmt(mDist);
         const mTotal = mPay + trans;
@@ -2177,7 +2235,7 @@ function renderPayment(content, right) {
           const c = cats.find(x=>x.id===e.categoryId);
           const a = e.staffAssignments.find(x=>x.staffId===sel.id);
           const p = calcPay(e, sel.id);
-          const dist = (v&&sel.lat) ? haversine(sel.lat,sel.lng,v.lat,v.lng) : 0;
+          const dist = (v&&sel.lat) ? haversine(sel.lat,sel.lng,v.lat,v.lng) * 2 : 0;
           const h = calcEventHours(e);
           mPay += p.total; mDist += dist;
           const roleCell = a?.isLeader ? '<span class="badge badge-purple" style="font-size:10px">リーダー</span>' : '';
@@ -2289,7 +2347,76 @@ function renderPayment(content, right) {
     }).join('') || '<div class="card"><div class="empty-state">イベントデータがありません</div></div>';
   }
 
-  content.innerHTML = urlCardHtml + `
+  // ══════════════════════════════════════════
+  // 作り手 × イベント
+  // ══════════════════════════════════════════
+  if (activeTab === 'maker') {
+    const makerPayments = load(SK.makerPayments,[]);
+    const makerEvents = events.filter(e=>e.makers&&e.makers.length>0)
+      .slice().sort((a,b)=>a.date.localeCompare(b.date));
+    if (makerEvents.length===0) {
+      body = '<div class="card"><div class="empty-state" style="padding:48px">作り手が登録されたイベントがありません<br><span style="font-size:12px;color:var(--ink-faint)">イベント編集画面から作り手を追加してください</span></div></div>';
+    } else {
+      body = makerEvents.map(e=>{
+        const v=venues.find(x=>x.id===e.venueId);
+        const c=cats.find(x=>x.id===e.categoryId);
+        const makerCards=(e.makers||[]).map((makerName,makerIdx)=>{
+          let p=makerPayments.find(x=>x.eventId===e.id&&x.makerName===makerName);
+          if(!p) p={items:MAKER_ITEMS.map(l=>({label:l,unitPrice:0,quantity:0})),memo:'',status:'未確定'};
+          let total=0;
+          const itemRows=MAKER_ITEMS.map((label,i)=>{
+            const item=p.items?.[i]||{unitPrice:0,quantity:0};
+            const sub=(item.unitPrice||0)*(item.quantity||0); total+=sub;
+            return '<tr>'
+              +'<td style="padding:6px 10px;font-size:12px">'+label+'</td>'
+              +'<td style="padding:4px 6px"><input type="number" id="mkr_up_'+e.id+'_'+makerIdx+'_'+i+'" value="'+(item.unitPrice||0)+'"'
+              +' oninput="calcMakerTotal('+e.id+','+makerIdx+')" onchange="saveMakerItems('+e.id+','+makerIdx+')"'
+              +' style="width:90px;padding:4px 8px;border:1px solid var(--surface-3);border-radius:6px;font-size:12px;font-family:inherit;text-align:right"></td>'
+              +'<td style="padding:4px 6px"><input type="number" id="mkr_qty_'+e.id+'_'+makerIdx+'_'+i+'" value="'+(item.quantity||0)+'"'
+              +' oninput="calcMakerTotal('+e.id+','+makerIdx+')" onchange="saveMakerItems('+e.id+','+makerIdx+')"'
+              +' style="width:60px;padding:4px 8px;border:1px solid var(--surface-3);border-radius:6px;font-size:12px;font-family:inherit;text-align:right"></td>'
+              +'<td id="mkr_sub_'+e.id+'_'+makerIdx+'_'+i+'" style="text-align:right;padding:6px 10px;font-size:12px;white-space:nowrap">¥'+sub.toLocaleString()+'</td>'
+              +'</tr>';
+          }).join('');
+          const statusBtns=MAKER_STATUSES.map(s=>{
+            const active=p.status===s;
+            const col=MAKER_STATUS_COLORS[s]||'#c7c7cc';
+            return '<button type="button" class="btn btn-sm" onclick="setMakerStatus('+e.id+','+makerIdx+',\''+s+'\')"'
+              +' style="font-size:11px;padding:4px 10px;'+(active?'background:'+col+';color:#fff;border-color:transparent':'background:var(--surface);color:var(--ink-mid);border:1px solid var(--surface-3)')+'">'+s+'</button>';
+          }).join('');
+          return '<div style="margin-bottom:12px;border:1px solid var(--surface-3);border-radius:var(--radius-sm);overflow:hidden">'
+            +'<div style="padding:10px 14px;background:var(--surface-2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+            +'<div style="font-size:13px;font-weight:500">👤 '+makerName+'</div>'
+            +'<div style="display:flex;gap:4px;flex-wrap:wrap">'+statusBtns+'</div></div>'
+            +'<table style="width:100%;border-collapse:collapse">'
+            +'<thead><tr style="background:var(--surface-2);border-bottom:1px solid var(--surface-3)">'
+            +'<th style="padding:6px 10px;font-size:11px;text-align:left;color:var(--ink-soft)">項目</th>'
+            +'<th style="padding:6px 10px;font-size:11px;text-align:left;color:var(--ink-soft)">単価</th>'
+            +'<th style="padding:6px 10px;font-size:11px;text-align:left;color:var(--ink-soft)">数量</th>'
+            +'<th style="padding:6px 10px;font-size:11px;text-align:right;color:var(--ink-soft)">小計</th>'
+            +'</tr></thead>'
+            +'<tbody>'+itemRows+'</tbody>'
+            +'<tfoot><tr style="background:var(--accent-light);border-top:1px solid var(--surface-3)">'
+            +'<td colspan="3" style="padding:6px 10px;font-size:12px;font-weight:500;color:var(--accent)">合計</td>'
+            +'<td id="mkr_total_'+e.id+'_'+makerIdx+'" style="text-align:right;padding:6px 10px;font-size:13px;font-weight:600;color:var(--accent);white-space:nowrap">¥'+total.toLocaleString()+'</td>'
+            +'</tr></tfoot></table>'
+            +'<div style="padding:10px 14px;border-top:1px solid var(--surface-3)">'
+            +'<label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px">※ 備考（規定など）</label>'
+            +'<textarea id="mkr_memo_'+e.id+'_'+makerIdx+'" rows="2"'
+            +' style="width:100%;padding:6px 10px;border:1px solid var(--surface-3);border-radius:6px;font-size:12px;font-family:inherit;resize:vertical"'
+            +' onchange="saveMakerItems('+e.id+','+makerIdx+')"'
+            +' placeholder="支払い規定・備考...">'+(p.memo||'')+'</textarea>'
+            +'</div></div>';
+        }).join('');
+        return '<div class="card" style="margin-bottom:16px">'
+          +'<div class="card-header"><h3>'+e.date+'　'+(v?.name||'')+'　<span class="badge '+(c?.color||'badge-gray')+'">'+( c?.name||'')+'</span></h3>'
+          +(e.content?'<span style="font-size:12px;color:var(--ink-soft)">'+e.content+'</span>':'')+'</div>'
+          +'<div style="padding:12px 16px">'+makerCards+'</div></div>';
+      }).join('');
+    }
+  }
+
+  content.innerHTML = (activeTab!=='maker'?urlCardHtml:'') + `
     <div class="tab-bar">
       ${tabs.map(t=>`<div class="tab ${activeTab===t.id?'active':''}" onclick="activeTab='${t.id}';renderPage()">${t.label}</div>`).join('')}
     </div>
@@ -2458,13 +2585,30 @@ function openEventModal(id) {
           </div>
         </div>
       </div>
+      <hr style="margin:12px 0;border:none;border-top:1px solid var(--surface-3)">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-bottom:12px;padding:10px 12px;background:var(--green-light,#ecfdf5);border-radius:var(--radius-sm);border:1px solid var(--green-border,#bbf7d0)">
+        <input type="checkbox" id="f_garden_distrib" ${ev?.gardenDistrib?'checked':''} style="width:16px;height:16px;accent-color:#2d6a4f">
+        <span>🌱 <strong>園配布リストに追加</strong></span>
+        <span style="font-size:11px;color:var(--ink-soft)">— チェックすると保育園配布リストに表示されます</span>
+      </label>
+      <hr style="margin:12px 0;border:none;border-top:1px solid var(--surface-3)">
+      <div style="margin-bottom:8px">
+        <div style="font-size:11px;font-weight:500;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">作り手</div>
+        <div id="f_makers_list" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px;margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="form-control" id="f_maker_input" placeholder="作り手の名前を入力" style="flex:1"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();addMakerToForm();}">
+          <button type="button" class="btn btn-sm" onclick="addMakerToForm()" style="white-space:nowrap">＋ 追加</button>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal()">キャンセル</button>
       <button class="btn btn-primary" onclick="saveEvent(${id||'null'})">保存</button>
     </div>
   </div>`);
-  setTimeout(calcOpHours, 0);
+  window._formMakers = ev?.makers ? [...ev.makers] : [];
+  setTimeout(()=>{ calcOpHours(); renderMakerChips(); }, 0);
 }
 
 // カテゴリ変更時に稼働時間を自動入力
@@ -2515,6 +2659,8 @@ function saveEvent(id) {
   const selVenue    = venues2.find(v=>v.id===venueId);
   const placeName   = selVenue?.name || '';
   const content     = document.getElementById('f_content')?.value.trim() || '';
+  const gardenDistrib = document.getElementById('f_garden_distrib')?.checked || false;
+  const makers      = window._formMakers ? [...window._formMakers] : [];
   // nameフィールドも更新（後方互換）
   const d = new Date(date+'T00:00:00');
   const days=['日','月','火','水','木','金','土'];
@@ -2522,11 +2668,11 @@ function saveEvent(id) {
   const name = placeName||content ? `${dateStr} ${placeName}${content?'：'+content:''}` : '';
   const evs = load(SK.events,[]);
   if (id) {
-    Object.assign(evs.find(e=>e.id===id), {date, venueId, categoryId, requiredCount:req, opStart, opEnd, opBreak, studyHours, ldrStudyHours, placeName, content, name});
+    Object.assign(evs.find(e=>e.id===id), {date, venueId, categoryId, requiredCount:req, opStart, opEnd, opBreak, studyHours, ldrStudyHours, placeName, content, name, makers, gardenDistrib});
   } else {
     const newId = (evs.length ? Math.max(...evs.map(e=>e.id)) : 0) + 1;
     evs.push({id:newId, date, venueId, categoryId, requiredCount:req,
-      staffAssignments:[], attendance:{}, opStart, opEnd, opBreak, studyHours, ldrStudyHours, placeName, content, name});
+      staffAssignments:[], attendance:{}, opStart, opEnd, opBreak, studyHours, ldrStudyHours, placeName, content, name, makers, gardenDistrib});
   }
   save(SK.events, evs); closeModal(); renderPage();
 }
