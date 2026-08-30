@@ -506,8 +506,10 @@ function removeMakerFromForm(i) {
 // HELPERS
 // =====================================================
 function transportAmt(km) {
-  // 往復距離 × 10円/km（小数点以下切り捨て）
-  return Math.floor(km * 10);
+  // 往復距離の段階制ガソリン代（1イベントごとに判定）
+  if (km <= 20) return 0;
+  if (km >= 200) return 2000;
+  return 250 + (Math.floor(km / 10) - 2) * 100;
 }
 function haversine(lat1,lng1,lat2,lng2) {
   const R=6371, dL=(lat2-lat1)*Math.PI/180, dN=(lng2-lng1)*Math.PI/180;
@@ -1950,8 +1952,11 @@ function renderCategories(content, right) {
         <h3>交通費支給規定</h3>
       </div>
       <div class="card-body">
-        <div style="font-size:14px;font-weight:500;color:var(--accent);margin-bottom:8px">往復距離 × 10円/km（小数点以下切り捨て）</div>
-        <div style="font-size:12px;color:var(--ink-soft)">月の合計往復距離に基づき支給　例）往復 123.2km → ¥1,232</div>
+        <div style="font-size:14px;font-weight:500;color:var(--accent);margin-bottom:8px">往復20km以上の場合のみ支給（段階制）</div>
+        <div style="font-size:12px;color:var(--ink-soft);line-height:1.8">
+          20km以下：¥0 ／ 20-30km：¥250 ／ 30-40km：¥350 ／ 40-50km：¥450 ／ … +10kmごとに+¥100 ／ 190-200km：¥1,950 ／ 200km以上：¥2,000<br>
+          ※1イベントごとの往復距離で判定
+        </div>
       </div>
     </div>`;
 
@@ -2042,12 +2047,10 @@ function staffTotalWithTransport(s, events, venues) {
   wevs.forEach(e => { pay += calcPay(e, s.id).total; });
   const months = [...new Set(wevs.map(e=>e.date.slice(0,7)))];
   months.forEach(m => {
-    let dist = 0;
     wevs.filter(e=>e.date.startsWith(m)).forEach(e=>{
       const v=venues.find(x=>x.id===e.venueId);
-      if(v&&s.lat) dist += haversine(s.lat,s.lng,v.lat,v.lng) * 2;
+      if(v&&s.lat) pay += transportAmt(haversine(s.lat,s.lng,v.lat,v.lng) * 2);
     });
-    pay += transportAmt(dist);
   });
   return pay;
 }
@@ -2079,7 +2082,7 @@ function renderPayment(content, right) {
     wevs.forEach(e => { const m = e.date.slice(0,7); if (!byMonth[m]) byMonth[m]=[]; byMonth[m].push(e); });
     let totalPay = 0, totalTransport = 0;
     const months = Object.entries(byMonth).sort().map(([month, mes]) => {
-      let mPay = 0, mDist = 0;
+      let mPay = 0, mDist = 0, mTransport = 0;
       const evRows = mes.map(e => {
         const v = venues.find(x => x.id === e.venueId);
         const c = cats.find(x => x.id === e.categoryId);
@@ -2087,12 +2090,11 @@ function renderPayment(content, right) {
         const p = calcPay(e, s.id);
         const h = calcEventHours(e);
         const dist = (v && s.lat) ? haversine(s.lat, s.lng, v.lat, v.lng) * 2 : 0;
-        mPay += p.total; mDist += dist;
+        mPay += p.total; mDist += dist; mTransport += transportAmt(dist);
         const displayStudy = a?.isLeader ? (e.ldrStudyHours ?? h.studyHours) : h.studyHours;
         return { date: e.date, venue: v?.name||'', cat: c?.name||'', catColor: c?.color||'badge-gray',
                  op: h.opHours, study: displayStudy, role: a?.isLeader ? 'leader' : 'staff', pay: p.total };
       });
-      const mTransport = transportAmt(mDist);
       totalPay += mPay; totalTransport += mTransport;
       return { month, dist: Math.round(mDist), transport: mTransport, events: evRows };
     });
@@ -2148,13 +2150,13 @@ function renderPayment(content, right) {
           e.staffAssignments.some(a=>a.staffId===s.id&&a.status==='worked')
         );
         if (!wevs.length) { matrix[m][s.id] = null; return; }
-        let mPay = 0, mDist = 0;
+        let mPay = 0, trans = 0;
         wevs.forEach(e => {
           const v = venues.find(x=>x.id===e.venueId);
           mPay  += calcPay(e, s.id).total;
-          mDist += (v&&s.lat) ? haversine(s.lat,s.lng,v.lat,v.lng) * 2 : 0;
+          const d = (v&&s.lat) ? haversine(s.lat,s.lng,v.lat,v.lng) * 2 : 0;
+          trans += transportAmt(d);
         });
-        const trans  = transportAmt(mDist);
         const mTotal = mPay + trans;
         matrix[m][s.id] = { pay: mPay, trans, total: mTotal, count: wevs.length };
         staffTotals[s.id] += mTotal;
@@ -2240,7 +2242,7 @@ function renderPayment(content, right) {
       });
       let grandPay = 0, grandTransport = 0;
       const monthBlocks = Object.entries(byMonth).sort().map(([month, mes]) => {
-        let mPay = 0, mDist = 0;
+        let mPay = 0, mDist = 0, mTransport = 0;
         const rows = mes.map(e => {
           const v = venues.find(x=>x.id===e.venueId);
           const c = cats.find(x=>x.id===e.categoryId);
@@ -2248,7 +2250,7 @@ function renderPayment(content, right) {
           const p = calcPay(e, sel.id);
           const dist = (v&&sel.lat) ? haversine(sel.lat,sel.lng,v.lat,v.lng) * 2 : 0;
           const h = calcEventHours(e);
-          mPay += p.total; mDist += dist;
+          mPay += p.total; mDist += dist; mTransport += transportAmt(dist);
           const roleCell = a?.isLeader ? '<span class="badge badge-purple" style="font-size:10px">リーダー</span>' : '';
           const displayStudy = a?.isLeader ? (e.ldrStudyHours ?? h.studyHours) : h.studyHours;
           const timeCell = `${h.opHours.toFixed(1)}h${displayStudy?'+'+displayStudy+'h':''}`;
@@ -2261,7 +2263,6 @@ function renderPayment(content, right) {
             <td style="text-align:right;font-weight:500">${p.total===0?'⚠ 未設定':'¥'+p.total.toLocaleString()}${p.isContractPrep?`<div style="font-size:10px;color:var(--green-dark,#2e7d32)" title="${(p.contractPrepItems||[]).map(ci=>ci.item+' ¥'+ci.amount.toLocaleString()).join('、')}">委託準備 ¥${p.studyPay.toLocaleString()}</div>`:''}</td>
           </tr>`;
         }).join('');
-        const mTransport = transportAmt(mDist);
         grandPay += mPay; grandTransport += mTransport;
         const [yr, mo] = month.split('-');
         const ml = `${yr}年${parseInt(mo)}月`;
