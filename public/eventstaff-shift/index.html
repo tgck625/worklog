@@ -926,6 +926,22 @@ function refreshConfirmedSnapshots() {
   if (updated) save(SK.confirmedSnapshots, snaps);
 }
 
+// confirmed/paid のスナップショットと paid_amounts を最新データで再生成
+function refreshPaidSnapshots(staffId, month) {
+  const key = `${staffId}:${month}`;
+  const statuses = load(SK.payStatus, {});
+  const st = statuses[key];
+  if (st !== 'confirmed' && st !== 'paid') return;
+  const snaps = load(SK.confirmedSnapshots, {});
+  snaps[key] = buildMonthSnapshot(staffId, month);
+  save(SK.confirmedSnapshots, snaps);
+  if (st === 'paid') {
+    const pa = load('staff_mgmt_paid_amounts', {});
+    pa[key] = snaps[key].total;
+    save('staff_mgmt_paid_amounts', pa);
+  }
+}
+
 // confirmed/paid でスナップショットがないエントリを補完
 function ensureSnapshots() {
   const statuses = load(SK.payStatus, {});
@@ -3775,8 +3791,7 @@ function renderPayment(content, right) {
           const pst = (load(SK.payStatus,{})[`${s.id}:${m}`]) || 'pending';
           const pa = pst === 'paid' ? load('staff_mgmt_paid_amounts',{})[`${s.id}:${m}`] : null;
           const useTotal = (pa != null) ? pa : snap.total;
-          const liveTotal = (pst === 'paid') ? calcStaffMonthTotal(s.id, m) : useTotal;
-          matrix[m][s.id] = { pay: snap.pay, trans: snap.transport, extra: snap.extra||0, prep: snap.prep||0, total: useTotal, liveTotal, count: cnt };
+          matrix[m][s.id] = { pay: snap.pay, trans: snap.transport, extra: snap.extra||0, prep: snap.prep||0, total: useTotal, count: cnt };
           staffTotals[s.id] += useTotal;
           monthTotals[m]    += useTotal;
           grandTotal        += useTotal;
@@ -3824,7 +3839,7 @@ function renderPayment(content, right) {
         const bg = active ? 'var(--accent-light)' : 'var(--surface)';
         const pst = (load(SK.payStatus,{})[`${s.id}:${m}`]) || 'pending';
         const paidAmt = load('staff_mgmt_paid_amounts',{})[`${s.id}:${m}`];
-        const diff = pst==='paid' && cell && paidAmt != null ? Math.max(0, (cell.liveTotal || cell.total) - paidAmt) : 0;
+        const diff = pst==='paid' && cell && paidAmt != null ? Math.max(0, cell.total - paidAmt) : 0;
         if (!cell) return `<td style="text-align:center;color:var(--ink-faint);padding:8px 10px;background:${bg};font-size:12px;cursor:pointer"
                               onclick="paymentSelectedStaff=${s.id};_openPayMonths.clear();renderPage()">－</td>`;
         return `<td style="text-align:center;padding:6px 10px;background:${bg};font-size:12px">
@@ -5718,14 +5733,22 @@ function savePrepWork(staffId, editId) {
     allPrep.push({ id, staffId, date, description, hours, hourlyRate });
   }
   save(SK.prepWork, allPrep);
+  // 振込済/確定済の月ならスナップショットと金額を自動更新
+  const prepMonth = date.slice(0, 7);
+  refreshPaidSnapshots(staffId, prepMonth);
   closeModal();
   renderPage();
 }
 
 function deletePrepWork(id) {
   if (!confirm('この事前準備を削除しますか？')) return;
-  const allPrep = load(SK.prepWork, []).filter(x => x.id !== id);
-  save(SK.prepWork, allPrep);
+  const allPrep = load(SK.prepWork, []);
+  const target = allPrep.find(x => x.id === id);
+  const delStaffId = target?.staffId;
+  const delMonth = target?.date?.slice(0, 7);
+  const filtered = allPrep.filter(x => x.id !== id);
+  save(SK.prepWork, filtered);
+  if (delStaffId && delMonth) refreshPaidSnapshots(delStaffId, delMonth);
   closeModal();
   renderPage();
 }
