@@ -3800,8 +3800,7 @@ function renderPayment(content, right) {
           const pst = (load(SK.payStatus,{})[`${s.id}:${m}`]) || 'pending';
           const pa = pst === 'paid' ? load('staff_mgmt_paid_amounts',{})[`${s.id}:${m}`] : null;
           const useTotal = (pa != null) ? pa : snap.total;
-          const liveTotal = (pst === 'paid') ? calcStaffMonthTotal(s.id, m) : useTotal;
-          matrix[m][s.id] = { pay: snap.pay, trans: snap.transport, extra: snap.extra||0, prep: snap.prep||0, total: useTotal, liveTotal, count: cnt };
+          matrix[m][s.id] = { pay: snap.pay, trans: snap.transport, extra: snap.extra||0, prep: snap.prep||0, total: useTotal, count: cnt };
           staffTotals[s.id] += useTotal;
           monthTotals[m]    += useTotal;
           grandTotal        += useTotal;
@@ -3849,7 +3848,22 @@ function renderPayment(content, right) {
         const bg = active ? 'var(--accent-light)' : 'var(--surface)';
         const pst = (load(SK.payStatus,{})[`${s.id}:${m}`]) || 'pending';
         const paidAmt = load('staff_mgmt_paid_amounts',{})[`${s.id}:${m}`];
-        const diff = pst==='paid' && cell && paidAmt != null ? Math.max(0, (cell.liveTotal || cell.total) - paidAmt) : 0;
+        // 振込後に追加された事前準備・追加費用のみを差額として検出
+        let diff = 0;
+        if (pst === 'paid' && cell) {
+          const snap = getMonthSnapshot(s.id, m);
+          if (snap) {
+            const curPrep = allPrepWorkAll.filter(pw => pw.staffId === s.id && pw.date.startsWith(m))
+              .reduce((sum, pw) => sum + Math.floor((pw.hours||0) * (pw.hourlyRate||0)), 0);
+            const snapPrep = snap.prep || 0;
+            const evIds = new Set((snap.events||[]).map(ev => ev.dt));
+            let curExtra = 0;
+            events.filter(e => e.date.startsWith(m) && e.staffAssignments.some(a => a.staffId === s.id && a.status === 'worked'))
+              .forEach(e => { curExtra += (allExtras[`${s.id}:${e.id}`]||[]).reduce((sum, x) => sum + (x.amount||0), 0); });
+            const snapExtra = snap.extra || 0;
+            diff = Math.max(0, curPrep - snapPrep) + Math.max(0, curExtra - snapExtra);
+          }
+        }
         if (!cell) return `<td style="text-align:center;color:var(--ink-faint);padding:8px 10px;background:${bg};font-size:12px;cursor:pointer"
                               onclick="paymentSelectedStaff=${s.id};_openPayMonths.clear();renderPage()">－</td>`;
         return `<td style="text-align:center;padding:6px 10px;background:${bg};font-size:12px">
