@@ -866,9 +866,9 @@ function buildMonthSnapshot(staffId, month) {
   const prepItems=allPrepWork.filter(pw=>pw.staffId===staffId&&pw.date.startsWith(month)).sort((a,b)=>a.date.localeCompare(b.date));
   let mPrep=0;
   const prepSnap=prepItems.map(pw=>{
-    const total=Math.floor((pw.hours||0)*(pw.hourlyRate||0));
+    const total=calcPrepTotal(pw);
     mPrep+=total;
-    return {dt:pw.date, desc:pw.description||'事前準備', h:pw.hours||0, rate:pw.hourlyRate||0, p:total};
+    return {dt:pw.date, desc:pw.description||'事前準備', h:pw.hours||0, rate:pw.hourlyRate||0, p:total, fixed:pw.fixedAmount||0};
   });
   const mTransport=getMonthTransport(staffId,month,mDist);
   const ctEntry=getCustomTransportEntry(staffId,month);
@@ -898,7 +898,7 @@ function calcStaffMonthTotal(staffId, month) {
     mExtra+=extras.reduce((sum,x)=>sum+(x.amount||0),0);
   });
   const prepItems=allPrepWork.filter(pw=>pw.staffId===staffId&&pw.date.startsWith(month));
-  const mPrep=prepItems.reduce((sum,pw)=>sum+Math.floor((pw.hours||0)*(pw.hourlyRate||0)),0);
+  const mPrep=prepItems.reduce((sum,pw)=>sum+calcPrepTotal(pw),0);
   return mPay+getMonthTransport(staffId,month,mDist)+mExtra+mPrep;
 }
 // スナップショットがあればそれを返す（confirmed/paid月用）
@@ -3612,9 +3612,9 @@ function buildStaffPaymentUrl(staffId, targetMonth) {
     const monthPrep = allPrepWork.filter(pw => pw.date.startsWith(month)).sort((a,b) => a.date.localeCompare(b.date));
     let mPrep = 0;
     const prepData = monthPrep.map(pw => {
-      const total = Math.floor((pw.hours||0) * (pw.hourlyRate||0));
+      const total = calcPrepTotal(pw);
       mPrep += total;
-      return { dt: pw.date, desc: pw.description||'事前準備', h: pw.hours||0, rate: pw.hourlyRate||0, p: total };
+      return { dt: pw.date, desc: pw.description||'事前準備', h: pw.hours||0, rate: pw.hourlyRate||0, p: total, fixed: pw.fixedAmount||0 };
     });
     const mTransport = getMonthTransport(staffId, month, mDist);
     const ctEntry = getCustomTransportEntry(staffId, month);
@@ -3811,7 +3811,7 @@ function renderPayment(content, right) {
           e.staffAssignments.some(a=>a.staffId===s.id&&a.status==='worked')
         );
         const prepItems = allPrepWorkAll.filter(pw => pw.staffId === s.id && pw.date.startsWith(m));
-        let mPrep = prepItems.reduce((sum, pw) => sum + Math.floor((pw.hours||0) * (pw.hourlyRate||0)), 0);
+        let mPrep = prepItems.reduce((sum, pw) => sum + calcPrepTotal(pw), 0);
         if (!wevs.length && !prepItems.length) { matrix[m][s.id] = null; return; }
         let mPay = 0, mDist = 0, mExtra = 0;
         wevs.forEach(e => {
@@ -3854,7 +3854,7 @@ function renderPayment(content, right) {
           const snap = getMonthSnapshot(s.id, m);
           if (snap) {
             const curPrep = allPrepWorkAll.filter(pw => pw.staffId === s.id && pw.date.startsWith(m))
-              .reduce((sum, pw) => sum + Math.floor((pw.hours||0) * (pw.hourlyRate||0)), 0);
+              .reduce((sum, pw) => sum + calcPrepTotal(pw), 0);
             const snapPrep = snap.prep || 0;
             const evIds = new Set((snap.events||[]).map(ev => ev.dt));
             let curExtra = 0;
@@ -3961,12 +3961,14 @@ function renderPayment(content, right) {
             </tr>`;
           }).join('');
           prepRows = (snap.prepWork||[]).map(pw => {
+            const timeLabel = pw.fixed ? '一式' : `${Math.floor(pw.h)}h${Math.round((pw.h%1)*60) ? Math.round((pw.h%1)*60)+'m' : ''}`;
+            const rateLabel = pw.fixed ? '' : `@¥${(pw.rate||0).toLocaleString()}`;
             return `<tr style="background:var(--purple-light)">
               <td style="white-space:nowrap;font-weight:500">${pw.dt}</td>
               <td colspan="2" style="font-size:12px;color:var(--purple)">${pw.desc || '事前準備'}</td>
-              <td style="font-size:12px;text-align:center">${Math.floor(pw.h)}h${Math.round((pw.h%1)*60) ? Math.round((pw.h%1)*60)+'m' : ''}</td>
+              <td style="font-size:12px;text-align:center">${timeLabel}</td>
               <td style="text-align:center"><span class="badge badge-purple" style="font-size:10px">準備</span></td>
-              <td style="text-align:right;font-size:11px;color:var(--ink-soft)">@¥${(pw.rate||0).toLocaleString()}</td>
+              <td style="text-align:right;font-size:11px;color:var(--ink-soft)">${rateLabel}</td>
               <td style="text-align:right;font-weight:500;color:var(--purple)">¥${pw.p.toLocaleString()}</td>
             </tr>`;
           }).join('');
@@ -4015,14 +4017,16 @@ function renderPayment(content, right) {
           const monthPrepWork = allPrepWork.filter(pw => pw.date.startsWith(month)).sort((a,b) => a.date.localeCompare(b.date));
           mPrep = 0;
           prepRows = monthPrepWork.map(pw => {
-            const total = Math.floor((pw.hours || 0) * (pw.hourlyRate || 0));
+            const total = calcPrepTotal(pw);
             mPrep += total;
+            const timeLabel = pw.fixedAmount ? '一式' : `${Math.floor(pw.hours)}h${Math.round((pw.hours%1)*60) ? Math.round((pw.hours%1)*60)+'m' : ''}`;
+            const rateLabel = pw.fixedAmount ? '' : `@¥${(pw.hourlyRate||0).toLocaleString()}`;
             return `<tr style="background:var(--purple-light);cursor:pointer" onclick="openPrepWorkModal(${sel.id},'${pw.id}')" title="クリックで編集">
               <td style="white-space:nowrap;font-weight:500">${pw.date}</td>
               <td colspan="2" style="font-size:12px;color:var(--purple)">${pw.description || '事前準備'}</td>
-              <td style="font-size:12px;text-align:center">${Math.floor(pw.hours)}h${Math.round((pw.hours%1)*60) ? Math.round((pw.hours%1)*60)+'m' : ''}</td>
+              <td style="font-size:12px;text-align:center">${timeLabel}</td>
               <td style="text-align:center"><span class="badge badge-purple" style="font-size:10px">準備</span></td>
-              <td style="text-align:right;font-size:11px;color:var(--ink-soft)">@¥${(pw.hourlyRate||0).toLocaleString()}</td>
+              <td style="text-align:right;font-size:11px;color:var(--ink-soft)">${rateLabel}</td>
               <td style="text-align:right;font-weight:500;color:var(--purple)">¥${total.toLocaleString()}</td>
             </tr>`;
           }).join('');
@@ -5684,6 +5688,7 @@ function openPrepWorkModal(staffId, editId) {
   const existH = Math.floor(existHours);
   const existM = Math.round((existHours - existH) * 60);
 
+  const isFixed = existing ? !!existing.fixedAmount : false;
   const today = new Date().toISOString().slice(0,10);
   openModal(`<div class="modal" style="max-width:420px">
     <div class="modal-header"><h3>${existing ? '事前準備を編集' : '事前準備を追加'}</h3><button class="modal-close" onclick="closeModal()">×</button></div>
@@ -5697,19 +5702,34 @@ function openPrepWorkModal(staffId, editId) {
         <label class="form-label">作業内容<span class="req">*</span></label>
         <input type="text" class="form-control" id="prepDesc" value="${existing ? existing.description || '' : ''}" placeholder="例：資料作成、買い出し等">
       </div>
-      <div style="display:flex;gap:10px;align-items:end">
-        <div class="form-group" style="flex:1">
-          <label class="form-label">作業時間<span class="req">*</span></label>
-          <div style="display:flex;align-items:center;gap:4px">
-            <input type="number" min="0" class="form-control" id="prepH" value="${existing ? existH : ''}" placeholder="0" style="width:60px" oninput="updatePrepTotal()">
-            <span style="font-size:12px">時間</span>
-            <input type="number" min="0" max="59" class="form-control" id="prepM" value="${existing ? existM : ''}" placeholder="0" style="width:60px" oninput="updatePrepTotal()">
-            <span style="font-size:12px">分</span>
+      <div class="form-group" style="margin-bottom:10px">
+        <label class="form-label">計算方法</label>
+        <div style="display:flex;gap:6px">
+          <button type="button" id="prepModeHourly" class="btn btn-sm ${isFixed?'':'btn-primary'}" onclick="setPrepMode('hourly')" style="font-size:12px">時給 × 時間</button>
+          <button type="button" id="prepModeFixed" class="btn btn-sm ${isFixed?'btn-primary':''}" onclick="setPrepMode('fixed')" style="font-size:12px">一式（固定額）</button>
+        </div>
+      </div>
+      <div id="prepHourlySection" style="${isFixed?'display:none':''}">
+        <div style="display:flex;gap:10px;align-items:end">
+          <div class="form-group" style="flex:1">
+            <label class="form-label">作業時間<span class="req">*</span></label>
+            <div style="display:flex;align-items:center;gap:4px">
+              <input type="number" min="0" class="form-control" id="prepH" value="${existing && !isFixed ? existH : ''}" placeholder="0" style="width:60px" oninput="updatePrepTotal()">
+              <span style="font-size:12px">時間</span>
+              <input type="number" min="0" max="59" class="form-control" id="prepM" value="${existing && !isFixed ? existM : ''}" placeholder="0" style="width:60px" oninput="updatePrepTotal()">
+              <span style="font-size:12px">分</span>
+            </div>
+          </div>
+          <div class="form-group" style="flex:0.7">
+            <label class="form-label">時給（円）<span class="req">*</span></label>
+            <input type="number" class="form-control" id="prepRate" value="${existing && !isFixed ? existing.hourlyRate : autoRate || ''}" placeholder="例：1200" oninput="updatePrepTotal()">
           </div>
         </div>
-        <div class="form-group" style="flex:0.7">
-          <label class="form-label">時給（円）<span class="req">*</span></label>
-          <input type="number" class="form-control" id="prepRate" value="${existing ? existing.hourlyRate : autoRate || ''}" placeholder="例：1200" oninput="updatePrepTotal()">
+      </div>
+      <div id="prepFixedSection" style="${isFixed?'':'display:none'}">
+        <div class="form-group">
+          <label class="form-label">金額（円）<span class="req">*</span></label>
+          <input type="number" class="form-control" id="prepFixedAmount" value="${existing && isFixed ? existing.fixedAmount : ''}" placeholder="例：5000" min="0" oninput="updatePrepTotal()">
         </div>
       </div>
       <div id="prepCalcDetail" style="font-size:11px;color:var(--ink-soft);padding:8px 10px;background:var(--surface-2);border-radius:6px;margin-top:8px"></div>
@@ -5721,41 +5741,70 @@ function openPrepWorkModal(staffId, editId) {
       <button class="btn btn-primary" onclick="savePrepWork(${staffId},'${editId||''}')">保存</button>
     </div>
   </div>`);
+  window._prepMode = isFixed ? 'fixed' : 'hourly';
   updatePrepTotal();
 }
 
+function calcPrepTotal(pw) {
+  if (pw.fixedAmount) return pw.fixedAmount;
+  return Math.floor((pw.hours||0) * (pw.hourlyRate||0));
+}
+
+window._prepMode = 'hourly';
+function setPrepMode(mode) {
+  window._prepMode = mode;
+  document.getElementById('prepHourlySection').style.display = mode === 'hourly' ? '' : 'none';
+  document.getElementById('prepFixedSection').style.display = mode === 'fixed' ? '' : 'none';
+  document.getElementById('prepModeHourly').className = 'btn btn-sm' + (mode === 'hourly' ? ' btn-primary' : '');
+  document.getElementById('prepModeFixed').className = 'btn btn-sm' + (mode === 'fixed' ? ' btn-primary' : '');
+  updatePrepTotal();
+}
 function updatePrepTotal() {
-  const h = parseInt(document.getElementById('prepH')?.value) || 0;
-  const m = parseInt(document.getElementById('prepM')?.value) || 0;
-  const r = parseInt(document.getElementById('prepRate')?.value) || 0;
-  const totalH = h + m / 60;
-  const pay = Math.floor(totalH * r);
   const detail = document.getElementById('prepCalcDetail');
   const total = document.getElementById('prepTotal');
-  if (detail) detail.innerHTML = `${h}時間${m}分 = ${totalH.toFixed(2)}h × ¥${r.toLocaleString()} = ¥${pay.toLocaleString()}`;
-  if (total) total.innerHTML = '<span style="color:var(--accent)">¥' + pay.toLocaleString() + '</span>';
+  if (window._prepMode === 'fixed') {
+    const amt = parseInt(document.getElementById('prepFixedAmount')?.value) || 0;
+    if (detail) detail.innerHTML = '一式';
+    if (total) total.innerHTML = '<span style="color:var(--accent)">¥' + amt.toLocaleString() + '</span>';
+  } else {
+    const h = parseInt(document.getElementById('prepH')?.value) || 0;
+    const m = parseInt(document.getElementById('prepM')?.value) || 0;
+    const r = parseInt(document.getElementById('prepRate')?.value) || 0;
+    const totalH = h + m / 60;
+    const pay = Math.floor(totalH * r);
+    if (detail) detail.innerHTML = `${h}時間${m}分 = ${totalH.toFixed(2)}h × ¥${r.toLocaleString()} = ¥${pay.toLocaleString()}`;
+    if (total) total.innerHTML = '<span style="color:var(--accent)">¥' + pay.toLocaleString() + '</span>';
+  }
 }
 
 function savePrepWork(staffId, editId) {
   const date = document.getElementById('prepDate')?.value;
   const description = document.getElementById('prepDesc')?.value.trim();
-  const h = parseInt(document.getElementById('prepH')?.value) || 0;
-  const m = parseInt(document.getElementById('prepM')?.value) || 0;
-  const hours = h + m / 60;
-  const hourlyRate = parseInt(document.getElementById('prepRate')?.value) || 0;
+  const mode = window._prepMode || 'hourly';
 
   if (!date) { alert('日付を入力してください'); return; }
   if (!description) { alert('作業内容を入力してください'); return; }
-  if (!hours) { alert('作業時間を入力してください'); return; }
-  if (!hourlyRate) { alert('時給を入力してください'); return; }
+
+  let hours = 0, hourlyRate = 0, fixedAmount = null;
+  if (mode === 'fixed') {
+    fixedAmount = parseInt(document.getElementById('prepFixedAmount')?.value) || 0;
+    if (!fixedAmount) { alert('金額を入力してください'); return; }
+  } else {
+    const h = parseInt(document.getElementById('prepH')?.value) || 0;
+    const m = parseInt(document.getElementById('prepM')?.value) || 0;
+    hours = h + m / 60;
+    hourlyRate = parseInt(document.getElementById('prepRate')?.value) || 0;
+    if (!hours) { alert('作業時間を入力してください'); return; }
+    if (!hourlyRate) { alert('時給を入力してください'); return; }
+  }
 
   const allPrep = load(SK.prepWork, []);
   if (editId) {
     const pw = allPrep.find(x => x.id === editId);
-    if (pw) { pw.date = date; pw.description = description; pw.hours = hours; pw.hourlyRate = hourlyRate; }
+    if (pw) { pw.date = date; pw.description = description; pw.hours = hours; pw.hourlyRate = hourlyRate; pw.fixedAmount = fixedAmount; }
   } else {
     const id = Math.random().toString(36).slice(2, 9);
-    allPrep.push({ id, staffId, date, description, hours, hourlyRate });
+    allPrep.push({ id, staffId, date, description, hours, hourlyRate, fixedAmount });
   }
   save(SK.prepWork, allPrep);
   closeModal();
