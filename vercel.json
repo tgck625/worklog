@@ -1,9 +1,24 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "build": {
+    "env": { "CI": "false" }
+  },
+  "headers": [
+    {
+      "source": "/distribution-list.html",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+    },
+    {
+      "source": "/eventstaff-shift/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+    }
+  ],
   "redirects": [
     { "source": "/eventstaff-shift", "destination": "/eventstaff-shift/", "permanent": false }
   ],
   "rewrites": [
-    { "source": "/distribution-list", "destination": "/distribution-list.html" },
+    { "source": "/distribution-list", "destination": "/distribution-list.html?v=2" },
     { "source": "/((?!eventstaff-shift).*)", "destination": "/index.html" }
   ]
 }

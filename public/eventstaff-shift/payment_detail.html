@@ -3,71 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>支払い明細</title>
+<title>業務委託 支払通知書</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --ink: #1c1c1e; --ink-mid: #48484a; --ink-soft: #8e8e93; --ink-faint: #c7c7cc;
-    --surface: #ffffff; --surface-2: #f2f2f7; --surface-3: #e5e5ea;
-    --accent: #1a6bbf; --accent-light: #e8f1fb;
-    --green-light: #e8f8ed; --green-dark: #1e7e34;
-    --red-light: #fff0ef; --red-dark: #c0392b;
-    --yellow-light: #fff8ec; --purple: #5856d6; --purple-light: #f0f0ff;
-    --radius: 12px; --radius-sm: 8px;
-  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Noto Sans JP', sans-serif; background: var(--surface-2); color: var(--ink); font-size: 14px; min-height: 100vh; }
-  .wrap { max-width: 860px; margin: 0 auto; padding: 24px 20px 60px; }
-  .page-header {
-    background: var(--surface); border-radius: var(--radius); border: 1px solid var(--surface-3);
-    padding: 20px 24px; margin-bottom: 20px;
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
-  }
-  .header-left { display: flex; align-items: center; gap: 14px; }
-  .av { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500; flex-shrink: 0; }
-  .staff-name { font-size: 20px; font-weight: 500; }
-  .staff-rank { font-size: 12px; color: var(--ink-soft); margin-top: 3px; }
-  .totals { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
-  .total-item { text-align: right; }
-  .total-label { font-size: 10px; color: var(--ink-soft); margin-bottom: 2px; }
-  .total-value { font-size: 18px; font-weight: 500; }
-  .total-value.accent { color: var(--accent); font-size: 22px; }
-  .divider { border-left: 1px solid var(--surface-3); padding-left: 20px; }
-  .btn { padding: 7px 14px; border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; border: 1px solid var(--surface-3); background: var(--surface); color: var(--ink); font-family: inherit; transition: all 0.12s; font-weight: 400; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
-  .btn:hover { background: var(--surface-2); }
-  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .btn-primary:hover { background: #155a9e; }
-  .card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--surface-3); margin-bottom: 16px; overflow: hidden; }
-  .month-header { font-size: 12px; font-weight: 500; color: var(--ink-soft); padding: 10px 16px; background: var(--surface-2); border-bottom: 1px solid var(--surface-3); display: flex; align-items: center; justify-content: space-between; }
-  .month-total { font-size: 13px; font-weight: 500; color: var(--accent); }
-  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 480px; }
-  th { text-align: left; padding: 8px 12px; font-weight: 500; font-size: 11px; color: var(--ink-soft); border-bottom: 1px solid var(--surface-3); white-space: nowrap; }
-  td { padding: 9px 12px; border-bottom: 1px solid var(--surface-3); vertical-align: middle; }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: var(--surface-2); }
-  tfoot td { background: var(--surface-2); font-size: 12px; color: var(--ink-soft); }
-  tfoot tr:hover td { background: var(--surface-2); }
-  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
-  .badge-green  { background: var(--green-light);  color: var(--green-dark); }
-  .badge-amber  { background: var(--yellow-light); color: #7d4a00; }
-  .badge-blue   { background: var(--accent-light); color: var(--accent); }
-  .badge-red    { background: var(--red-light);    color: var(--red-dark); }
-  .badge-gray   { background: var(--surface-3);    color: var(--ink-soft); }
-  .badge-purple { background: var(--purple-light); color: var(--purple); }
-  .empty { text-align: center; padding: 48px 16px; color: var(--ink-soft); font-size: 13px; }
-  .error-box { background: var(--red-light); border: 1px solid var(--red-dark); border-radius: var(--radius); padding: 24px; margin-top: 40px; text-align: center; color: var(--red-dark); line-height: 1.8; }
+  body { font-family: 'Noto Sans JP', sans-serif; background: #f5f5f5; color: #1c1c1e; font-size: 14px; }
+  .wrap { max-width: 800px; margin: 0 auto; padding: 24px 20px 60px; }
+  .invoice { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 40px; }
+  .invoice-header { text-align: center; margin-bottom: 32px; border-bottom: 3px solid #1c1c1e; padding-bottom: 16px; }
+  .invoice-title { font-size: 24px; font-weight: 700; letter-spacing: 0.15em; }
+  .invoice-date { text-align: right; font-size: 13px; color: #666; margin-bottom: 28px; }
+  .recipient { margin-bottom: 28px; }
+  .recipient-name { font-size: 18px; font-weight: 500; border-bottom: 1px solid #1c1c1e; display: inline-block; padding-bottom: 4px; }
+  .recipient-suffix { font-size: 14px; font-weight: 400; margin-left: 4px; }
+  .recipient-detail { font-size: 13px; color: #555; line-height: 1.8; margin-top: 8px; }
+  .section-label { font-size: 13px; font-weight: 500; color: #555; margin-bottom: 12px; letter-spacing: 0.05em; }
+  .total-box { background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; display: flex; align-items: center; justify-content: space-between; }
+  .total-box-label { font-size: 14px; font-weight: 500; }
+  .total-box-value { font-size: 24px; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 24px; }
+  thead th { background: #f0f0f0; padding: 8px 12px; font-weight: 500; font-size: 12px; color: #555; border-bottom: 2px solid #ccc; text-align: left; }
+  thead th:last-child { text-align: right; }
+  tbody td { padding: 8px 12px; border-bottom: 1px solid #e5e5e5; }
+  tbody td:last-child { text-align: right; font-weight: 500; }
+  tbody tr:last-child td { border-bottom: 1px solid #ccc; }
+  tfoot td { padding: 10px 12px; font-weight: 500; }
+  tfoot td:last-child { text-align: right; }
+  .subtotal-row td { border-top: 1px solid #ccc; font-size: 13px; color: #555; }
+  .total-row td { border-top: 2px solid #1c1c1e; font-size: 15px; font-weight: 700; }
+  .issuer { margin-top: 40px; padding-top: 24px; border-top: 1px solid #ddd; }
+  .issuer-label { font-size: 11px; color: #888; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.1em; }
+  .issuer-name { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+  .issuer-detail { font-size: 13px; color: #555; line-height: 1.8; }
+  .btn { padding: 7px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; border: 1px solid #ddd; background: #fff; color: #1c1c1e; font-family: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+  .btn-primary { background: #1a6bbf; color: #fff; border-color: #1a6bbf; }
+  .error-box { background: #fff0ef; border: 1px solid #c0392b; border-radius: 8px; padding: 24px; margin-top: 40px; text-align: center; color: #c0392b; line-height: 1.8; }
   @media print {
     body { background: #fff; }
     .wrap { padding: 0; max-width: none; }
     .print-hide { display: none !important; }
-    .card { border-radius: 0; border-left: none; border-right: none; margin-bottom: 0; page-break-inside: avoid; }
-    .page-header { page-break-inside: avoid; }
-  }
-  @media (max-width: 600px) {
-    .page-header { flex-direction: column; align-items: flex-start; }
-    .divider { border-left: none; border-top: 1px solid var(--surface-3); padding-left: 0; padding-top: 12px; width: 100%; }
+    .invoice { border: none; padding: 20px; }
   }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
@@ -80,8 +56,7 @@
   <div id="root"></div>
 </div>
 <script>
-// LZString decompressor (URI-safe subset)
-var LZString=function(){var f=String.fromCharCode,keyStrUriSafe="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$",baseReverseDic={};function getBaseValue(alphabet,character){if(!baseReverseDic[alphabet]){baseReverseDic[alphabet]={};for(var i=0;i<alphabet.length;i++)baseReverseDic[alphabet][alphabet.charAt(i)]=i}return baseReverseDic[alphabet][character]}return{decompressFromEncodedURIComponent:function(input){if(input==null)return"";if(input=="")return null;input=input.replace(/ /g,"+");return LZString._decompress(input.length,32,function(index){return getBaseValue(keyStrUriSafe,input.charAt(index))})},_decompress:function(length,resetValue,getNextValue){var dictionary=[],next,enlargeIn=4,dictSize=4,numBits=3,entry="",result=[],i,w,bits,resb,maxpower,power,c,data={val:getNextValue(0),position:resetValue,index:1};for(i=0;i<3;i+=1)dictionary[i]=i;bits=0;maxpower=Math.pow(2,2);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++)}bits|=(resb>0?1:0)*power;power<<=1}switch(next=bits){case 0:bits=0;maxpower=Math.pow(2,8);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++)}bits|=(resb>0?1:0)*power;power<<=1}c=f(bits);break;case 1:bits=0;maxpower=Math.pow(2,16);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++)}bits|=(resb>0?1:0)*power;power<<=1}c=f(bits);break;case 2:return""}dictionary[3]=c;w=c;result.push(c);while(true){if(data.index>length)return"";bits=0;maxpower=Math.pow(2,numBits);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++)}bits|=(resb>0?1:0)*power;power<<=1}switch(c=bits){case 0:bits=0;maxpower=Math.pow(2,8);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++)}bits|=(resb>0?1:0)*power;power<<=1}dictionary[dictSize++]=f(bits);c=dictSize-1;enlargeIn--;break;case 1:bits=0;maxpower=Math.pow(2,16);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++)}bits|=(resb>0?1:0)*power;power<<=1}dictionary[dictSize++]=f(bits);c=dictSize-1;enlargeIn--;break;case 2:return result.join("")}if(enlargeIn==0){enlargeIn=Math.pow(2,numBits);numBits++}if(dictionary[c]){entry=dictionary[c]}else{if(c===dictSize){entry=w+w.charAt(0)}else{return null}}result.push(entry);dictionary[dictSize++]=w+entry.charAt(0);enlargeIn--;if(enlargeIn==0){enlargeIn=Math.pow(2,numBits);numBits++}w=entry}}}()}
+var LZString=function(){var f=String.fromCharCode,keyStrUriSafe="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$",baseReverseDic={};function getBaseValue(alphabet,character){if(!baseReverseDic[alphabet]){baseReverseDic[alphabet]={};for(var i=0;i<alphabet.length;i++)baseReverseDic[alphabet][alphabet.charAt(i)]=i}return baseReverseDic[alphabet][character]}function _decompress(length,resetValue,getNextValue){var dictionary=[],next,enlargeIn=4,dictSize=4,numBits=3,entry="",result=[],i,w,bits,resb,maxpower,power,c,data={val:getNextValue(0),position:resetValue,index:1};for(i=0;i<3;i+=1)dictionary[i]=i;bits=0;maxpower=Math.pow(2,2);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++)}bits|=(resb>0?1:0)*power;power<<=1}switch(next=bits){case 0:bits=0;maxpower=Math.pow(2,8);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++)}bits|=(resb>0?1:0)*power;power<<=1}c=f(bits);break;case 1:bits=0;maxpower=Math.pow(2,16);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++)}bits|=(resb>0?1:0)*power;power<<=1}c=f(bits);break;case 2:return""}dictionary[3]=c;w=c;result.push(c);while(true){if(data.index>length)return"";bits=0;maxpower=Math.pow(2,numBits);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++)}bits|=(resb>0?1:0)*power;power<<=1}switch(c=bits){case 0:bits=0;maxpower=Math.pow(2,8);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++)}bits|=(resb>0?1:0)*power;power<<=1}dictionary[dictSize++]=f(bits);c=dictSize-1;enlargeIn--;break;case 1:bits=0;maxpower=Math.pow(2,16);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++)}bits|=(resb>0?1:0)*power;power<<=1}dictionary[dictSize++]=f(bits);c=dictSize-1;enlargeIn--;break;case 2:return result.join("")}if(enlargeIn==0){enlargeIn=Math.pow(2,numBits);numBits++}if(dictionary[c]){entry=dictionary[c]}else{if(c===dictSize){entry=w+w.charAt(0)}else{return null}}result.push(entry);dictionary[dictSize++]=w+entry.charAt(0);enlargeIn--;if(enlargeIn==0){enlargeIn=Math.pow(2,numBits);numBits++}w=entry}}return{decompressFromEncodedURIComponent:function(input){if(input==null)return"";if(input=="")return null;input=input.replace(/ /g,"+");return _decompress(input.length,32,function(index){return getBaseValue(keyStrUriSafe,input.charAt(index))})}}}();
 
 function render() {
   var root = document.getElementById('root');
@@ -97,7 +72,9 @@ function render() {
   var data;
   try {
     if (compressed) {
-      data = JSON.parse(LZString.decompressFromEncodedURIComponent(compressed));
+      var decompressed = LZString.decompressFromEncodedURIComponent(compressed);
+      if (!decompressed) throw new Error('decompression failed');
+      data = JSON.parse(decompressed);
     } else {
       data = JSON.parse(decodeURIComponent(escape(atob(encoded))));
     }
@@ -106,102 +83,137 @@ function render() {
     return;
   }
 
-  document.title = '支払い明細 - ' + data.n;
+  var m = (data.ms && data.ms.length) ? data.ms[0] : null;
+  var parts = m ? m.mo.split('-') : [];
+  var monthLabel = m ? parts[0] + '\u5e74' + parseInt(parts[1]) + '\u6708' : '';
+
+  document.title = '\u696d\u52d9\u59d4\u8a17 \u652f\u6255\u901a\u77e5\u66f8 - ' + data.n + ' - ' + monthLabel;
   window._pdfData = data;
   document.getElementById('pdf-actions').style.display = 'block';
 
-  var monthBlocks = (data.ms || []).map(function(m) {
-    var parts = m.mo.split('-');
-    var monthLabel = parts[0] + '年' + parseInt(parts[1]) + '月';
-    var mPay = m.ev.reduce(function(s, e) { return s + e.p; }, 0);
-    var mTotal = mPay + m.tr;
-
-    var rows = m.ev.map(function(e) {
-      var roleCell = e.rl === 'leader'
-        ? '<span class="badge badge-purple" style="font-size:10px">リーダー</span>'
-        : '<span class="badge badge-blue" style="font-size:10px">スタッフ</span>';
-      var payCell = e.p === 0 ? '<span style="color:var(--red-dark)">⚠ 未設定</span>' : '¥' + e.p.toLocaleString();
-      var timeCell = e.o.toFixed(1) + 'h' + (e.s ? '+' + e.s + 'h' : '');
-      var extraRow = '';
+  // Build line items
+  var rows = '';
+  var subtotalPay = 0;
+  if (m) {
+    m.ev.forEach(function(e) {
+      var desc = [e.v, e.ct].filter(Boolean).join(' / ');
+      subtotalPay += e.p;
+      rows += '<tr><td style="white-space:nowrap">' + e.dt + '</td>'
+        + '<td>' + desc + '</td>'
+        + '<td style="text-align:right;font-weight:500">\uffe5' + e.p.toLocaleString() + '</td></tr>';
       if (e.ex && e.ex.length) {
-        var chips = e.ex.map(function(x) {
-          return '<span style="font-size:10px;border:1px solid var(--surface-3);border-radius:10px;padding:1px 7px">' + x.lb + ' ¥' + x.am.toLocaleString() + '</span>';
-        }).join(' ');
-        extraRow = '<tr><td colspan="6" style="padding:2px 12px 6px 24px;border-bottom:1px solid var(--surface-3)">'
-          + '<span style="font-size:10px;color:var(--ink-faint);margin-right:4px">↳</span>' + chips + '</td></tr>';
+        e.ex.forEach(function(x) {
+          subtotalPay += x.am;
+          rows += '<tr><td></td><td style="font-size:12px;color:#666">\u2514 ' + x.lb + '</td>'
+            + '<td style="text-align:right;font-weight:500">\uffe5' + x.am.toLocaleString() + '</td></tr>';
+        });
       }
-      return '<tr>'
-        + '<td style="white-space:nowrap;font-weight:500">' + e.dt + '</td>'
-        + '<td style="font-size:12px;color:var(--ink-soft)">' + e.v + '</td>'
-        + '<td><span class="badge ' + e.cc + '" style="font-size:10px">' + e.c + '</span></td>'
-        + '<td style="font-size:12px;text-align:center">' + timeCell + '</td>'
-        + '<td style="text-align:center">' + roleCell + '</td>'
-        + '<td style="text-align:right;font-weight:500">' + payCell + '</td>'
-        + '</tr>' + extraRow;
-    }).join('');
+    });
+    (m.prep || []).forEach(function(pw) {
+      subtotalPay += pw.p;
+      rows += '<tr><td style="white-space:nowrap">' + pw.dt + '</td>'
+        + '<td style="color:#5856d6">' + pw.desc + '</td>'
+        + '<td style="text-align:right;font-weight:500;color:#5856d6">\uffe5' + pw.p.toLocaleString() + '</td></tr>';
+    });
+  }
 
-    return '<div class="card">'
-      + '<div class="month-header">'
-      + '<span>' + monthLabel + '\u3000<span style="color:var(--ink-faint);font-weight:400">' + m.ev.length + '件 \uff0f ' + m.d + 'km</span></span>'
-      + '<span class="month-total">\uffe5' + mTotal.toLocaleString() + '</span>'
-      + '</div>'
-      + '<div class="table-scroll"><table>'
-      + '<thead><tr><th>日付</th><th>会場</th><th>カテゴリ</th><th style="text-align:center">時間</th><th style="text-align:center">役割</th><th style="text-align:right">給与</th></tr></thead>'
-      + '<tbody>' + rows + '</tbody>'
-      + '<tfoot><tr>'
-      + '<td colspan="4" style="padding:8px 12px">交通費（' + m.d + 'km）</td>'
-      + '<td style="text-align:right;padding:8px 12px">\uffe5' + m.tr.toLocaleString() + '</td>'
-      + '<td style="text-align:right;font-weight:500;padding:8px 12px;color:var(--accent)">\uffe5' + mTotal.toLocaleString() + '</td>'
-      + '</tr></tfoot>'
-      + '</table></div></div>';
-  }).join('');
+  var transport = m ? m.tr : 0;
+  var grandTotal = subtotalPay + transport;
 
-  var gt = data.tp + data.tt;
+  var today = new Date();
+  var todayStr = today.getFullYear() + '\u5e74' + (today.getMonth()+1) + '\u6708' + today.getDate() + '\u65e5';
 
-  root.innerHTML = '<div class="page-header">'
-    + '<div class="header-left">'
-    + '<div class="av">' + data.n[0] + '</div>'
-    + '<div><div class="staff-name">' + data.n + '</div><div class="staff-rank">' + (data.r || '').trim() + '</div></div>'
-    + '</div>'
-    + '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
-    + '<div class="totals">'
-    + '<div class="total-item"><div class="total-label">給与累計</div><div class="total-value">\uffe5' + data.tp.toLocaleString() + '</div></div>'
-    + '<div class="total-item"><div class="total-label">交通費累計</div><div class="total-value">\uffe5' + data.tt.toLocaleString() + '</div></div>'
-    + '<div class="total-item divider"><div class="total-label">合計</div><div class="total-value accent">\uffe5' + gt.toLocaleString() + '</div></div>'
-    + '</div>'
-    + ''
+  var html = '<div class="invoice">'
+    + '<div class="invoice-header"><div class="invoice-title">\u696d\u52d9\u59d4\u8a17\u3000\u652f\u6255\u901a\u77e5\u66f8</div></div>'
+    + '<div class="invoice-date">\u767a\u884c\u65e5: ' + todayStr + '</div>'
+
+    // 宛先（スタッフ）
+    + '<div class="recipient">'
+    + '<div class="recipient-name">' + data.n + '<span class="recipient-suffix">\u69d8</span></div>'
+    + '<div class="recipient-detail">'
+    + (data.addr ? '\u4f4f\u6240: ' + data.addr + '<br>' : '')
+    + (data.phone ? '\u96fb\u8a71\u756a\u53f7: ' + data.phone : '')
     + '</div>'
     + '</div>'
-    + (data.ms.length === 0
-      ? '<div class="card"><div class="empty">稼働履歴がありません</div></div>'
-      : monthBlocks);
+
+    // 支払い内容
+    + '<div class="section-label">\u652f\u6255\u3044\u5185\u5bb9\uff08' + monthLabel + '\uff09</div>'
+    + '<div class="total-box">'
+    + '<div class="total-box-label">\u652f\u6255\u91d1\u984d</div>'
+    + '<div class="total-box-value">\uffe5' + grandTotal.toLocaleString() + '</div>'
+    + '</div>'
+    + '<table>'
+    + '<thead><tr><th>\u65e5\u4ed8</th><th>\u5185\u5bb9</th><th style="text-align:right">\u91d1\u984d</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '<tfoot>'
+    + '<tr class="subtotal-row"><td colspan="2" style="text-align:right">\u5c0f\u8a08</td><td style="text-align:right">\uffe5' + subtotalPay.toLocaleString() + '</td></tr>'
+    + '<tr class="subtotal-row"><td colspan="2" style="text-align:right">\u4ea4\u901a\u8cbb' + (m && m.d ? '\uff08' + m.d + 'km\uff09' : '') + '</td><td style="text-align:right">\uffe5' + transport.toLocaleString() + '</td></tr>'
+    + '<tr class="total-row"><td colspan="2" style="text-align:right">\u5408\u8a08</td><td style="text-align:right">\uffe5' + grandTotal.toLocaleString() + '</td></tr>'
+    + '</tfoot>'
+    + '</table>'
+
+    // 備考（内容詳細）
+    + (function() {
+      var isLeader = m && m.ev.some(function(e) { return e.rl === 'leader'; });
+      if (isLeader) {
+        return '<div style="margin-top:8px;padding:16px 20px;background:#fafafa;border:1px solid #e5e5e5;border-radius:4px">'
+          + '<div style="font-size:12px;font-weight:500;color:#555;margin-bottom:8px">\u5185\u5bb9\u8a73\u7d30</div>'
+          + '<ul style="font-size:13px;color:#333;line-height:2;padding-left:20px;margin:0">'
+          + '<li>\u30de\u30cb\u30e5\u30a2\u30eb\u3092\u53c2\u8003\u3068\u3057\u305f\u3001\u77e5\u898b\u3068\u7d4c\u9a13\u3092\u6d3b\u304b\u3057\u305f\u30a4\u30d9\u30f3\u30c8\u306e\u904b\u55b6</li>'
+          + '<li>\u696d\u52d9\u7d42\u4e86\u5f8c\u306e\u5831\u544a\uff08\u826f\u304b\u3063\u305f\u70b9\u3001\u6539\u5584\u70b9\u3001\u30de\u30cb\u30e5\u30a2\u30eb\u6539\u5584\u306e\u52a9\u8a00\u7b49\uff09</li>'
+          + '<li>\u5404\u7a2e\u5171\u6709\uff08\u632f\u308a\u8fd4\u308a\u3001\u30a2\u30f3\u30b1\u30fc\u30c8\u3001\u64ae\u5f71\u30c7\u30fc\u30bf\u7b49\uff09</li>'
+          + '<li>\u30de\u30cb\u30e5\u30a2\u30eb\u306e\u4fee\u6b63</li>'
+          + '</ul></div>';
+      } else {
+        return '<div style="margin-top:8px;padding:16px 20px;background:#fafafa;border:1px solid #e5e5e5;border-radius:4px">'
+          + '<div style="font-size:12px;font-weight:500;color:#555;margin-bottom:8px">\u5185\u5bb9\u8a73\u7d30</div>'
+          + '<ul style="font-size:13px;color:#333;line-height:2;padding-left:20px;margin:0">'
+          + '<li>\u30de\u30cb\u30e5\u30a2\u30eb\u3092\u53c2\u8003\u3068\u3057\u305f\u3001\u77e5\u898b\u3068\u7d4c\u9a13\u3092\u6d3b\u304b\u3057\u305f\u30a4\u30d9\u30f3\u30c8\u306e\u904b\u55b6</li>'
+          + '<li>\u696d\u52d9\u7d42\u4e86\u5f8c\u306e\u5831\u544a\uff08\u826f\u304b\u3063\u305f\u70b9\u3001\u6539\u5584\u70b9\u3001\u30de\u30cb\u30e5\u30a2\u30eb\u6539\u5584\u306e\u52a9\u8a00\u7b49\uff09</li>'
+          + '</ul></div>';
+      }
+    })()
+
+    // 支払元
+    + '<div class="issuer">'
+    + '<div class="issuer-label">\u652f\u6255\u5143</div>'
+    + '<div class="issuer-name">Lawin\u682a\u5f0f\u4f1a\u793e</div>'
+    + '<div class="issuer-detail">'
+    + '\u3012470-0156<br>'
+    + '\u611b\u77e5\u770c\u611b\u77e5\u90e1\u6771\u90f7\u753a\u5fa1\u5cb3\u4e8c\u4e01\u76ee\uff11\u756a\u5730\uff11'
+    + '</div>'
+    + '</div>'
+
+    + '</div>';
+
+  root.innerHTML = html;
 }
 render();
 
 function downloadPDF() {
   var btn = document.getElementById('pdfBtn');
-  btn.textContent = '生成中…';
+  btn.textContent = '\u751f\u6210\u4e2d\u2026';
   btn.disabled = true;
   var el = document.getElementById('root');
   var name = window._pdfData ? window._pdfData.n : 'staff';
-  var now = new Date();
-  var dateStr = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
-  var filename = '支払い明細_' + name + '_' + dateStr + '.pdf';
+  var m = window._pdfData && window._pdfData.ms && window._pdfData.ms[0];
+  var monthStr = m ? m.mo.replace('-','') : '';
+  var filename = '\u652f\u6255\u901a\u77e5\u66f8_' + name + '_' + monthStr + '.pdf';
   var opt = {
-    margin:       [10, 10, 10, 10],
-    filename:     filename,
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
-    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+    margin: [10, 10, 10, 10],
+    filename: filename,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
   };
   html2pdf().set(opt).from(el).save().then(function() {
-    btn.textContent = 'PDF ダウンロード';
+    btn.textContent = 'PDF \u30c0\u30a6\u30f3\u30ed\u30fc\u30c9';
     btn.disabled = false;
   }).catch(function() {
-    btn.textContent = 'PDF ダウンロード';
+    btn.textContent = 'PDF \u30c0\u30a6\u30f3\u30ed\u30fc\u30c9';
     btn.disabled = false;
-    alert('PDF生成に失敗しました。');
+    alert('PDF\u751f\u6210\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002');
   });
 }
 </script>

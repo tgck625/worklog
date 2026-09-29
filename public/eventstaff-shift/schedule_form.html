@@ -371,6 +371,13 @@ async function init() {
     return;
   }
 
+  // 日付昇順にソート
+  targetEventIds.sort((a, b) => {
+    const ea = events.find(e => e.id === a);
+    const eb = events.find(e => e.id === b);
+    return (ea?.date || '').localeCompare(eb?.date || '');
+  });
+
   document.getElementById('formWrap').style.display = 'block';
   buildStaffSelector();
   buildEventCards();

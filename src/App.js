@@ -1,8 +1,30 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import Timesheet from "./Timesheet";
 import NavBar from "./NavBar";
 import DistributionList from "./DistributionList";
+import { AuthProvider, useAuth } from "./AuthContext";
+import LoginPage from "./LoginPage";
+import AdminMembers from "./AdminMembers";
+
+// ── Error Boundary ───────────────────────────────────────────────────────
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError:false, error:null }; }
+  static getDerivedStateFromError(error) { return { hasError:true, error }; }
+  render() {
+    if (this.state.hasError) return (
+      <div style={{ padding:40, textAlign:'center', fontFamily:"'Noto Sans JP',sans-serif" }}>
+        <div style={{ fontSize:24, marginBottom:16 }}>⚠ エラーが発生しました</div>
+        <div style={{ fontSize:13, color:'#7a746c', marginBottom:20 }}>{this.state.error?.message}</div>
+        <button onClick={()=>{ localStorage.removeItem('wf_isTsuge'); window.location.reload(); }}
+          style={{ padding:'10px 24px', borderRadius:8, border:'none', background:'#e07840', color:'#fff', fontSize:14, cursor:'pointer' }}>
+          リロード
+        </button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 // ── Colors ──────────────────────────────────────────────────────────────
 const C = {
@@ -114,9 +136,9 @@ function Btn({ children, onClick, variant='default', small, style: sx, disabled 
   return <button onClick={disabled?undefined:onClick} style={{ ...base, ...variants[variant] }}>{children}</button>;
 }
 const inp = { background:'#fff', border:`1px solid ${C.border}`, borderRadius:10, color:C.text, padding:'8px 10px', fontSize:13, fontFamily:'inherit', width:'100%', outline:'none', transition:'border 0.12s' };
-function Input({ ...props }) { return <input style={inp} {...props} onFocus={e=>e.target.style.borderColor=C.orange} onBlur={e=>e.target.style.borderColor=C.border} />; }
+const Input = React.forwardRef(function Input(props, ref) { return <input ref={ref} style={inp} {...props} onFocus={e=>e.target.style.borderColor=C.orange} onBlur={e=>e.target.style.borderColor=C.border} />; });
 function Select({ children, ...props }) { return <select style={inp} {...props} onFocus={e=>e.target.style.borderColor=C.orange} onBlur={e=>e.target.style.borderColor=C.border}>{children}</select>; }
-function Textarea({ ...props }) { return <textarea style={{ ...inp, resize:'vertical', minHeight:68 }} {...props} onFocus={e=>e.target.style.borderColor=C.orange} onBlur={e=>e.target.style.borderColor=C.border} />; }
+function Textarea({ style:sx, ...props }) { return <textarea style={{ ...inp, resize:'vertical', minHeight:68, ...sx }} {...props} onFocus={e=>e.target.style.borderColor=C.orange} onBlur={e=>e.target.style.borderColor=C.border} />; }
 function FG({ label, children }) {
   return <div style={{ display:'flex',flexDirection:'column',gap:5 }}><label style={{ fontSize:11,fontWeight:600,color:C.text2,letterSpacing:0.3 }}>{label}</label>{children}</div>;
 }
@@ -175,10 +197,11 @@ function PINModal({ open, onClose, onSuccess, mode='unlock' }) {
   const [pin, setPin] = useState('');
   const [err, setErr] = useState('');
   const [setupStep, setSetupStep] = useState(1);
-  const [firstPin, setFirstPin] = useState('');
+  const setupStepRef = useRef(1);
+  const firstPinRef = useRef('');
   const inputRef = useRef(null);
 
-  useEffect(()=>{ if(open){ setPin(''); setErr(''); setSetupStep(1); setFirstPin(''); setTimeout(()=>inputRef.current?.focus(),100); } },[open]);
+  useEffect(()=>{ if(open){ setPin(''); setErr(''); setSetupStep(1); setupStepRef.current=1; firstPinRef.current=''; setTimeout(()=>inputRef.current?.focus(),100); } },[open]);
 
   function handleChange(v) {
     const digits = v.replace(/\D/g,'').slice(0,4);
@@ -189,9 +212,12 @@ function PINModal({ open, onClose, onSuccess, mode='unlock' }) {
   function submit(p) {
     const stored = localStorage.getItem(PIN_KEY);
     if (mode==='setup' || !stored) {
-      if (setupStep===1) { setFirstPin(p); setSetupStep(2); setPin(''); setErr(''); return; }
-      if (p===firstPin) { localStorage.setItem(PIN_KEY,p); onSuccess(); onClose(); }
-      else { setErr('PINが一致しません'); setPin(''); }
+      if (setupStepRef.current===1) {
+        firstPinRef.current=p; setupStepRef.current=2;
+        setSetupStep(2); setPin(''); setErr(''); return;
+      }
+      if (p===firstPinRef.current) { localStorage.setItem(PIN_KEY,p); onSuccess(); onClose(); }
+      else { setErr('PINが一致しません'); setPin(''); setupStepRef.current=1; firstPinRef.current=''; setSetupStep(1); }
     } else if (mode==='unlock') {
       if (p===stored) { onSuccess(); onClose(); }
       else { setErr('PINが違います'); setPin(''); }
@@ -205,7 +231,7 @@ function PINModal({ open, onClose, onSuccess, mode='unlock' }) {
   function resetPin() {
     if (!window.confirm('PINをリセットしますか？\n新しいPINを設定し直せます。')) return;
     localStorage.removeItem(PIN_KEY);
-    setPin(''); setErr(''); setSetupStep(1); setFirstPin('');
+    setPin(''); setErr(''); setSetupStep(1); setupStepRef.current=1; firstPinRef.current='';
     setTimeout(()=>inputRef.current?.focus(), 100);
   }
 
@@ -366,7 +392,7 @@ function CopyTasksModal({ currentProjectId, projects, tasks, onClose, onCopy }) 
 }
 
 // ── Task Modal ────────────────────────────────────────────────────────────
-function TaskModal({ open, onClose, data, projects, members, defaultProjectId, defaultStatus, onSave, onDelete, isTsuge }) {
+function TaskModal({ open, onClose, data, projects, members, defaultProjectId, defaultStatus, defaultAssigneeId, defaultTitle, onSave, onDelete, isTsuge }) {
   const [title,setTitle]=useState('');
   const [projectId,setProjectId]=useState('');
   const [assigneeIds,setAssigneeIds]=useState([]);
@@ -374,34 +400,53 @@ function TaskModal({ open, onClose, data, projects, members, defaultProjectId, d
   const [status,setStatus]=useState('todo');
   const [priority,setPriority]=useState('mid');
   const [memo,setMemo]=useState('');
+  const [estimatedMin,setEstimatedMin]=useState('');
+  const [manual,setManual]=useState('');
   const [isPrivate,setIsPrivate]=useState(false);
+  const titleRef=useRef(null);
 
   useEffect(()=>{
     if(!open) return;
-    if(data){ setTitle(data.title); setProjectId(data.projectId); setAssigneeIds(data.assigneeIds||[]); setDue(data.due||''); setStatus(data.status); setPriority(data.priority); setMemo(data.memo||''); setIsPrivate(!!data.isPrivate); }
-    else { setTitle(''); setProjectId(defaultProjectId!=='all'?defaultProjectId:(projects[0]?.id||'')); setAssigneeIds([]); setDue(''); setStatus(defaultStatus||'todo'); setPriority('mid'); setMemo(''); setIsPrivate(false); }
+    if(data){ setTitle(data.title); setProjectId(data.projectId); setAssigneeIds(data.assigneeIds||[]); setDue(data.due||''); setStatus(data.status); setPriority(data.priority); setMemo(data.memo||''); setEstimatedMin(data.estimatedMin||''); setManual(data.manual||''); setIsPrivate(!!data.isPrivate); }
+    else { const t=defaultTitle||'【】'; setTitle(t); setProjectId(defaultProjectId!=='all'?defaultProjectId:(projects[0]?.id||'')); setAssigneeIds(defaultAssigneeId?[defaultAssigneeId]:[]); setDue(''); setStatus(defaultStatus||'todo'); setPriority('mid'); setMemo(''); setEstimatedMin(''); setManual(''); setIsPrivate(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[open]);
 
+  useEffect(()=>{
+    if(open && !data && titleRef.current){
+      const el=titleRef.current; el.focus(); const pos=el.value.lastIndexOf('】'); el.setSelectionRange(pos>=0?pos:1,pos>=0?pos:1);
+    }
+  },[open,data]);
+
   const selProj = projects.find(p=>p.id===projectId);
   const relLabel = selProj && due ? getRelLabel(selProj, due) : null;
+  const availableMembers = (selProj?.visibleMemberIds?.length > 0)
+    ? members.filter(m => selProj.visibleMemberIds.includes(m.id))
+    : members;
 
   return (
     <Modal open={open} onClose={onClose} title={data?'タスクを編集':'タスクを追加'}
       footer={<>
         {data && <Btn variant="danger" style={{ marginRight:'auto' }} onClick={()=>{ if(window.confirm('このタスクを削除しますか？')){onDelete(data.id);onClose();} }}>削除</Btn>}
         <Btn onClick={onClose}>キャンセル</Btn>
-        <Btn variant="primary" onClick={()=>{ if(!title.trim()){alert('タスク名を入力してください');return;} onSave({id:data?.id||genId(),title:title.trim(),projectId,assigneeIds,due,status,priority,memo,isPrivate}); onClose(); }}>保存</Btn>
+        <Btn variant="primary" onClick={()=>{ if(!title.trim()){alert('タスク名を入力してください');return;} onSave({id:data?.id||genId(),title:title.trim(),projectId,assigneeIds,due,status,priority,memo,estimatedMin:estimatedMin?Number(estimatedMin):0,manual,isPrivate}); onClose(); }}>保存</Btn>
       </>}>
-      <FG label="タスク名"><Input value={title} onChange={e=>setTitle(e.target.value)} placeholder="タスクの内容を入力" autoFocus/></FG>
+      <FG label="タスク名"><Input ref={titleRef} value={title} onChange={e=>setTitle(e.target.value)} placeholder="タスクの内容を入力" autoFocus/></FG>
       <FG label="プロジェクト">
-        <Select value={projectId} onChange={e=>setProjectId(e.target.value)}>
+        <Select value={projectId} onChange={e=>{
+          const newProjId = e.target.value;
+          setProjectId(newProjId);
+          const newProj = projects.find(p=>p.id===newProjId);
+          if (newProj?.visibleMemberIds?.length > 0) {
+            setAssigneeIds(prev => prev.filter(id => newProj.visibleMemberIds.includes(id)));
+          }
+        }}>
           {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
         </Select>
       </FG>
       <FG label="担当者">
         <div style={{ display:'flex',flexWrap:'wrap',gap:6 }}>
-          {members.map(m=>{
+          {availableMembers.map(m=>{
             const checked=assigneeIds.includes(m.id);
             return (
               <label key={m.id} style={{ display:'flex',alignItems:'center',gap:5,padding:'5px 10px',borderRadius:999,border:`1px solid ${checked?m.color:C.border}`,background:checked?m.color+'20':'transparent',cursor:'pointer',fontSize:12,color:checked?m.color:C.text2,transition:'all 0.12s' }}>
@@ -411,14 +456,14 @@ function TaskModal({ open, onClose, data, projects, members, defaultProjectId, d
               </label>
             );
           })}
-          {members.length===0 && <span style={{ fontSize:12,color:C.text3 }}>メンバーがいません</span>}
+          {availableMembers.length===0 && <span style={{ fontSize:12,color:C.text3 }}>メンバーがいません（プロジェクトにメンバーを設定してください）</span>}
         </div>
       </FG>
       <FG label="期日">
         <Input type="date" value={due} onChange={e=>setDue(e.target.value)}/>
         {relLabel && <div style={{ fontSize:11,color:C.orange,marginTop:3 }}>{relLabel}</div>}
       </FG>
-      <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 }}>
+      <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12 }}>
         <FG label="ステータス">
           <Select value={status} onChange={e=>setStatus(e.target.value)}>
             <option value="todo">未着手</option>
@@ -433,8 +478,12 @@ function TaskModal({ open, onClose, data, projects, members, defaultProjectId, d
             <option value="low">低</option>
           </Select>
         </FG>
+        <FG label="目安時間（分）">
+          <Input type="number" min="0" value={estimatedMin} onChange={e=>setEstimatedMin(e.target.value)} placeholder="例: 30"/>
+        </FG>
       </div>
       <FG label="メモ"><Textarea value={memo} onChange={e=>setMemo(e.target.value)} placeholder="詳細や備考（任意）"/></FG>
+      <FG label="マニュアル"><Textarea value={manual} onChange={e=>setManual(e.target.value)} placeholder="作業手順・マニュアル（任意）" style={{ minHeight:100 }}/></FG>
       {isTsuge && (
         <label style={{ display:'flex',alignItems:'center',gap:8,fontSize:12,color:C.text2,cursor:'pointer' }}>
           <input type="checkbox" checked={isPrivate} onChange={e=>setIsPrivate(e.target.checked)}/>
@@ -446,7 +495,7 @@ function TaskModal({ open, onClose, data, projects, members, defaultProjectId, d
 }
 
 // ── Project Modal ─────────────────────────────────────────────────────────
-function ProjectModal({ open, onClose, data, members, onSave, onDelete, isTsuge }) {
+function ProjectModal({ open, onClose, data, members, onSave, onDelete, isTsuge, adminMemberId, defaultType }) {
   const [type,setType]=useState('event');
   const [name,setName]=useState('');
   const [color,setColor]=useState(PALETTE[0]);
@@ -464,7 +513,7 @@ function ProjectModal({ open, onClose, data, members, onSave, onDelete, isTsuge 
   useEffect(()=>{
     if(!open) return;
     if(data){ setType(data.type||'event'); setName(data.name||''); setColor(data.color||PALETTE[0]); setIsPrivate(!!data.isPrivate); setEventDate(data.eventDate||''); setVenue(data.venue||''); setContent(data.content||''); setStart(data.start||''); setEnd(data.end||data.eventDate||''); setMemo(data.memo||''); setLinks(data.links||[]); setVisibleMemberIds(data.visibleMemberIds||[]); setClosed(!!data.closed); }
-    else { setType('event'); setName(''); setColor(PALETTE[0]); setIsPrivate(false); setEventDate(''); setVenue(''); setContent(''); setStart(''); setEnd(''); setMemo(''); setLinks([]); setVisibleMemberIds([]); setClosed(false); }
+    else { setType(defaultType||'event'); setName(''); setColor(PALETTE[0]); setIsPrivate(false); setEventDate(''); setVenue(''); setContent(''); setStart(''); setEnd(''); setMemo(''); setLinks([]); setVisibleMemberIds(adminMemberId?[adminMemberId]:[]); setClosed(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[open]);
 
@@ -473,7 +522,8 @@ function ProjectModal({ open, onClose, data, members, onSave, onDelete, isTsuge 
   function handleSave() {
     const nm = type==='event' ? genEventName(eventDate,venue,content) : name.trim();
     if(!nm){ alert('プロジェクト名を入力してください'); return; }
-    const proj = { id:data?.id||genId(), type, name:nm, color, isPrivate, closed, memo, visibleMemberIds,
+    const finalVisibleMemberIds = adminMemberId && !visibleMemberIds.includes(adminMemberId) ? [...visibleMemberIds, adminMemberId] : visibleMemberIds;
+    const proj = { id:data?.id||genId(), type, name:nm, color, isPrivate, closed, memo, visibleMemberIds: finalVisibleMemberIds,
       links: links.filter(lk=>lk.url.trim()),
       ...(type==='event' ? { eventDate, venue, content, start:eventDate, end:eventDate } : { start, end }),
     };
@@ -537,26 +587,30 @@ function ProjectModal({ open, onClose, data, members, onSave, onDelete, isTsuge 
           ＋ リンクを追加
         </button>
       </div>
-      {(members||[]).length>0 && (
-        <div>
-          <label style={{ fontSize:11,fontWeight:600,color:C.text2,letterSpacing:0.3,display:'block',marginBottom:8 }}>表示メンバー（選択したメンバーのみ表示）</label>
-          <div style={{ display:'flex',flexWrap:'wrap',gap:8,marginBottom:6 }}>
-            {(members||[]).map(m=>{
-              const checked = visibleMemberIds.includes(m.id);
-              return (
-                <label key={m.id} style={{ display:'flex',alignItems:'center',gap:6,fontSize:12,color:C.text,cursor:'pointer',padding:'5px 10px',borderRadius:999,border:`1px solid ${checked?m.color:C.border}`,background:checked?m.color+'22':'transparent',transition:'all 0.12s' }}>
-                  <input type="checkbox" checked={checked} onChange={e=>setVisibleMemberIds(prev=>e.target.checked?[...prev,m.id]:prev.filter(id=>id!==m.id))} style={{ display:'none' }}/>
-                  <Avatar name={m.name} color={m.color} size={16} fs={8}/>
-                  {m.name}
-                </label>
-              );
-            })}
-          </div>
-          <div style={{ fontSize:11,color:C.text3 }}>
-            {visibleMemberIds.length===0 ? '全員が表示（制限なし）' : `${visibleMemberIds.length}名のみ表示。「自分」未設定のユーザーには全て表示されます。`}
-          </div>
-        </div>
-      )}
+      <div>
+        <label style={{ fontSize:11,fontWeight:600,color:C.text2,letterSpacing:0.3,display:'block',marginBottom:8 }}>表示メンバー（選択したメンバーのみ表示）</label>
+        {(members||[]).length>0 ? (
+          <>
+            <div style={{ display:'flex',flexWrap:'wrap',gap:8,marginBottom:6 }}>
+              {(members||[]).map(m=>{
+                const checked = visibleMemberIds.includes(m.id);
+                return (
+                  <label key={m.id} style={{ display:'flex',alignItems:'center',gap:6,fontSize:12,color:C.text,cursor:'pointer',padding:'5px 10px',borderRadius:999,border:`1px solid ${checked?m.color:C.border}`,background:checked?m.color+'22':'transparent',transition:'all 0.12s' }}>
+                    <input type="checkbox" checked={checked} onChange={e=>setVisibleMemberIds(prev=>e.target.checked?[...prev,m.id]:prev.filter(id=>id!==m.id))} style={{ display:'none' }}/>
+                    <Avatar name={m.name} color={m.color} size={16} fs={8}/>
+                    {m.name}
+                  </label>
+                );
+              })}
+            </div>
+            <div style={{ fontSize:11,color:C.text3 }}>
+              {visibleMemberIds.length===0 ? '管理者のみ表示' : `${visibleMemberIds.length}名に表示`}
+            </div>
+          </>
+        ) : (
+          <div style={{ fontSize:11,color:C.text3 }}>メンバータブでメンバーを追加すると、ここで表示設定ができます</div>
+        )}
+      </div>
       {data && (
         <label style={{ display:'flex',alignItems:'center',gap:8,fontSize:12,color:closed?C.text3:C.text2,cursor:'pointer' }}>
           <input type="checkbox" checked={closed} onChange={e=>setClosed(e.target.checked)}/>
@@ -574,24 +628,83 @@ function ProjectModal({ open, onClose, data, members, onSave, onDelete, isTsuge 
 }
 
 // ── Member Modal ──────────────────────────────────────────────────────────
-function MemberModal({ open, onClose, onSave }) {
-  const [name,setName]=useState('');
-  const [color,setColor]=useState(PALETTE[1]);
-  useEffect(()=>{ if(open){ setName(''); setColor(PALETTE[1]); } },[open]);
+function MemberModal({ open, onClose, onSave, existingMemberIds }) {
+  const [fbUsers, setFbUsers] = useState({});
+  const [selected, setSelected] = useState([]);
+  useEffect(()=>{
+    if(!open) return;
+    setSelected([]);
+    import("firebase/database").then(({ ref: fbRef, onValue })=>{
+      import("./firebase").then(({ db: fbDb })=>{
+        if (!fbDb) return;
+        const unsub = onValue(fbRef(fbDb, "users"), (snap)=>{ setFbUsers(snap.val()||{}); });
+        return ()=>unsub();
+      });
+    });
+  },[open]);
+  const availableUsers = Object.entries(fbUsers)
+    .filter(([,u])=>u.status==='approved')
+    .filter(([uid])=>!(existingMemberIds||[]).includes(uid));
+  function handleAdd() {
+    selected.forEach((uid,i)=>{
+      const u = fbUsers[uid];
+      if(u) {
+        onSave({ id:uid, name:u.displayName, color:PALETTE[(i+1)%PALETTE.length] });
+        // Firebase の memberId も自動設定
+        import("firebase/database").then(({ ref: fbRef, update: fbUpdate })=>{
+          import("./firebase").then(({ db: fbDb })=>{
+            if (fbDb) fbUpdate(fbRef(fbDb, `users/${uid}`), { memberId: uid });
+          });
+        });
+      }
+    });
+    onClose();
+  }
   return (
     <Modal open={open} onClose={onClose} title="メンバーを追加"
-      footer={<><Btn onClick={onClose}>キャンセル</Btn><Btn variant="primary" onClick={()=>{ if(!name.trim()){alert('名前を入力してください');return;} onSave({id:genId(),name:name.trim(),color}); onClose(); }}>追加</Btn></>}>
-      <FG label="名前"><Input value={name} onChange={e=>setName(e.target.value)} placeholder="メンバーの名前" autoFocus/></FG>
-      <FG label="アバターカラー"><ColorSwatchPicker selected={color} onSelect={setColor}/></FG>
+      footer={<><Btn onClick={onClose}>キャンセル</Btn><Btn variant="primary" onClick={handleAdd} disabled={selected.length===0}>追加 ({selected.length})</Btn></>}>
+      {availableUsers.length===0
+        ? <div style={{ fontSize:12,color:C.text3,textAlign:'center',padding:20 }}>追加できるメンバーがいません</div>
+        : <>
+          <div style={{ fontSize:11,color:C.text3,marginBottom:10 }}>登録済みメンバーから選択してください（複数可）</div>
+          <div style={{ display:'flex',flexDirection:'column',gap:6 }}>
+            {availableUsers.map(([uid,u])=>{
+              const checked = selected.includes(uid);
+              return (
+                <label key={uid} onClick={()=>setSelected(prev=>checked?prev.filter(id=>id!==uid):[...prev,uid])}
+                  style={{ display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:10,border:`1px solid ${checked?C.orange:C.border}`,background:checked?C.orangeBg:'#fff',cursor:'pointer',transition:'all 0.12s' }}>
+                  <div style={{ width:18,height:18,borderRadius:4,border:`2px solid ${checked?C.orange:C.border}`,background:checked?C.orange:'transparent',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700,flexShrink:0 }}>
+                    {checked&&'✓'}
+                  </div>
+                  <div>
+                    <div style={{ fontSize:13,fontWeight:500,color:C.text }}>{u.displayName}</div>
+                    <div style={{ fontSize:11,color:C.text3 }}>{u.email}</div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        </>}
     </Modal>
   );
 }
 
+// ── Category helper ──────────────────────────────────────────────────────
+function extractCategory(title) {
+  const m = title.match(/【(.+?)】/);
+  return m ? m[1] : null;
+}
+function stripCategory(title) {
+  return title.replace(/【.+?】\s*/, '');
+}
+
 // ── Kanban ────────────────────────────────────────────────────────────────
-function KanbanView({ tasks, projects, members, onOpenTask, onStatusChange, onAddTask, onDuplicateTask, taskOrder, onReorder, isMobile, onAddTaskWithStatus }) {
+function KanbanView({ tasks, projects, members, onOpenTask, onStatusChange, onAddTask, onDuplicateTask, taskOrder, onReorder, isMobile, onAddTaskWithStatus, onTimerSelect, timerTaskId }) {
   const dragId = useRef(null);
   const dragSourceCol = useRef(null);
   const dragOverCard = useRef(null);
+  const [groupByCategory, setGroupByCategory] = useState(()=>{ try { return localStorage.getItem('wf_kanban_catGroup')==='true'; } catch { return false; } });
+  const toggleCatGroup = () => { setGroupByCategory(prev => { const v=!prev; try{localStorage.setItem('wf_kanban_catGroup',String(v))}catch{} return v; }); };
   const statuses = [
     { key:'todo', label:'未着手', color:C.text3 },
     { key:'doing', label:'進行中', color:C.blue },
@@ -622,9 +735,135 @@ function KanbanView({ tasks, projects, members, onOpenTask, onStatusChange, onAd
     return sorted;
   }
 
+  const renderCard = (t, st) => {
+    const proj = projects.find(p=>p.id===t.projectId);
+    const taskMembers = (t.assigneeIds||[]).map(id=>members.find(m=>m.id===id)).filter(Boolean);
+    const ds = getDueStyle(t.due);
+    const relLabel = proj && t.due ? getRelLabel(proj,t.due) : null;
+    const displayTitle = groupByCategory ? stripCategory(t.title) : t.title;
+    const cat = extractCategory(t.title);
+    return (
+      <div key={t.id} draggable onClick={()=>onTimerSelect?onTimerSelect(t):onOpenTask(t)}
+        onDragStart={()=>{ dragId.current=t.id; dragSourceCol.current=st.key; }}
+        onDragEnd={()=>{ dragId.current=null; dragSourceCol.current=null; dragOverCard.current=null; }}
+        onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); dragOverCard.current=t.id; }}
+        onDrop={e=>{
+          e.stopPropagation();
+          if (!dragId.current || !dragOverCard.current) return;
+          if (dragSourceCol.current === st.key && dragId.current !== dragOverCard.current) {
+            onReorder(st.key, dragId.current, dragOverCard.current);
+          }
+        }}
+        style={{ background:timerTaskId===t.id?C.orangeBg:'#fff',border:`1px solid ${timerTaskId===t.id?C.orange:C.border}`,borderRadius:10,padding:12,cursor:'pointer',transition:'all 0.12s' }}
+        onMouseEnter={e=>{ e.currentTarget.style.borderColor=timerTaskId===t.id?C.orange:C.border2; e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 4px 12px rgba(58,53,48,0.1)'; }}
+        onMouseLeave={e=>{ e.currentTarget.style.borderColor=timerTaskId===t.id?C.orange:C.border; e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}>
+        {proj && <div style={{ fontSize:10,fontWeight:600,letterSpacing:0.3,marginBottom:5,display:'flex',alignItems:'center',gap:4,color:proj.color }}>
+          <div style={{ width:6,height:6,borderRadius:'50%',background:proj.color }}/>{proj.name}
+        </div>}
+        <div style={{ display:'flex',alignItems:'flex-start',gap:5,marginBottom:8 }}>
+          <PriorityDot priority={t.priority}/>
+          <div style={{ fontSize:13,fontWeight:500,color:C.text,lineHeight:1.4,flex:1 }}>
+            {!groupByCategory && cat && <span style={{ fontSize:10,color:C.blue,background:C.blue+'14',padding:'1px 5px',borderRadius:4,marginRight:4,fontWeight:600 }}>{cat}</span>}
+            {displayTitle}
+          </div>
+          {t.isPrivate && <span style={{ fontSize:9,color:C.orange,background:C.orangeBg,border:`1px solid ${C.orangeBorder}`,padding:'1px 5px',borderRadius:999,whiteSpace:'nowrap',flexShrink:0 }}>🔐</span>}
+        </div>
+        <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,flexWrap:'wrap' }}>
+          <div style={{ display:'flex',alignItems:'center',gap:5,fontSize:11,color:C.text2 }}>
+            {taskMembers.length>0
+              ? <div style={{ display:'flex',alignItems:'center',gap:3 }}>
+                  {taskMembers.map(m=><Avatar key={m.id} name={m.name} color={m.color} size={18} fs={9}/>)}
+                  {taskMembers.length===1 && <span>{taskMembers[0].name.split(' ')[0]}</span>}
+                </div>
+              : <span style={{ color:C.text3 }}>未割当</span>}
+          </div>
+          <div style={{ display:'flex',gap:5,alignItems:'center',flexWrap:'wrap' }}>
+            {relLabel && <span style={{ fontSize:10,color:C.text3,background:C.cream3,padding:'1px 6px',borderRadius:999 }}>{relLabel}</span>}
+            {t.due && (()=>{
+              const doneOverdue = getDoneOverdue(t);
+              if (t.status==='done') {
+                return <span style={{ fontSize:10,padding:'2px 7px',borderRadius:999,background:C.cream2,color:C.text3,border:`1px solid ${C.border}`,whiteSpace:'nowrap' }}>
+                  📅 {fmtDate(t.due)}{doneOverdue ? ` (${doneOverdue})` : ''}
+                </span>;
+              }
+              return <span style={{ fontSize:10,padding:'2px 7px',borderRadius:999,background:ds.bg,color:ds.color,border:`1px solid ${ds.border}`,whiteSpace:'nowrap' }}>
+                📅 {fmtDate(t.due)}{ds.overdue?` (${ds.overdue}日超過)`:''}
+              </span>;
+            })()}
+            <button onClick={e=>{ e.stopPropagation(); onOpenTask(t); }}
+              title="編集" style={{ padding:'1px 6px',borderRadius:999,border:`1px solid ${C.border}`,background:C.cream2,color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.5 }}
+              onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.blue; e.currentTarget.style.color=C.blue; }}
+              onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; }}>
+              ✏️
+            </button>
+            {onDuplicateTask && (
+              <button onClick={e=>{ e.stopPropagation(); onDuplicateTask(t); }}
+                title="複製" style={{ padding:'1px 6px',borderRadius:999,border:`1px solid ${C.border}`,background:C.cream2,color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.5 }}
+                onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.orange; e.currentTarget.style.color=C.orange; }}
+                onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; }}>
+                ⧉
+              </button>
+            )}
+            <button onClick={e=>{ e.stopPropagation(); if(window.confirm('削除しますか？')) onStatusChange(t.id,'__delete__'); }}
+              style={{ padding:'2px 7px',borderRadius:999,border:`1px solid ${C.red}44`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.5 }}
+              onMouseEnter={e=>{ e.currentTarget.style.background=C.red; e.currentTarget.style.color='#fff'; e.currentTarget.style.borderColor=C.red; }}
+              onMouseLeave={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.color=C.text3; e.currentTarget.style.borderColor=C.red+'44'; }}>
+              🗑
+            </button>
+            {t.status==='todo' && (
+              <button onClick={e=>{ e.stopPropagation(); onStatusChange(t.id,'done'); }}
+                style={{ padding:'2px 8px',borderRadius:999,border:`1px solid ${C.green}55`,background:'#edf5f0',color:C.green,cursor:'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.5,whiteSpace:'nowrap' }}
+                onMouseEnter={e=>{ e.currentTarget.style.background=C.green; e.currentTarget.style.color='#fff'; }}
+                onMouseLeave={e=>{ e.currentTarget.style.background='#edf5f0'; e.currentTarget.style.color=C.green; }}>
+                →完了
+              </button>
+            )}
+            <button onClick={e=>{ e.stopPropagation(); const next=t.status==='todo'?'doing':t.status==='doing'?'done':'todo'; onStatusChange(t.id,next); }}
+              style={{ padding:'2px 8px',borderRadius:999,border:`1px solid ${C.border}`,background:C.cream2,color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.5,whiteSpace:'nowrap' }}
+              onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.orange; e.currentTarget.style.color=C.orange; e.currentTarget.style.background=C.orangeBg; }}
+              onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; e.currentTarget.style.background=C.cream2; }}>
+              {t.status==='todo'?'→進行中':t.status==='doing'?'→完了':'→未着手'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderColContent = (colTasks, st) => {
+    if (colTasks.length===0 && st.key!=='todo') return <div style={{ padding:20,textAlign:'center',color:C.text3,fontSize:12 }}>タスクなし</div>;
+    if (!groupByCategory) return colTasks.map(t => renderCard(t, st));
+    // Group by category
+    const catMap = new Map();
+    colTasks.forEach(t => {
+      const cat = extractCategory(t.title) || 'その他';
+      if (!catMap.has(cat)) catMap.set(cat, []);
+      catMap.get(cat).push(t);
+    });
+    const catColors = ['#5856d6','#1a6bbf','#e07840','#34c759','#ff3b30','#ff9500','#8e8e93'];
+    let ci = 0;
+    return Array.from(catMap.entries()).map(([cat, catTasks]) => {
+      const color = cat === 'その他' ? C.text3 : catColors[ci++ % catColors.length];
+      return (
+        <div key={cat}>
+          <div style={{ fontSize:10,fontWeight:700,color,letterSpacing:0.3,padding:'8px 2px 4px',borderBottom:`2px solid ${color}33`,marginBottom:6,display:'flex',alignItems:'center',gap:4 }}>
+            <div style={{ width:5,height:5,borderRadius:'50%',background:color }}/>{cat}<span style={{ fontWeight:400,color:C.text3,marginLeft:2 }}>({catTasks.length})</span>
+          </div>
+          {catTasks.map(t => renderCard(t, st))}
+        </div>
+      );
+    });
+  };
+
   return (
     <div style={{ flex:1,overflowX:'auto',overflowY:'hidden',padding:'16px 24px' }}>
-      <div style={{ display:'flex',flexDirection:'row',gap:14,height:'100%',minWidth:'fit-content' }}>
+      <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:10 }}>
+        <button onClick={toggleCatGroup}
+          style={{ padding:'4px 10px',borderRadius:999,border:`1px solid ${groupByCategory?C.blue:C.border}`,background:groupByCategory?C.blue+'14':'transparent',color:groupByCategory?C.blue:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',transition:'all 0.12s' }}>
+          {groupByCategory ? '✦ カテゴリ別' : '☰ カテゴリ別'}
+        </button>
+      </div>
+      <div style={{ display:'flex',flexDirection:'row',gap:14,height:'calc(100% - 36px)',minWidth:'fit-content' }}>
         {statuses.map(st=>{
           const colTasks = getSortedColTasks(st.key);
           return (
@@ -646,71 +885,7 @@ function KanbanView({ tasks, projects, members, onOpenTask, onStatusChange, onAd
                 <span style={{ fontSize:11,color:C.text3,background:C.cream3,padding:'1px 6px',borderRadius:999 }}>{colTasks.length}</span>
               </div>
               <div style={{ flex:1,overflowY:'auto',padding:10,display:'flex',flexDirection:'column',gap:8 }}>
-                {colTasks.length===0 && st.key!=='todo'
-                  ? <div style={{ padding:20,textAlign:'center',color:C.text3,fontSize:12 }}>タスクなし</div>
-                  : colTasks.map(t=>{
-                    const proj = projects.find(p=>p.id===t.projectId);
-                    const taskMembers = (t.assigneeIds||[]).map(id=>members.find(m=>m.id===id)).filter(Boolean);
-                    const ds = getDueStyle(t.due);
-                    const relLabel = proj && t.due ? getRelLabel(proj,t.due) : null;
-                    return (
-                      <div key={t.id} draggable onClick={()=>onOpenTask(t)}
-                        onDragStart={()=>{ dragId.current=t.id; dragSourceCol.current=st.key; }}
-                        onDragEnd={()=>{ dragId.current=null; dragSourceCol.current=null; dragOverCard.current=null; }}
-                        onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); dragOverCard.current=t.id; }}
-                        onDrop={e=>{
-                          e.stopPropagation();
-                          if (!dragId.current || !dragOverCard.current) return;
-                          if (dragSourceCol.current === st.key && dragId.current !== dragOverCard.current) {
-                            onReorder(st.key, dragId.current, dragOverCard.current);
-                          }
-                        }}
-                        style={{ background:'#fff',border:`1px solid ${C.border}`,borderRadius:10,padding:12,cursor:'pointer',transition:'all 0.12s' }}
-                        onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.border2; e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 4px 12px rgba(58,53,48,0.1)'; }}
-                        onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}>
-                        {proj && <div style={{ fontSize:10,fontWeight:600,letterSpacing:0.3,marginBottom:5,display:'flex',alignItems:'center',gap:4,color:proj.color }}>
-                          <div style={{ width:6,height:6,borderRadius:'50%',background:proj.color }}/>{proj.name}
-                        </div>}
-                        <div style={{ display:'flex',alignItems:'flex-start',gap:5,marginBottom:8 }}>
-                          <PriorityDot priority={t.priority}/>
-                          <div style={{ fontSize:13,fontWeight:500,color:C.text,lineHeight:1.4,flex:1 }}>{t.title}</div>
-                          {t.isPrivate && <span style={{ fontSize:9,color:C.orange,background:C.orangeBg,border:`1px solid ${C.orangeBorder}`,padding:'1px 5px',borderRadius:999,whiteSpace:'nowrap',flexShrink:0 }}>🔐</span>}
-                        </div>
-                        <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,flexWrap:'wrap' }}>
-                          <div style={{ display:'flex',alignItems:'center',gap:5,fontSize:11,color:C.text2 }}>
-                            {taskMembers.length>0
-                              ? <div style={{ display:'flex',alignItems:'center',gap:3 }}>
-                                  {taskMembers.map(m=><Avatar key={m.id} name={m.name} color={m.color} size={18} fs={9}/>)}
-                                  {taskMembers.length===1 && <span>{taskMembers[0].name.split(' ')[0]}</span>}
-                                </div>
-                              : <span style={{ color:C.text3 }}>未割当</span>}
-                          </div>
-                          <div style={{ display:'flex',gap:5,alignItems:'center',flexWrap:'wrap' }}>
-                            {relLabel && <span style={{ fontSize:10,color:C.text3,background:C.cream3,padding:'1px 6px',borderRadius:999 }}>{relLabel}</span>}
-                            {t.due && (()=>{
-                              const doneOverdue = getDoneOverdue(t);
-                              if (t.status==='done') {
-                                return <span style={{ fontSize:10,padding:'2px 7px',borderRadius:999,background:C.cream2,color:C.text3,border:`1px solid ${C.border}`,whiteSpace:'nowrap' }}>
-                                  📅 {fmtDate(t.due)}{doneOverdue ? ` (${doneOverdue})` : ''}
-                                </span>;
-                              }
-                              return <span style={{ fontSize:10,padding:'2px 7px',borderRadius:999,background:ds.bg,color:ds.color,border:`1px solid ${ds.border}`,whiteSpace:'nowrap' }}>
-                                📅 {fmtDate(t.due)}{ds.overdue?` (${ds.overdue}日超過)`:''}
-                              </span>;
-                            })()}
-                            {onDuplicateTask && (
-                              <button onClick={e=>{ e.stopPropagation(); onDuplicateTask(t); }}
-                                title="複製" style={{ padding:'1px 6px',borderRadius:999,border:`1px solid ${C.border}`,background:C.cream2,color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.5 }}
-                                onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.orange; e.currentTarget.style.color=C.orange; }}
-                                onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; }}>
-                                ⧉
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                {renderColContent(colTasks, st)}
                 {st.key !== 'done' && (
                   <button onClick={()=>(onAddTaskWithStatus||onAddTask)(st.key)} style={{ display:'flex',alignItems:'center',justifyContent:'center',gap:5,width:'100%',padding:'8px',borderRadius:10,border:`1.5px dashed ${C.border2}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:12,fontFamily:'inherit',transition:'all 0.12s',marginTop:2 }}
                     onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.orange; e.currentTarget.style.color=C.orange; e.currentTarget.style.background=C.orangeBg; }}
@@ -727,42 +902,480 @@ function KanbanView({ tasks, projects, members, onOpenTask, onStatusChange, onAd
   );
 }
 
-// ── List View ─────────────────────────────────────────────────────────────
-function ListView({ tasks, projects, members, onOpenTask }) {
-  if (!tasks.length) return <div style={{ flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:C.text3,gap:10 }}><div style={{ fontSize:36 }}>📋</div><div style={{ fontSize:14,color:C.text2 }}>タスクがありません</div></div>;
+// ── Timer Panel (right side of kanban) ────────────────────────────────────
+function TimerPanel({ timerTask, projects, onClearTask }) {
+  const [running, setRunning] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [startTime, setStartTime] = useState(null);
+  const [logs, setLogs] = useState(()=>{ try { return JSON.parse(localStorage.getItem('wf_timer_logs'))||[]; } catch { return []; } });
+  const [exportedIds, setExportedIds] = useState(()=>{ try { return new Set(JSON.parse(localStorage.getItem('wf_timer_exportedIds'))||[]); } catch { return new Set(); } });
+  const [deletedIds, setDeletedIds] = useState([]);
+  const [updatedNoteIds, setUpdatedNoteIds] = useState(new Set());
+  const [lastDeleted, setLastDeleted] = useState([]);
+  const intervalRef = useRef(null);
+  const [manualMinutes, setManualMinutes] = useState('');
+  const [manualNote, setManualNote] = useState('');
+  // After-stop state: show saved log for note editing before sheet send
+  const [savedLog, setSavedLog] = useState(null);
+  const [savedLogNote, setSavedLogNote] = useState('');
+  const [editingNoteId, setEditingNoteId] = useState(null);
+
+  useEffect(()=>{ try { localStorage.setItem('wf_timer_logs', JSON.stringify(logs)); } catch {} }, [logs]);
+  useEffect(()=>{ try { localStorage.setItem('wf_timer_exportedIds', JSON.stringify([...exportedIds])); } catch {} }, [exportedIds]);
+
+  useEffect(()=>{
+    if (running) {
+      intervalRef.current = setInterval(()=>setElapsed(Math.floor((Date.now()-startTime)/1000)),1000);
+    } else { clearInterval(intervalRef.current); }
+    return ()=>clearInterval(intervalRef.current);
+  },[running,startTime]);
+
+  const pad = n => String(Math.floor(n)).padStart(2,'0');
+  const timerDisplay = `${pad(elapsed/3600)}:${pad((elapsed%3600)/60)}:${pad(elapsed%60)}`;
+
+  function postGAS(payload) {
+    let gasUrl = localStorage.getItem('wl_gasUrl');
+    if (gasUrl) { try { gasUrl = JSON.parse(gasUrl); } catch {} }
+    if (gasUrl) { try { fetch(gasUrl, { method:'POST', body:JSON.stringify(payload), redirect:'follow' }); } catch {} }
+  }
+
+  function doStart() {
+    if (!timerTask) return;
+    setStartTime(Date.now()); setElapsed(0); setRunning(true);
+  }
+  function doResume() {
+    if (!timerTask) return;
+    setStartTime(Date.now() - elapsed*1000); setPaused(false); setRunning(true);
+  }
+  function doPause() { setRunning(false); setPaused(true); }
+  function doStop() {
+    if (!timerTask) return;
+    setRunning(false); setPaused(false);
+    const proj = projects.find(p=>p.id===timerTask.projectId);
+    const log = { id: Date.now(), project: proj?.name||'', task: timerTask.title, startedAt: new Date(startTime).toISOString(), endedAt: new Date().toISOString(), duration: elapsed, note: '' };
+    setLogs(prev=>[log,...prev]);
+    setElapsed(0);
+    setSavedLog(log); setSavedLogNote('');
+  }
+  function doCancel() { setRunning(false); setPaused(false); setElapsed(0); onClearTask(); }
+
+  // Send saved log (after stop) to sheet
+  function sendSavedLog() {
+    if (!savedLog) return;
+    const logWithNote = { ...savedLog, note: savedLogNote };
+    setLogs(prev=>prev.map(l=>l.id===savedLog.id ? logWithNote : l));
+    postGAS({ action:'syncLogs', logs:[logWithNote], deletedIds:[], updatedNotes:[] });
+    setExportedIds(prev=>new Set([...prev, String(savedLog.id)]));
+    setSavedLog(null); setSavedLogNote(''); onClearTask();
+  }
+
+  // Manual log: just minutes
+  function submitManualLog() {
+    if (!timerTask) return;
+    const mins = parseInt(manualMinutes)||0;
+    const dur = mins*60;
+    if (dur <= 0) return;
+    const proj = projects.find(p=>p.id===timerTask.projectId);
+    const now = new Date();
+    const log = { id: Date.now(), project: proj?.name||'', task: timerTask.title, startedAt: new Date(now.getTime()-dur*1000).toISOString(), endedAt: now.toISOString(), duration: dur, note: manualNote };
+    setLogs(prev=>[log,...prev]);
+    postGAS({ action:'syncLogs', logs:[log], deletedIds:[], updatedNotes:[] });
+    setExportedIds(prev=>new Set([...prev, String(log.id)]));
+    setManualMinutes(''); setManualNote(''); onClearTask();
+  }
+
+  // Log operations
+  function deleteLog(id) {
+    const strId = String(id);
+    const logToDelete = logs.find(l=>String(l.id)===strId);
+    setLastDeleted(prev=> logToDelete ? [logToDelete,...prev].slice(0,3) : prev);
+    setLogs(prev=>prev.filter(l=>String(l.id)!==strId));
+    if (exportedIds.has(strId)) setDeletedIds(prev=>[...prev, strId]);
+    setExportedIds(prev=>{ const s=new Set(prev); s.delete(strId); return s; });
+  }
+  function undoDelete() {
+    if (!lastDeleted.length) return;
+    const [first,...rest] = lastDeleted;
+    setLogs(prev=>[first,...prev]);
+    setLastDeleted(rest);
+  }
+  function updateNote(id, note) {
+    setLogs(prev=>prev.map(l=>l.id===id ? {...l, note} : l));
+    setUpdatedNoteIds(prev=>new Set([...prev, String(id)]));
+  }
+  function syncSheets() {
+    const newLogs = logs.filter(l=>!exportedIds.has(String(l.id)));
+    const updatedNotes = logs.filter(l=>exportedIds.has(String(l.id))&&updatedNoteIds.has(String(l.id)));
+    if (!newLogs.length && !deletedIds.length && !updatedNotes.length) return;
+    postGAS({ action:'syncLogs', logs:newLogs, deletedIds, updatedNotes });
+    setExportedIds(prev=>new Set([...prev,...newLogs.map(l=>String(l.id))]));
+    setDeletedIds([]); setUpdatedNoteIds(new Set());
+  }
+
+  function fmtDur(s) {
+    const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60;
+    if(h>0) return `${h}h${m}m`;
+    if(m>0) return `${m}m${ss}s`;
+    return `${ss}s`;
+  }
+
+  const todayStr = new Date().toISOString().slice(0,10);
+  const yesterdayStr = (()=>{ const d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
+  const todayLogs = logs.filter(l=>l.startedAt?.slice(0,10)===todayStr);
+  const yesterdayLogs = logs.filter(l=>l.startedAt?.slice(0,10)===yesterdayStr);
+  const todayTotal = todayLogs.reduce((s,l)=>s+l.duration,0);
+  const yesterdayTotal = yesterdayLogs.reduce((s,l)=>s+l.duration,0);
+  const [showYesterday, setShowYesterday] = useState(false);
+  const timerProj = timerTask ? projects.find(p=>p.id===timerTask.projectId) : null;
+  const manualDur = (parseInt(manualMinutes)||0)*60;
+  const isIdle = !running && !paused && !savedLog;
+  const hasUnsyncedChanges = logs.some(l=>!exportedIds.has(String(l.id))) || deletedIds.length>0 || updatedNoteIds.size>0;
+  const [editingLogId, setEditingLogId] = useState(null);
+  const [editDuration, setEditDuration] = useState('');
+
   return (
-    <div style={{ flex:1,overflowY:'auto',padding:'16px 24px' }}>
-      <table style={{ width:'100%',borderCollapse:'collapse' }}>
-        <thead><tr>{['タスク名','プロジェクト','担当者','開催日との関係','期日','ステータス'].map(h=>(
-          <th key={h} style={{ textAlign:'left',fontSize:10,fontWeight:600,color:C.text3,letterSpacing:0.5,textTransform:'uppercase',padding:'8px 12px',borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap' }}>{h}</th>
-        ))}</tr></thead>
-        <tbody>{tasks.map(t=>{
-          const pj=projects.find(p=>p.id===t.projectId);
-          const mbs=(t.assigneeIds||[]).map(id=>members.find(m=>m.id===id)).filter(Boolean);
-          const ds=getDueStyle(t.due);
-          const rel=pj&&t.due?getRelLabel(pj,t.due):null;
+    <div style={{ width:260,flexShrink:0,display:'flex',flexDirection:'column',background:'#fff',borderRadius:14,border:`1px solid ${C.border}`,maxHeight:'100%',overflow:'hidden' }}>
+      {/* Header */}
+      <div style={{ padding:'10px 14px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:8,flexShrink:0 }}>
+        <div style={{ width:7,height:7,borderRadius:'50%',background:running?C.green:paused?C.amber:C.text3,boxShadow:running?`0 0 6px ${C.green}`:'none' }}/>
+        <span style={{ fontSize:12,fontWeight:600,color:C.text }}>タイマー</span>
+        {todayTotal>0 && <span style={{ fontSize:10,color:C.text3,marginLeft:'auto' }}>今日 {fmtDur(todayTotal)}</span>}
+      </div>
+
+      {/* Selected Task Info */}
+      {timerTask ? (
+        <div style={{ padding:'10px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0,background:C.orangeBg }}>
+          <div style={{ fontSize:12,color:C.text,fontWeight:500,lineHeight:1.4 }}>{timerTask.title}</div>
+          {timerProj && <div style={{ fontSize:10,color:timerProj.color,marginTop:2 }}>{timerProj.name}</div>}
+        </div>
+      ) : (
+        <div style={{ padding:'14px',textAlign:'center',borderBottom:`1px solid ${C.border}`,flexShrink:0 }}>
+          <div style={{ fontSize:11,color:C.text3 }}>タスクを押して選択</div>
+        </div>
+      )}
+
+      {/* After-stop: note editing + sheet send */}
+      {savedLog && (
+        <div style={{ padding:'10px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0,background:C.cream }}>
+          <div style={{ fontSize:11,color:C.green,fontWeight:600,marginBottom:6 }}>✓ {fmtDur(savedLog.duration)} 記録済み</div>
+          <input value={savedLogNote} onChange={e=>setSavedLogNote(e.target.value)} placeholder="備考（任意）"
+            style={{ width:'100%',padding:'5px 8px',borderRadius:6,border:`1px solid ${C.border}`,fontSize:11,fontFamily:'inherit',background:'#fff',color:C.text,boxSizing:'border-box',marginBottom:6 }}/>
+          <button onClick={sendSavedLog}
+            style={{ width:'100%',padding:'6px',borderRadius:8,border:'none',background:C.orange,color:'#fff',cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:500 }}>
+            → シート送信
+          </button>
+        </div>
+      )}
+
+      {/* Timer + Manual Log - only when task is selected and no saved log pending */}
+      {timerTask && !savedLog && (
+        <div style={{ flexShrink:0,borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ padding:'12px 14px',textAlign:'center' }}>
+            <div style={{ fontSize:30,fontWeight:300,letterSpacing:'-0.02em',color:running?C.orange:paused?C.amber:C.text3,fontFamily:"'DM Mono','Fira Code',monospace",transition:'color 0.3s' }}>
+              {timerDisplay}
+            </div>
+            <div style={{ display:'flex',gap:5,justifyContent:'center',marginTop:8,flexWrap:'wrap' }}>
+              {isIdle && (
+                <button onClick={doStart} style={{ padding:'5px 16px',borderRadius:999,border:'none',background:C.orange,color:'#fff',cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:500 }}>▶ タイマー開始</button>
+              )}
+              {running && <>
+                <button onClick={doPause} style={{ padding:'5px 12px',borderRadius:999,border:`1px solid ${C.amber}`,background:C.cream,color:C.amber,cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:500 }}>⏸ 一時停止</button>
+                <button onClick={doStop} style={{ padding:'5px 12px',borderRadius:999,border:`1px solid ${C.red}`,background:C.cream,color:C.red,cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:500 }}>■ 停止</button>
+              </>}
+              {paused && <>
+                <button onClick={doResume} style={{ padding:'5px 12px',borderRadius:999,border:'none',background:C.orange,color:'#fff',cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:500 }}>▶ 再開</button>
+                <button onClick={doStop} style={{ padding:'5px 12px',borderRadius:999,border:`1px solid ${C.red}`,background:C.cream,color:C.red,cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:500 }}>■ 停止</button>
+                <button onClick={doCancel} style={{ padding:'5px 8px',borderRadius:999,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit' }}>✕</button>
+              </>}
+            </div>
+          </div>
+          {/* Manual Log (when idle) */}
+          {isIdle && (
+            <div style={{ padding:'10px 14px',borderTop:`1px solid ${C.border}` }}>
+              <div style={{ fontSize:10,fontWeight:600,color:C.text3,marginBottom:6 }}>または手動で記録</div>
+              <div style={{ display:'flex',gap:6,alignItems:'center',marginBottom:6 }}>
+                <input type="number" min="0" value={manualMinutes} onChange={e=>setManualMinutes(e.target.value)} placeholder="0"
+                  style={{ width:60,padding:'5px 6px',borderRadius:6,border:`1px solid ${C.border}`,fontSize:12,fontFamily:'inherit',background:'#fff',color:C.text,textAlign:'center',boxSizing:'border-box' }}/>
+                <span style={{ fontSize:11,color:C.text2 }}>分</span>
+              </div>
+              <input value={manualNote} onChange={e=>setManualNote(e.target.value)} placeholder="備考（任意）"
+                style={{ width:'100%',padding:'5px 8px',borderRadius:6,border:`1px solid ${C.border}`,fontSize:11,fontFamily:'inherit',background:'#fff',color:C.text,boxSizing:'border-box',marginBottom:6 }}/>
+              <button onClick={submitManualLog} disabled={!manualDur}
+                style={{ width:'100%',padding:'6px',borderRadius:8,border:'none',background:manualDur?C.orange:C.cream3,color:manualDur?'#fff':C.text3,cursor:manualDur?'pointer':'default',fontSize:11,fontFamily:'inherit',fontWeight:500 }}>
+                → シート送信
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Logs */}
+      <div style={{ flex:1,overflowY:'auto',padding:10 }}>
+        <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 4px 6px' }}>
+          <span style={{ fontSize:10,fontWeight:600,color:C.text3,letterSpacing:0.3 }}>今日のログ ({todayLogs.length})</span>
+          <div style={{ display:'flex',gap:4,alignItems:'center' }}>
+            {lastDeleted.length>0 && (
+              <button onClick={undoDelete} style={{ padding:'2px 6px',borderRadius:999,border:`1px solid ${C.green}55`,background:'#edf5f0',color:C.green,cursor:'pointer',fontSize:9,fontFamily:'inherit' }}>↩ 戻す({lastDeleted.length})</button>
+            )}
+            {hasUnsyncedChanges && (
+              <button onClick={syncSheets} style={{ padding:'2px 6px',borderRadius:999,border:`1px solid ${C.orange}55`,background:C.orangeBg,color:C.orange,cursor:'pointer',fontSize:9,fontFamily:'inherit' }}>↑ 同期</button>
+            )}
+          </div>
+        </div>
+        {todayLogs.length>0 ? todayLogs.map(l=>{
+          const isEditing = editingLogId===l.id;
           return (
-            <tr key={t.id} onClick={()=>onOpenTask(t)} style={{ cursor:'pointer' }}
-              onMouseEnter={e=>Array.from(e.currentTarget.cells).forEach(td=>td.style.background=C.cream2)}
-              onMouseLeave={e=>Array.from(e.currentTarget.cells).forEach(td=>td.style.background='')}>
-              <td style={{ padding:'10px 12px',borderBottom:`1px solid ${C.border}` }}><div style={{ display:'flex',alignItems:'center',gap:6 }}><PriorityDot priority={t.priority}/>{t.title}{t.isPrivate&&<span style={{ fontSize:9,color:C.orange,background:C.orangeBg,border:`1px solid ${C.orangeBorder}`,padding:'1px 5px',borderRadius:999 }}>🔐</span>}</div></td>
-              <td style={{ padding:'10px 12px',borderBottom:`1px solid ${C.border}` }}>{pj?<span style={{ color:pj.color,fontSize:12 }}>● {pj.name}</span>:<span style={{ color:C.text3 }}>-</span>}</td>
-              <td style={{ padding:'10px 12px',borderBottom:`1px solid ${C.border}` }}>{mbs.length>0?<div style={{ display:'flex',alignItems:'center',gap:4 }}>{mbs.map(m=><div key={m.id} style={{ display:'flex',alignItems:'center',gap:4,marginRight:4 }}><Avatar name={m.name} color={m.color} size={18}/><span style={{ fontSize:12 }}>{m.name}</span></div>)}</div>:<span style={{ color:C.text3 }}>-</span>}</td>
-              <td style={{ padding:'10px 12px',borderBottom:`1px solid ${C.border}` }}>{rel?<span style={{ fontSize:11,color:C.text3,background:C.cream3,padding:'2px 7px',borderRadius:999 }}>{rel}</span>:'-'}</td>
-              <td style={{ padding:'10px 12px',borderBottom:`1px solid ${C.border}` }}>
-                {t.due?(()=>{
-                  const doneOverdue = getDoneOverdue(t);
-                  if (t.status==='done') {
-                    return <span style={{ fontSize:11,padding:'2px 7px',borderRadius:999,background:C.cream2,color:C.text3,border:`1px solid ${C.border}` }}>{fmtDate(t.due)}{doneOverdue ? ` (${doneOverdue})` : ''}</span>;
-                  }
-                  return <span style={{ fontSize:11,padding:'2px 7px',borderRadius:999,background:ds.bg,color:ds.color,border:`1px solid ${ds.border}` }}>{fmtDate(t.due)}{ds.overdue?` (${ds.overdue}日超過)`:''}</span>;
-                })():<span style={{ color:C.text3 }}>-</span>}
-              </td>
-              <td style={{ padding:'10px 12px',borderBottom:`1px solid ${C.border}` }}><StatusBadge status={t.status}/></td>
-            </tr>
+          <div key={l.id} style={{ padding:'5px 6px',fontSize:10,color:C.text2,borderBottom:`1px solid ${C.border}22` }}>
+            <div style={{ display:'flex',justifyContent:'space-between',gap:4,alignItems:'center' }}>
+              <span style={{ flex:1,fontWeight:500 }}>{l.task}</span>
+              {isEditing ? (
+                <div style={{ display:'flex',gap:3,alignItems:'center',flexShrink:0 }}>
+                  <input type="number" min="0" value={editDuration} onChange={e=>setEditDuration(e.target.value)}
+                    style={{ width:40,padding:'2px 4px',borderRadius:4,border:`1px solid ${C.border}`,fontSize:10,fontFamily:'inherit',textAlign:'center' }}/>
+                  <span style={{ fontSize:9,color:C.text3 }}>分</span>
+                  <button onClick={()=>{ const mins=parseInt(editDuration)||0; if(mins>0){setLogs(prev=>prev.map(x=>x.id===l.id?{...x,duration:mins*60}:x));setUpdatedNoteIds(prev=>new Set([...prev,String(l.id)]));} setEditingLogId(null); }}
+                    style={{ padding:'2px 5px',borderRadius:4,border:'none',background:C.orange,color:'#fff',cursor:'pointer',fontSize:9,fontFamily:'inherit' }}>OK</button>
+                  <button onClick={()=>setEditingLogId(null)}
+                    style={{ padding:'2px 5px',borderRadius:4,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:9,fontFamily:'inherit' }}>✕</button>
+                </div>
+              ) : (
+                <span onClick={()=>{setEditingLogId(l.id);setEditDuration(String(Math.round(l.duration/60)));}} style={{ color:C.orange,fontWeight:600,flexShrink:0,cursor:'pointer' }}
+                  onMouseEnter={e=>{e.currentTarget.style.textDecoration='underline';}} onMouseLeave={e=>{e.currentTarget.style.textDecoration='none';}}>{fmtDur(l.duration)}</span>
+              )}
+              <button onClick={()=>deleteLog(l.id)} style={{ padding:'1px 4px',border:'none',background:'transparent',color:C.text3,cursor:'pointer',fontSize:10,flexShrink:0 }}
+                onMouseEnter={e=>{e.currentTarget.style.color=C.red;}} onMouseLeave={e=>{e.currentTarget.style.color=C.text3;}}>🗑</button>
+            </div>
+            <div style={{ color:C.text3,fontSize:9,marginBottom:2 }}>{l.project}</div>
+            {editingNoteId===l.id ? (
+              <div style={{ display:'flex',gap:4 }}>
+                <input value={l.note||''} onChange={e=>updateNote(l.id,e.target.value)} placeholder="備考..."
+                  style={{ flex:1,padding:'3px 6px',borderRadius:4,border:`1px solid ${C.border}`,fontSize:10,fontFamily:'inherit',background:'#fff',color:C.text,boxSizing:'border-box' }}/>
+                <button onClick={()=>setEditingNoteId(null)} style={{ padding:'3px 6px',borderRadius:4,border:'none',background:C.orange,color:'#fff',cursor:'pointer',fontSize:9,fontFamily:'inherit' }}>OK</button>
+              </div>
+            ) : (
+              <div onClick={()=>setEditingNoteId(l.id)} style={{ cursor:'pointer',fontSize:9,color:l.note?C.text2:C.text3,fontStyle:l.note?'normal':'italic' }}>
+                {l.note ? `📝 ${l.note}` : '+ 備考'}
+              </div>
+            )}
+          </div>
           );
-        })}</tbody>
-      </table>
+        }) : (
+          <div style={{ padding:16,textAlign:'center',fontSize:11,color:C.text3 }}>まだログがありません</div>
+        )}
+
+        {/* Yesterday's Logs */}
+        {yesterdayLogs.length>0 && (
+          <>
+            <div onClick={()=>setShowYesterday(!showYesterday)}
+              style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 4px 6px',marginTop:4,cursor:'pointer',borderTop:`1px solid ${C.border}` }}
+              onMouseEnter={e=>{e.currentTarget.style.background=C.cream;}} onMouseLeave={e=>{e.currentTarget.style.background='transparent';}}>
+              <span style={{ fontSize:10,fontWeight:600,color:C.text3,letterSpacing:0.3 }}>昨日のログ ({yesterdayLogs.length}){yesterdayTotal>0 && ` — ${fmtDur(yesterdayTotal)}`}</span>
+              <span style={{ fontSize:10,color:C.text3 }}>{showYesterday?'▲':'▼'}</span>
+            </div>
+            {showYesterday && yesterdayLogs.map(l=>{
+              const isEditing = editingLogId===l.id;
+              return (
+              <div key={l.id} style={{ padding:'5px 6px',fontSize:10,color:C.text2,borderBottom:`1px solid ${C.border}22` }}>
+                <div style={{ display:'flex',justifyContent:'space-between',gap:4,alignItems:'center' }}>
+                  <span style={{ flex:1,fontWeight:500 }}>{l.task}</span>
+                  {isEditing ? (
+                    <div style={{ display:'flex',gap:3,alignItems:'center',flexShrink:0 }}>
+                      <input type="number" min="0" value={editDuration} onChange={e=>setEditDuration(e.target.value)}
+                        style={{ width:40,padding:'2px 4px',borderRadius:4,border:`1px solid ${C.border}`,fontSize:10,fontFamily:'inherit',textAlign:'center' }}/>
+                      <span style={{ fontSize:9,color:C.text3 }}>分</span>
+                      <button onClick={()=>{ const mins=parseInt(editDuration)||0; if(mins>0){setLogs(prev=>prev.map(x=>x.id===l.id?{...x,duration:mins*60}:x));setUpdatedNoteIds(prev=>new Set([...prev,String(l.id)]));} setEditingLogId(null); }}
+                        style={{ padding:'2px 5px',borderRadius:4,border:'none',background:C.orange,color:'#fff',cursor:'pointer',fontSize:9,fontFamily:'inherit' }}>OK</button>
+                      <button onClick={()=>setEditingLogId(null)}
+                        style={{ padding:'2px 5px',borderRadius:4,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:9,fontFamily:'inherit' }}>✕</button>
+                    </div>
+                  ) : (
+                    <span onClick={()=>{setEditingLogId(l.id);setEditDuration(String(Math.round(l.duration/60)));}} style={{ color:C.orange,fontWeight:600,flexShrink:0,cursor:'pointer' }}
+                      onMouseEnter={e=>{e.currentTarget.style.textDecoration='underline';}} onMouseLeave={e=>{e.currentTarget.style.textDecoration='none';}}>{fmtDur(l.duration)}</span>
+                  )}
+                  <button onClick={()=>deleteLog(l.id)} style={{ padding:'1px 4px',border:'none',background:'transparent',color:C.text3,cursor:'pointer',fontSize:10,flexShrink:0 }}
+                    onMouseEnter={e=>{e.currentTarget.style.color=C.red;}} onMouseLeave={e=>{e.currentTarget.style.color=C.text3;}}>🗑</button>
+                </div>
+                <div style={{ color:C.text3,fontSize:9,marginBottom:2 }}>{l.project}</div>
+                {editingNoteId===l.id ? (
+                  <div style={{ display:'flex',gap:4 }}>
+                    <input value={l.note||''} onChange={e=>updateNote(l.id,e.target.value)} placeholder="備考..."
+                      style={{ flex:1,padding:'3px 6px',borderRadius:4,border:`1px solid ${C.border}`,fontSize:10,fontFamily:'inherit',background:'#fff',color:C.text,boxSizing:'border-box' }}/>
+                    <button onClick={()=>setEditingNoteId(null)} style={{ padding:'3px 6px',borderRadius:4,border:'none',background:C.orange,color:'#fff',cursor:'pointer',fontSize:9,fontFamily:'inherit' }}>OK</button>
+                  </div>
+                ) : (
+                  <div onClick={()=>setEditingNoteId(l.id)} style={{ cursor:'pointer',fontSize:9,color:l.note?C.text2:C.text3,fontStyle:l.note?'normal':'italic' }}>
+                    {l.note ? `📝 ${l.note}` : '+ 備考'}
+                  </div>
+                )}
+              </div>
+              );
+            })}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── List View ─────────────────────────────────────────────────────────────
+function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDelete, onSave, onTimerSelect, timerTaskId, onAddTask, onCopyCategoryToProject }) {
+  const [assigneeOpen, setAssigneeOpen] = useState(null);
+  const [catOrder, setCatOrder] = useState(()=>{ try { return JSON.parse(localStorage.getItem('wf_listCatOrder'))||[]; } catch { return []; } });
+  const [copyCatOpen, setCopyCatOpen] = useState(null);
+  if (!tasks.length) return <div style={{ flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:C.text3,gap:10 }}><div style={{ fontSize:36 }}>📋</div><div style={{ fontSize:14,color:C.text2 }}>タスクがありません</div>{onAddTask&&<button onClick={onAddTask} style={{ marginTop:8,padding:'8px 20px',borderRadius:10,border:`1.5px dashed ${C.border2}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:12,fontFamily:'inherit' }} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border2;e.currentTarget.style.color=C.text3;}}>＋ タスク追加</button>}</div>;
+  const thStyle = { textAlign:'left',fontSize:10,fontWeight:600,color:C.text3,letterSpacing:0.5,textTransform:'uppercase',padding:'8px 12px',borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap' };
+  const tdStyle = { padding:'8px 12px',borderBottom:`1px solid ${C.border}`,verticalAlign:'middle' };
+
+  // Sort by due date (earliest first, no due last) then group by category
+  const sorted = [...tasks].sort((a,b) => { if(!a.due&&!b.due) return 0; if(!a.due) return 1; if(!b.due) return -1; return a.due.localeCompare(b.due); });
+  const catMap = new Map();
+  sorted.forEach(t => {
+    const cat = extractCategory(t.title) || 'その他';
+    if (!catMap.has(cat)) catMap.set(cat, []);
+    catMap.get(cat).push(t);
+  });
+  const allCats = Array.from(catMap.keys());
+  const categories = allCats.sort((a,b) => {
+    if(a==='その他') return 1; if(b==='その他') return -1;
+    const ai=catOrder.indexOf(a), bi=catOrder.indexOf(b);
+    if(ai>=0&&bi>=0) return ai-bi;
+    if(ai>=0) return -1; if(bi>=0) return 1;
+    return a.localeCompare(b,'ja');
+  });
+  function moveCat(cat, dir) {
+    const curr = [...categories].filter(c=>c!=='その他');
+    const idx = curr.indexOf(cat);
+    if(idx<0) return;
+    const ni = idx+dir;
+    if(ni<0||ni>=curr.length) return;
+    [curr[idx],curr[ni]]=[curr[ni],curr[idx]];
+    setCatOrder(curr);
+    localStorage.setItem('wf_listCatOrder', JSON.stringify(curr));
+  }
+  const catColors = ['#5856d6','#1a6bbf','#e07840','#34c759','#ff9500','#ff3b30','#8e8e93'];
+
+  const renderRow = (t) => {
+    const pj=projects.find(p=>p.id===t.projectId);
+    const mbs=(t.assigneeIds||[]).map(id=>members.find(m=>m.id===id)).filter(Boolean);
+    const ds=getDueStyle(t.due);
+    const rel=pj&&t.due?getRelLabel(pj,t.due):null;
+    const availMembers=pj?.visibleMemberIds?.length>0?members.filter(m=>pj.visibleMemberIds.includes(m.id)):members;
+    const displayTitle = stripCategory(t.title);
+    return (
+      <tr key={t.id}
+        onMouseEnter={e=>Array.from(e.currentTarget.cells).forEach(td=>td.style.background=C.cream2)}
+        onMouseLeave={e=>Array.from(e.currentTarget.cells).forEach(td=>td.style.background='')}>
+        <td style={{ ...tdStyle,cursor:'pointer',background:timerTaskId===t.id?C.orangeBg:undefined }} onClick={()=>onTimerSelect?onTimerSelect(t):onOpenTask(t)}>
+          <div style={{ display:'flex',alignItems:'center',gap:6 }}><PriorityDot priority={t.priority}/>{displayTitle}{t.isPrivate&&<span style={{ fontSize:9,color:C.orange,background:C.orangeBg,border:`1px solid ${C.orangeBorder}`,padding:'1px 5px',borderRadius:999 }}>🔐</span>}</div>
+        </td>
+        <td style={{ ...tdStyle,position:'relative',cursor:'pointer' }}
+          onClick={e=>{ e.stopPropagation(); setAssigneeOpen(assigneeOpen===t.id?null:t.id); }}>
+          {mbs.length>0
+            ? <div style={{ display:'flex',alignItems:'center',gap:4,flexWrap:'wrap' }}>
+                {mbs.map(m=><div key={m.id} style={{ display:'flex',alignItems:'center',gap:3 }}><Avatar name={m.name} color={m.color} size={18}/><span style={{ fontSize:12 }}>{m.name}</span></div>)}
+                <span style={{ color:C.text3,fontSize:10 }}>▾</span>
+              </div>
+            : <span style={{ color:C.text3,fontSize:12 }}>未割当 ▾</span>}
+          {assigneeOpen===t.id && availMembers.length>0 && (
+            <div onClick={e=>e.stopPropagation()} style={{ position:'absolute',top:'100%',left:0,zIndex:200,background:'#fff',border:`1px solid ${C.border}`,borderRadius:10,padding:6,display:'flex',flexDirection:'column',gap:2,minWidth:150,boxShadow:'0 4px 16px rgba(58,53,48,0.15)' }}>
+              {availMembers.map(m=>{
+                const checked=(t.assigneeIds||[]).includes(m.id);
+                return (
+                  <label key={m.id} style={{ display:'flex',alignItems:'center',gap:7,padding:'5px 8px',borderRadius:6,cursor:'pointer',background:checked?m.color+'18':'transparent',fontSize:12,color:checked?m.color:C.text }}>
+                    <input type="checkbox" checked={checked} onChange={e=>{ e.stopPropagation(); const ids=t.assigneeIds||[]; onSave({...t,assigneeIds:checked?ids.filter(id=>id!==m.id):[...ids,m.id]}); }} style={{ display:'none' }}/>
+                    <Avatar name={m.name} color={m.color} size={18} fs={9}/>
+                    {m.name}
+                    {checked && <span style={{ marginLeft:'auto',fontSize:11,color:m.color }}>✓</span>}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </td>
+        <td style={{ ...tdStyle }} onClick={e=>e.stopPropagation()}>
+          <input type="date" value={t.due||''} onChange={e=>onSave({...t,due:e.target.value})}
+            style={{ border:'none',background:'transparent',color:t.due?C.text:C.text3,fontSize:11,fontFamily:'inherit',cursor:'pointer',outline:'none',padding:0 }}/>
+          {rel && <div style={{ fontSize:9,color:C.text3,marginTop:1 }}>{rel}</div>}
+        </td>
+        <td style={{ ...tdStyle,cursor:'pointer' }} onClick={e=>{ e.stopPropagation(); const next=t.status==='todo'?'doing':t.status==='doing'?'done':'todo'; onStatusChange(t.id,next); }}
+          title="クリックでステータス変更">
+          <StatusBadge status={t.status}/>
+        </td>
+        <td style={{ ...tdStyle,whiteSpace:'nowrap' }} onClick={e=>e.stopPropagation()}>
+          <button onClick={()=>{ if(window.confirm('このタスクを削除しますか？')) onDelete(t.id); }}
+            style={{ background:'none',border:'none',cursor:'pointer',color:C.text3,fontSize:14,padding:'3px 6px',borderRadius:6,fontFamily:'inherit' }}
+            onMouseEnter={e=>{ e.currentTarget.style.color=C.red; e.currentTarget.style.background=C.red+'18'; }}
+            onMouseLeave={e=>{ e.currentTarget.style.color=C.text3; e.currentTarget.style.background='none'; }}>
+            🗑
+          </button>
+          <button onClick={()=>onOpenTask(t)}
+            title="編集" style={{ padding:'1px 6px',borderRadius:999,border:`1px solid ${C.border}`,background:C.cream2,color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.5 }}
+            onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.blue; e.currentTarget.style.color=C.blue; }}
+            onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; }}>
+            ✏️
+          </button>
+        </td>
+      </tr>
+    );
+  };
+
+  return (
+    <div style={{ flex:1,overflowY:'auto',padding:'16px 24px' }} onClick={()=>{setAssigneeOpen(null);setCopyCatOpen(null);}}>
+      {categories.map((cat, ci) => {
+        const catTasks = catMap.get(cat);
+        const color = cat === 'その他' ? C.text3 : catColors[ci % catColors.length];
+        return (
+          <div key={cat} style={{ marginBottom:20 }}>
+            <div style={{ display:'flex',alignItems:'center',gap:8,padding:'10px 0 6px',borderBottom:`2px solid ${color}44` }}>
+              <div style={{ width:8,height:8,borderRadius:'50%',background:color }}/>
+              <span style={{ fontSize:13,fontWeight:600,color }}>{cat}</span>
+              <span style={{ fontSize:11,color:C.text3 }}>({catTasks.length})</span>
+              <button onClick={()=>onAddTask(cat)} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>＋</button>
+              {cat!=='その他' && onCopyCategoryToProject && <span style={{ position:'relative' }}>
+                <button onClick={e=>{e.stopPropagation();setCopyCatOpen(copyCatOpen===cat?null:cat);}} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
+                  title="このカテゴリのタスクを他プロジェクトにコピー"
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=C.blue;e.currentTarget.style.color=C.blue;}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>📋 コピー</button>
+                {copyCatOpen===cat && (
+                  <div onClick={e=>e.stopPropagation()} style={{ position:'absolute',top:'100%',left:0,zIndex:300,background:'#fff',border:`1px solid ${C.border}`,borderRadius:10,padding:8,minWidth:200,boxShadow:'0 4px 16px rgba(58,53,48,0.15)',marginTop:4 }}>
+                    <div style={{ fontSize:11,color:C.text3,padding:'4px 8px',fontWeight:600 }}>コピー先プロジェクト:</div>
+                    {projects.filter(p=>!p.closed).map(p=>(
+                      <div key={p.id} onClick={()=>{
+                        if(window.confirm(`【${cat}】のタスク${catTasks.length}件を「${p.name}」にコピーしますか？`)){
+                          onCopyCategoryToProject(catTasks, p.id);
+                          setCopyCatOpen(null);
+                        }
+                      }} style={{ padding:'6px 8px',borderRadius:6,cursor:'pointer',fontSize:12,color:C.text,display:'flex',alignItems:'center',gap:6 }}
+                        onMouseEnter={e=>e.currentTarget.style.background=C.cream2}
+                        onMouseLeave={e=>e.currentTarget.style.background=''}>
+                        <span style={{ width:8,height:8,borderRadius:'50%',background:p.color,flexShrink:0 }}/>
+                        {p.name}
+                      </div>
+                    ))}
+                    {projects.filter(p=>!p.closed).length===0 && <div style={{ padding:'6px 8px',fontSize:12,color:C.text3 }}>プロジェクトがありません</div>}
+                  </div>
+                )}
+              </span>}
+              {cat!=='その他' && <span style={{ marginLeft:'auto',display:'flex',gap:2 }}>
+                <button onClick={()=>moveCat(cat,-1)} disabled={ci===0} style={{ padding:'0 4px',border:`1px solid ${C.border}`,borderRadius:4,background:C.cream2,color:ci===0?C.text3+'55':C.text3,cursor:ci===0?'default':'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.6 }}>▲</button>
+                <button onClick={()=>moveCat(cat,1)} disabled={ci===categories.length-1||(ci===categories.length-2&&categories[categories.length-1]==='その他')} style={{ padding:'0 4px',border:`1px solid ${C.border}`,borderRadius:4,background:C.cream2,color:(ci>=categories.length-2)?C.text3+'55':C.text3,cursor:(ci>=categories.length-2)?'default':'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.6 }}>▼</button>
+              </span>}
+            </div>
+            <table style={{ width:'100%',borderCollapse:'collapse' }}>
+              <thead><tr>{['タスク名','担当者','期日','ステータス',''].map(h=>(
+                <th key={h} style={thStyle}>{h}</th>
+              ))}</tr></thead>
+              <tbody>{catTasks.map(t => renderRow(t))}</tbody>
+            </table>
+          </div>
+        );
+      })}
+      {onAddTask && <button onClick={onAddTask} style={{ display:'flex',alignItems:'center',justifyContent:'center',gap:5,width:'100%',padding:'8px',borderRadius:10,border:`1.5px dashed ${C.border2}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:12,fontFamily:'inherit',transition:'all 0.12s',marginTop:2 }}
+        onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
+        onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border2;e.currentTarget.style.color=C.text3;}}>＋ タスク追加</button>}
     </div>
   );
 }
@@ -858,6 +1471,133 @@ function MemberView({ tasks, projects, members, memberFilter, onOpenTask, isMobi
   );
 }
 
+// ── Calendar View ─────────────────────────────────────────────────────────
+function CalendarView({ tasks, projects, members, onOpenTask }) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayStr = today.toISOString().slice(0,10);
+  const [currentMonth, setCurrentMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState(null);
+
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
+  const goToday = () => { setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setSelectedDate(todayStr); };
+
+  // Build map: date string -> tasks
+  const tasksByDate = {};
+  tasks.forEach(t => {
+    if (!t.due) return;
+    if (!tasksByDate[t.due]) tasksByDate[t.due] = [];
+    tasksByDate[t.due].push(t);
+  });
+
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    cells.push(dateStr);
+  }
+
+  const selectedTasks = selectedDate && tasksByDate[selectedDate] ? tasksByDate[selectedDate] : [];
+
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      <div style={{ flex:1, overflow:'auto', padding:'16px 24px' }}>
+        {/* Month navigation */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:16, marginBottom:16 }}>
+          <button onClick={prevMonth} style={{ background:'none', border:`1px solid ${C.border}`, borderRadius:8, cursor:'pointer', padding:'4px 12px', fontSize:16, color:C.text2, fontFamily:'inherit' }}>‹</button>
+          <div style={{ fontSize:16, fontWeight:600, color:C.text, minWidth:140, textAlign:'center' }}>{year}年{month+1}月</div>
+          <button onClick={nextMonth} style={{ background:'none', border:`1px solid ${C.border}`, borderRadius:8, cursor:'pointer', padding:'4px 12px', fontSize:16, color:C.text2, fontFamily:'inherit' }}>›</button>
+          <button onClick={goToday} style={{ background:'none', border:`1px solid ${C.orange}`, borderRadius:8, cursor:'pointer', padding:'4px 10px', fontSize:11, color:C.orange, fontFamily:'inherit' }}>今日</button>
+        </div>
+        {/* Day headers */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2, marginBottom:2 }}>
+          {['日','月','火','水','木','金','土'].map((d,i) => (
+            <div key={d} style={{ textAlign:'center', fontSize:11, fontWeight:600, color:i===0?'#b85050':i===6?'#5878a0':C.text3, padding:'4px 0' }}>{d}</div>
+          ))}
+        </div>
+        {/* Calendar grid */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
+          {cells.map((dateStr, i) => {
+            if (!dateStr) return <div key={`empty-${i}`} />;
+            const day = parseInt(dateStr.slice(-2));
+            const dayOfWeek = new Date(dateStr).getDay();
+            const dateTasks = tasksByDate[dateStr] || [];
+            const hasTasks = dateTasks.length > 0;
+            const hasIncomplete = dateTasks.some(t => t.status !== 'done');
+            const isToday = dateStr === todayStr;
+            const isSelected = dateStr === selectedDate;
+            const isOverdue = hasTasks && dateTasks.some(t => t.status !== 'done' && new Date(dateStr) < today);
+
+            let bg = '#fff';
+            let border = C.border;
+            let numColor = dayOfWeek === 0 ? '#b85050' : dayOfWeek === 6 ? '#5878a0' : C.text;
+            if (isSelected) { bg = C.orangeBg; border = C.orange; }
+            else if (isToday) { bg = '#f0f8ff'; border = '#5878a0'; }
+
+            return (
+              <div key={dateStr} onClick={() => setSelectedDate(dateStr === selectedDate ? null : dateStr)}
+                style={{ minHeight:60, padding:'4px 6px', background:bg, border:`1.5px solid ${border}`, borderRadius:8, cursor:hasTasks?'pointer':'default', transition:'all 0.12s', position:'relative' }}
+                onMouseEnter={e=>{ if(hasTasks){e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.background=C.orangeBg;} }}
+                onMouseLeave={e=>{ e.currentTarget.style.borderColor=isSelected?C.orange:isToday?'#5878a0':C.border; e.currentTarget.style.background=isSelected?C.orangeBg:isToday?'#f0f8ff':'#fff'; }}>
+                <div style={{ fontSize:13, fontWeight:isToday?700:400, color:isToday?'#5878a0':numColor, textAlign:'right' }}>
+                  {isToday ? <span style={{ background:'#5878a0', color:'#fff', borderRadius:999, padding:'1px 6px', fontSize:12 }}>{day}</span> : day}
+                </div>
+                {hasTasks && (
+                  <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginTop:2 }}>
+                    {isOverdue && <span style={{ width:7, height:7, borderRadius:'50%', background:'#b85050', flexShrink:0 }} title="期限切れあり" />}
+                    {hasIncomplete && !isOverdue && <span style={{ width:7, height:7, borderRadius:'50%', background:C.orange, flexShrink:0 }} title="未完了あり" />}
+                    {!hasIncomplete && <span style={{ width:7, height:7, borderRadius:'50%', background:C.green, flexShrink:0 }} title="すべて完了" />}
+                    <span style={{ fontSize:10, color:C.text3 }}>{dateTasks.length}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {/* Selected date tasks */}
+        {selectedDate && (
+          <div style={{ marginTop:16, borderTop:`1px solid ${C.border}`, paddingTop:12 }}>
+            <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:10 }}>
+              {(() => { const [,m,d] = selectedDate.split('-'); return `${parseInt(m)}月${parseInt(d)}日`; })()}のタスク
+              {selectedTasks.length === 0 && <span style={{ fontWeight:400, color:C.text3, marginLeft:8 }}>なし</span>}
+            </div>
+            {selectedTasks.map(t => {
+              const proj = projects.find(p => p.id === t.projectId);
+              const assignees = (t.assigneeIds || []).map(id => members.find(m => m.id === id)?.name).filter(Boolean);
+              const isDone = t.status === 'done';
+              const ds = getDueStyle(t.due);
+              return (
+                <div key={t.id} onClick={() => onOpenTask(t)}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', marginBottom:4, background:'#fff', border:`1px solid ${C.border}`, borderRadius:10, cursor:'pointer', transition:'all 0.12s', opacity:isDone?0.6:1 }}
+                  onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.orange; e.currentTarget.style.boxShadow='0 2px 8px rgba(224,120,64,0.10)'; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.boxShadow='none'; }}>
+                  <span style={{ fontSize:14, flexShrink:0 }}>{isDone?'✅':t.status==='progress'?'🔵':'⬜'}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:500, color:C.text, textDecoration:isDone?'line-through':'none', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.title}</div>
+                    <div style={{ display:'flex', gap:8, marginTop:2, fontSize:11, color:C.text3 }}>
+                      {proj && <span style={{ color:C.text2 }}>{proj.name}</span>}
+                      {assignees.length > 0 && <span>👤 {assignees.join(', ')}</span>}
+                    </div>
+                  </div>
+                  {!isDone && ds.bg !== 'transparent' && (
+                    <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, background:ds.bg, color:ds.color, border:`1px solid ${ds.border}`, whiteSpace:'nowrap', flexShrink:0 }}>
+                      {ds.overdue ? `${ds.overdue}日超過` : fmtDate(t.due)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── App ───────────────────────────────────────────────────────────────────
 function Workflow() {
   const [data, setData] = useState(()=>loadData());
@@ -866,11 +1606,19 @@ function Workflow() {
   const setProjFilterSaved = (v) => { setProjFilter(v); try { localStorage.setItem('wf_projFilter', v); } catch {} };
   const [view, setView] = useState('kanban');
   const [memberFilter, setMemberFilter] = useState('all');
-  const [isTsuge, setIsTsuge] = useState(false);
-  const [myMemberId, setMyMemberId] = useState(() => { try { return localStorage.getItem('wf_myMemberId') || ''; } catch { return ''; } });
-  const setMyMemberIdSaved = v => { setMyMemberId(v); try { localStorage.setItem('wf_myMemberId', v); } catch {} };
+  const isDev = window.location.hostname.includes('-dev');
+  const { isAdmin, memberId: authMemberId, displayName: authDisplayName } = useAuth();
+  const isTsuge = isDev ? isAdmin : true;
+  const myMemberId = authMemberId;
+  useEffect(() => {
+    if (authMemberId) { try { localStorage.setItem('wf_myMemberId', authMemberId); } catch {} }
+  }, [authMemberId]);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [closedProjOpen, setClosedProjOpen] = useState(false);
+  const [openMonths, setOpenMonths] = useState(()=>{ const m=new Date().toISOString().slice(0,7); return {event:{[m]:true},other:{[m]:true}}; });
+  const toggleMonth = (section,month)=>setOpenMonths(prev=>({...prev,[section]:{...prev[section],[month]:!prev[section][month]}}));
+  const [timerTask, setTimerTask] = useState(null);
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handler);
@@ -880,14 +1628,57 @@ function Workflow() {
   // 他タブ（eventstaff-shift等）でlocalStorage変更があったら即反映
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === KEY) setData(loadData());
+      if (e.key === KEY) {
+        console.log('[storage event] data overwritten by other tab');
+        setGasFetchDebug(prev => prev + ' | STORAGE_OVERWRITE');
+        setData(loadData());
+      }
     };
     window.addEventListener('storage', handler);
     return () => window.removeEventListener('storage', handler);
   }, []);
 
+  // ── Event Staff data ──
+  const [esEvents, setEsEvents] = useState(() => { try { return JSON.parse(localStorage.getItem('staff_mgmt_events')) || []; } catch { return []; } });
+  const [esStaffs, setEsStaffs] = useState(() => { try { return JSON.parse(localStorage.getItem('staff_mgmt_staffs')) || []; } catch { return []; } });
+  const [staffRoles, setStaffRoles] = useState(() => { try { return JSON.parse(localStorage.getItem('wf_staff_roles')) || {}; } catch { return {}; } });
+  const [staffOrder, setStaffOrder] = useState(() => { try { return JSON.parse(localStorage.getItem('wf_staff_order')) || {}; } catch { return {}; } });
+  useEffect(() => { try { localStorage.setItem('wf_staff_roles', JSON.stringify(staffRoles)); } catch {} }, [staffRoles]);
+  useEffect(() => { try { localStorage.setItem('wf_staff_order', JSON.stringify(staffOrder)); } catch {} }, [staffOrder]);
+  const [dragStaff, setDragStaff] = useState(null);
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'staff_mgmt_events') { try { setEsEvents(JSON.parse(e.newValue) || []); } catch {} }
+      if (e.key === 'staff_mgmt_staffs') { try { setEsStaffs(JSON.parse(e.newValue) || []); } catch {} }
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, []);
+  function getConfirmedStaff(projectId) {
+    if (!String(projectId).startsWith('es_ev_')) return [];
+    const evId = String(projectId).replace('es_ev_', '');
+    const ev = esEvents.find(e => String(e.id) === evId);
+    if (!ev || !ev.staffAssignments) return [];
+    return ev.staffAssignments
+      .filter(a => a.status === 'confirmed' || a.status === 'worked' || a.status === 'leader')
+      .map(a => {
+        const s = esStaffs.find(x => String(x.id) === String(a.staffId));
+        return { staffId: a.staffId, name: s?.name || '?', status: a.status, isLeader: a.isLeader };
+      });
+  }
+  function getConfirmedMakers(projectId) {
+    if (!String(projectId).startsWith('es_ev_')) return [];
+    const evId = String(projectId).replace('es_ev_', '');
+    const ev = esEvents.find(e => String(e.id) === evId);
+    if (!ev || !ev.makers || !ev.makers.length) return [];
+    const presence = ev.makerAttendance?.presence || {};
+    return ev.makers
+      .filter(name => presence[name] === 'confirmed')
+      .map(name => ({ name }));
+  }
+
   const [taskModal, setTaskModal] = useState({ open:false, data:null, defaultStatus:'todo' });
-  const [projModal, setProjModal] = useState({ open:false, data:null });
+  const [projModal, setProjModal] = useState({ open:false, data:null, defaultType:null });
   const [memberModal, setMemberModal] = useState(false);
   const [pinModal, setPinModal] = useState({ open:false, mode:'unlock' });
   const [dupModal, setDupModal] = useState({ open:false, project:null });
@@ -895,7 +1686,20 @@ function Workflow() {
   const [taskOrder, setTaskOrder] = useState(() => { try { const v = localStorage.getItem('wf_taskOrder'); return v ? JSON.parse(v) : {}; } catch { return {}; } });
 
   // ── GAS Sync ────────────────────────────────────────────────────────────
-  const [wfGasUrl] = useState(() => { try { return localStorage.getItem('wf_gasUrl') || ''; } catch { return ''; } });
+  const [wfGasUrl, setWfGasUrl] = useState(() => { try { return localStorage.getItem('wf_gasUrl') || ''; } catch { return ''; } });
+  // FirebaseからWorkflow GAS URLを取得（管理者が設定した共有URL）
+  useEffect(() => {
+    import("firebase/database").then(({ ref: fbRef, onValue })=>{
+      import("./firebase").then(({ db: fbDb })=>{
+        if (!fbDb) return;
+        const unsub = onValue(fbRef(fbDb, "config/wfGasUrl"), (snap)=>{
+          const url = snap.val();
+          if (url) { setWfGasUrl(url); try { localStorage.setItem('wf_gasUrl', url); } catch {} }
+        });
+        return ()=>unsub();
+      });
+    });
+  }, []);
   const [syncStatus, setSyncStatus] = useState('');
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const syncVersionRef = useRef(0);
@@ -903,9 +1707,11 @@ function Workflow() {
   const wfGasUrlRef = useRef(wfGasUrl);
   useEffect(() => { wfGasUrlRef.current = wfGasUrl; }, [wfGasUrl]);
 
+  const [gasFetchDebug, setGasFetchDebug] = useState('未取得');
   const fetchFromGAS = useCallback(async (url) => {
     try {
-      const res = await fetch(`${url}?action=getWorkflowData`);
+      setGasFetchDebug('取得中...');
+      const res = await fetch(`${url}?action=getWorkflowData&_t=${Date.now()}`);
       const json = await res.json();
       if (json.ok) {
         setLastSyncedAt(new Date());
@@ -918,11 +1724,16 @@ function Workflow() {
           const gasProjs = (json.data.projects||[]).filter(p => !String(p.id).startsWith('es_ev_'));
           const gasTasks = (json.data.tasks||[]).filter(t => !String(t.projectId).startsWith('es_ev_'));
           const merged = { ...json.data, projects: [...gasProjs, ...localEsProjs], tasks: [...gasTasks, ...localEsTasks] };
-          setData(merged);
           saveData(merged);
+          setData(merged);
+          setGasFetchDebug(`OK GAS:${(json.data.projects||[]).length} gasNonEs:${gasProjs.length} localEs:${localEsProjs.length} merged:${merged.projects.length}`);
+        } else {
+          setGasFetchDebug(`skip v${json.version}<=v${syncVersionRef.current}`);
         }
+      } else {
+        setGasFetchDebug(`NG: ${JSON.stringify(json).slice(0,50)}`);
       }
-    } catch {}
+    } catch (e) { setGasFetchDebug(`ERR: ${e.message}`); }
   }, []);
 
   useEffect(() => {
@@ -936,6 +1747,7 @@ function Workflow() {
   }, [wfGasUrl, fetchFromGAS]);
 
   function schedulePush(d) {
+    if (!isTsuge) return;
     const url = wfGasUrlRef.current;
     if (!url) return;
     clearTimeout(pushTimerRef.current);
@@ -955,7 +1767,10 @@ function Workflow() {
     }, 1500);
   }
 
-  const update = useCallback((d)=>{ setData(d); saveData(d); schedulePush(d); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const updateRef = useRef(null);
+  updateRef.current = (d) => { setData(d); saveData(d); schedulePush(d); };
+  function update(d) { updateRef.current(d); }
+
 
   // ── Mutations ──────────────────────────────────────────────────────────
   function saveTask(t) {
@@ -973,6 +1788,7 @@ function Workflow() {
   }
   function deleteTask(id) { update({ ...data, tasks:data.tasks.filter(t=>t.id!==id) }); }
   function changeStatus(id, status) {
+    if (status==='__delete__') { deleteTask(id); return; }
     update({ ...data, tasks:data.tasks.map(t=>{
       if (t.id!==id) return t;
       if (status==='done' && t.status!=='done') return { ...t, status, doneAt:new Date().toISOString().slice(0,10) };
@@ -1000,8 +1816,19 @@ function Workflow() {
   }
 
   function saveProject(p) {
-    const projects = data.projects.find(x=>x.id===p.id) ? data.projects.map(x=>x.id===p.id?p:x) : [...data.projects,p];
+    const old = data.projects.find(x=>x.id===p.id);
+    const projects = old ? data.projects.map(x=>x.id===p.id?p:x) : [...data.projects,p];
     update({ ...data, projects });
+    if (old && old.name !== p.name) {
+      try {
+        const tsLogs = JSON.parse(localStorage.getItem('wl_logs') || '[]');
+        const updated = tsLogs.map(l => l.project === old.name ? { ...l, project: p.name } : l);
+        localStorage.setItem('wl_logs', JSON.stringify(updated));
+        const tsProjects = JSON.parse(localStorage.getItem('wl_projects') || '[]');
+        const updatedProjects = tsProjects.map(n => n === old.name ? p.name : n);
+        localStorage.setItem('wl_projects', JSON.stringify(updatedProjects));
+      } catch {}
+    }
   }
   function deleteProject(id) {
     if(projFilter===id) setProjFilterSaved('all');
@@ -1030,6 +1857,17 @@ function Workflow() {
       });
     update({ ...data, projects:[...data.projects,newProj], tasks:[...data.tasks,...newTasks] });
   }
+
+  // ── Event Calendar Sync ──────────────────────────────────────────────────
+  useEffect(() => {
+    const calGasUrl = (() => { try { const v = localStorage.getItem('wl_calGasUrl'); if (!v) return ''; try { return JSON.parse(v); } catch { return v; } } catch { return ''; } })();
+    if (!calGasUrl) return;
+    const events = data.projects
+      .filter(p => p.type === 'event' && p.eventDate && !p.closed)
+      .map(p => ({ name: p.name, date: p.eventDate }));
+    if (!events.length) return;
+    fetch(calGasUrl, { method: 'POST', body: JSON.stringify({ action: 'syncEventDates', events }), redirect: 'follow' }).catch(() => {});
+  }, [data.projects]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Google Calendar Sync ─────────────────────────────────────────────────
   useEffect(() => {
@@ -1066,22 +1904,61 @@ function Workflow() {
     update({ ...data, tasks:[...data.tasks, newTask] });
   }
 
-  // Visible projects (hide private unless Tsuge)
+  function copyCategoryToProject(categoryTasks, targetProjectId) {
+    const targetProj = data.projects.find(p=>p.id===targetProjectId);
+    if (!targetProj) return;
+    const newTasks = categoryTasks.map(t => ({
+      ...t, id:genId(), projectId:targetProjectId, status:'todo', due:'',
+    }));
+    // Remove doneAt from copied tasks
+    newTasks.forEach(t => { delete t.doneAt; });
+    update({ ...data, tasks:[...data.tasks, ...newTasks] });
+  }
+
+  // Visible projects: admin sees all, members see only projects they're added to
   const visibleProjects = data.projects.filter(p => {
-    if (p.isPrivate && !isTsuge) return false;
-    if (!isTsuge && p.visibleMemberIds && p.visibleMemberIds.length > 0 && myMemberId) {
+    if (isTsuge) return true; // admin sees everything
+    if (p.isPrivate) return false;
+    if (!myMemberId) return false;
+    if (p.visibleMemberIds && p.visibleMemberIds.length > 0) {
       return p.visibleMemberIds.includes(myMemberId);
     }
-    return true;
+    return false; // members only see projects they're explicitly added to
   });
+
+  // デバッグ用（後で削除）
+  const _debugInfo = {
+    myMemberId,
+    gasUrl: wfGasUrl ? '有' : '無',
+    totalProjects: data.projects.length,
+    visibleCount: visibleProjects.length,
+    projectsWithMe: data.projects.filter(p => (p.visibleMemberIds||[]).includes(myMemberId)).length,
+    sampleVisibleMemberIds: data.projects.slice(0,3).map(p => ({ name: p.name?.slice(0,10), vids: (p.visibleMemberIds||[]).join(',').slice(0,30) })),
+    syncStatus,
+    isTsuge,
+    membersCount: data.members.length,
+    gasFetch: gasFetchDebug,
+  };
   const activeProjects = visibleProjects.filter(p=>!p.closed);
   const closedProjects = visibleProjects.filter(p=>p.closed).sort((a,b)=>(b.eventDate||b.end||'').localeCompare(a.eventDate||a.end||''));
-  const eventProjects = activeProjects.filter(p=>p.type==='event').sort((a,b)=>(a.eventDate||'').localeCompare(b.eventDate||''));
-  const otherProjects = activeProjects.filter(p=>p.type!=='event');
+  const eventProjects = activeProjects.filter(p=>p.type==='event').sort((a,b)=>(b.eventDate||'').localeCompare(a.eventDate||''));
+  const otherProjects = activeProjects.filter(p=>p.type!=='event').sort((a,b)=>(b.start||b.end||'').localeCompare(a.start||a.end||''));
+  const groupByMonth = (projects, dateKey) => {
+    const groups = {};
+    projects.forEach(p => {
+      const d = dateKey(p);
+      const month = d ? d.slice(0,7) : '日付なし';
+      if (!groups[month]) groups[month] = [];
+      groups[month].push(p);
+    });
+    return Object.entries(groups).sort((a,b)=> a[0]==='日付なし'?1:b[0]==='日付なし'?-1:b[0].localeCompare(a[0]));
+  };
+  const eventByMonth = groupByMonth(eventProjects, p=>p.eventDate);
+  const closedByMonth = groupByMonth(closedProjects, p=>p.eventDate||p.end);
 
   const closedProjectIds = new Set(closedProjects.map(p=>p.id));
   const filteredTasks = data.tasks
-    .filter(t=>{ const pj=data.projects.find(p=>p.id===t.projectId); return pj?(!pj.isPrivate||isTsuge):true; })
+    .filter(t=>{ const pj=data.projects.find(p=>p.id===t.projectId); return pj ? visibleProjects.some(vp=>vp.id===pj.id) : isTsuge; })
     .filter(t=>!t.isPrivate||isTsuge)
     .filter(t=>projFilter==='all'?!closedProjectIds.has(t.projectId):t.projectId===projFilter)
     .filter(t=>memberFilter==='all'||(t.assigneeIds||[]).includes(memberFilter));
@@ -1090,6 +1967,10 @@ function Workflow() {
 
   return (
     <div style={{ height:'100vh',background:C.cream,color:C.text,fontFamily:"'Noto Sans JP',sans-serif",fontSize:13,display:'flex',flexDirection:'column',overflow:'hidden' }}>
+      <div style={{ background:'#333',color:'#0f0',fontSize:10,padding:'6px 12px',fontFamily:'monospace',whiteSpace:'pre-wrap',zIndex:9999 }}>
+        {`ID:${_debugInfo.myMemberId||'なし'} | GAS:${_debugInfo.gasUrl} | fetch:${_debugInfo.gasFetch} | 全PJ:${_debugInfo.totalProjects} | 表示PJ:${_debugInfo.visibleCount} | 自分含むPJ:${_debugInfo.projectsWithMe} | admin:${_debugInfo.isTsuge} | sync:${_debugInfo.syncStatus||'idle'} | members:${_debugInfo.membersCount}\n`}
+        {_debugInfo.sampleVisibleMemberIds.map(p=>`${p.name}: [${p.vids||'空'}]`).join(' | ')}
+      </div>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600&family=Playfair+Display:ital@0;1&display=swap');
         * { box-sizing:border-box; margin:0; padding:0; }
@@ -1113,12 +1994,10 @@ function Workflow() {
           {wfGasUrl && <span style={{ fontSize:10, color:syncStatus==='error'?C.red:syncStatus==='syncing'||syncStatus==='pending'?C.amber:C.text3, transition:'color 0.3s', whiteSpace:'nowrap' }}>
             {syncStatus==='syncing'?'⟳ 同期中…':syncStatus==='pending'?'…':syncStatus==='error'?'⚠ 同期失敗':lastSyncedAt?`✓ ${lastSyncedAt.getHours().toString().padStart(2,'0')}:${lastSyncedAt.getMinutes().toString().padStart(2,'0')} 同期済`:'接続中…'}
           </span>}
-          {data.members.length>0 && (
-            <select value={myMemberId} onChange={e=>setMyMemberIdSaved(e.target.value)}
-              style={{ padding:'5px 10px',borderRadius:999,border:`1px solid ${myMemberId?C.blue:C.border}`,background:myMemberId?C.blue+'18':'transparent',color:myMemberId?C.blue:C.text2,fontSize:11,fontFamily:'inherit',cursor:'pointer',outline:'none',maxWidth:120 }}>
-              <option value="">👤 自分を設定</option>
-              {data.members.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+          {authMemberId && (
+            <span style={{ padding:'5px 10px',borderRadius:999,border:`1px solid ${C.blue}`,background:C.blue+'18',color:C.blue,fontSize:11,fontFamily:'inherit',maxWidth:120,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis' }}>
+              {data.members.find(m=>m.id===authMemberId)?.name || authDisplayName}
+            </span>
           )}
         </>}
       />
@@ -1139,35 +2018,53 @@ function Workflow() {
             <SidebarItem label="すべて" color={C.text3} count={data.tasks.filter(t=>!closedProjectIds.has(t.projectId)).length} active={projFilter==='all'} onClick={()=>{ setProjFilterSaved('all'); if(isMobile) setSidebarOpen(false); }}/>
 
             {/* Events */}
-            {eventProjects.length>0 && <>
-              <div style={{ fontSize:10,fontWeight:700,letterSpacing:1,color:C.text3,textTransform:'uppercase',padding:'12px 4px 6px' }}>イベント</div>
-              {eventProjects.map(p=><SidebarItem key={p.id} label={p.name} color={p.color} count={data.tasks.filter(t=>t.projectId===p.id).length} active={projFilter===p.id} onClick={()=>{ setProjFilterSaved(p.id); if(isMobile) setSidebarOpen(false); }} onContextMenu={e=>{ e.preventDefault(); setProjModal({open:true,data:p}); }} isPrivate={p.isPrivate} restricted={p.visibleMemberIds&&p.visibleMemberIds.length>0}/>)}
-            </>}
+            <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 4px 6px' }}>
+              <span style={{ fontSize:10,fontWeight:700,letterSpacing:1,color:C.text3,textTransform:'uppercase' }}>イベント</span>
+              <button onClick={()=>setProjModal({open:true,data:null,defaultType:'event'})} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
+                onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.orange; e.currentTarget.style.color=C.orange; }}
+                onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; }}>＋</button>
+            </div>
+            {eventByMonth.map(([month, ps])=>{ const label = month==='日付なし'?'日付なし':`${month.slice(0,4)}年${parseInt(month.slice(5))}月`; const isOpen = openMonths.event?.[month]; return <div key={month}>
+              <div onClick={()=>toggleMonth('event',month)} style={{ display:'flex',alignItems:'center',gap:4,padding:'4px 8px',cursor:'pointer',borderRadius:4 }}
+                onMouseEnter={e=>e.currentTarget.style.background=C.cream3||'#f5f0eb'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                <span style={{ fontSize:9,color:C.text3,width:10 }}>{isOpen?'▼':'▶'}</span>
+                <span style={{ fontSize:10,color:C.text3,fontWeight:600 }}>{label}</span>
+                <span style={{ fontSize:9,color:C.text3,opacity:0.6 }}>({ps.length})</span>
+              </div>
+              {isOpen && ps.map(p=><SidebarItem key={p.id} label={p.name} color={p.color} count={data.tasks.filter(t=>t.projectId===p.id).length} active={projFilter===p.id} onClick={()=>{ setProjFilterSaved(p.id); if(isMobile) setSidebarOpen(false); }} onContextMenu={e=>{ e.preventDefault(); setProjModal({open:true,data:p}); }} isPrivate={p.isPrivate} restricted={p.visibleMemberIds&&p.visibleMemberIds.length>0}/>)}
+            </div>; })}
 
             {/* Other */}
-            {otherProjects.length>0 && <>
-              <div style={{ fontSize:10,fontWeight:700,letterSpacing:1,color:C.text3,textTransform:'uppercase',padding:'12px 4px 6px' }}>その他</div>
-              {otherProjects.map(p=><SidebarItem key={p.id} label={p.name} color={p.color} count={data.tasks.filter(t=>t.projectId===p.id).length} active={projFilter===p.id} onClick={()=>{ setProjFilterSaved(p.id); if(isMobile) setSidebarOpen(false); }} onContextMenu={e=>{ e.preventDefault(); setProjModal({open:true,data:p}); }} isPrivate={p.isPrivate} restricted={p.visibleMemberIds&&p.visibleMemberIds.length>0}/>)}
-            </>}
+            <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 4px 6px' }}>
+              <span style={{ fontSize:10,fontWeight:700,letterSpacing:1,color:C.text3,textTransform:'uppercase' }}>その他</span>
+              <button onClick={()=>setProjModal({open:true,data:null,defaultType:'other'})} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
+                onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.orange; e.currentTarget.style.color=C.orange; }}
+                onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; }}>＋</button>
+            </div>
+            {otherProjects.map(p=><SidebarItem key={p.id} label={p.name} color={p.color} count={data.tasks.filter(t=>t.projectId===p.id).length} active={projFilter===p.id} onClick={()=>{ setProjFilterSaved(p.id); if(isMobile) setSidebarOpen(false); }} onContextMenu={e=>{ e.preventDefault(); setProjModal({open:true,data:p}); }} isPrivate={p.isPrivate} restricted={p.visibleMemberIds&&p.visibleMemberIds.length>0}/>)}
 
-            {/* Closed */}
+            {/* Closed (accordion) */}
             {closedProjects.length>0 && <>
-              <div style={{ fontSize:10,fontWeight:700,letterSpacing:1,color:C.text3,textTransform:'uppercase',padding:'12px 4px 6px',opacity:0.6 }}>終了したプロジェクト</div>
-              {closedProjects.map(p=><SidebarItem key={p.id} label={p.name} color={C.text3} count={data.tasks.filter(t=>t.projectId===p.id).length} active={projFilter===p.id} onClick={()=>{ setProjFilterSaved(p.id); if(isMobile) setSidebarOpen(false); }} onContextMenu={e=>{ e.preventDefault(); setProjModal({open:true,data:p}); }} isPrivate={p.isPrivate} restricted={p.visibleMemberIds&&p.visibleMemberIds.length>0}/>)}
+              <div onClick={()=>setClosedProjOpen(!closedProjOpen)} style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 4px 6px',cursor:'pointer',opacity:0.6 }}>
+                <span style={{ fontSize:10,fontWeight:700,letterSpacing:1,color:C.text3,textTransform:'uppercase' }}>終了したプロジェクト ({closedProjects.length})</span>
+                <span style={{ fontSize:10,color:C.text3 }}>{closedProjOpen?'▼':'▶'}</span>
+              </div>
+              {closedProjOpen && closedByMonth.map(([month, ps])=>{ const label = month==='日付なし'?'日付なし':`${month.slice(0,4)}年${parseInt(month.slice(5))}月`; const isOpen = openMonths.closed?.[month]; return <div key={month}>
+                <div onClick={()=>toggleMonth('closed',month)} style={{ display:'flex',alignItems:'center',gap:4,padding:'4px 8px',cursor:'pointer',borderRadius:4 }}
+                  onMouseEnter={e=>e.currentTarget.style.background=C.cream3||'#f5f0eb'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <span style={{ fontSize:9,color:C.text3,width:10 }}>{isOpen?'▼':'▶'}</span>
+                  <span style={{ fontSize:10,color:C.text3,fontWeight:600 }}>{label}</span>
+                  <span style={{ fontSize:9,color:C.text3,opacity:0.6 }}>({ps.length})</span>
+                </div>
+                {isOpen && ps.map(p=><SidebarItem key={p.id} label={p.name} color={C.text3} count={data.tasks.filter(t=>t.projectId===p.id).length} active={projFilter===p.id} onClick={()=>{ setProjFilterSaved(p.id); if(isMobile) setSidebarOpen(false); }} onContextMenu={e=>{ e.preventDefault(); setProjModal({open:true,data:p}); }} isPrivate={p.isPrivate} restricted={p.visibleMemberIds&&p.visibleMemberIds.length>0}/>)}
+              </div>; })}
             </>}
-
-            <button onClick={()=>setProjModal({open:true,data:null})} style={{ display:'flex',alignItems:'center',gap:5,width:'100%',padding:'8px 10px',borderRadius:10,border:`1.5px dashed ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',marginTop:10,transition:'all 0.12s' }}
-              onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.orange; e.currentTarget.style.color=C.orange; e.currentTarget.style.background=C.orangeBg; }}
-              onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; e.currentTarget.style.background='transparent'; }}>
-              ＋ プロジェクト追加
-            </button>
           </div>
-          {data.members.find(m=>m.id===myMemberId&&m.name.includes('柘植')) && (
+          {isAdmin && (
             <div style={{ marginTop:'auto',padding:'12px 14px',borderTop:`1px solid ${C.border}` }}>
-              <button onClick={()=>{ if(isTsuge){setIsTsuge(false);} else { const pin=localStorage.getItem(PIN_KEY); setPinModal({open:true,mode:pin?'unlock':'setup'}); } }}
-                style={{ background:'none',border:'none',cursor:'pointer',fontSize:11,opacity:isTsuge?0.45:0.18,padding:0,color:C.text3,fontFamily:'inherit',display:'flex',alignItems:'center',gap:4 }}>
-                {isTsuge?'🔓':'🔒'}<span style={{ fontSize:10 }}>{isTsuge?'管理中':'管理'}</span>
-              </button>
+              <span style={{ fontSize:11,opacity:0.45,color:C.text3,fontFamily:'inherit',display:'flex',alignItems:'center',gap:4 }}>
+                🔓<span style={{ fontSize:10 }}>管理者</span>
+              </span>
             </div>
           )}
         </div>
@@ -1183,7 +2080,7 @@ function Workflow() {
                 )}
                 <div style={{ fontSize:15,fontWeight:600,color:C.text }}>{projName}</div>
                 <div style={{ display:'flex',gap:2,background:C.cream3,borderRadius:999,padding:2 }}>
-                  {[['kanban','カンバン'],['list','リスト'],['member','メンバー別']].map(([v,l])=>(
+                  {[['kanban','カンバン'],['list','リスト'],['calendar','カレンダー'],['member','メンバー別']].map(([v,l])=>(
                     <button key={v} onClick={()=>setView(v)} style={{ padding:'5px 11px',borderRadius:999,border:'none',background:view===v?'#fff':'transparent',color:view===v?C.orange:C.text2,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:view===v?500:400,boxShadow:view===v?'0 1px 3px rgba(58,53,48,0.12)':'none',transition:'all 0.12s' }}>{l}</button>
                   ))}
                 </div>
@@ -1207,22 +2104,108 @@ function Workflow() {
             </div>
             {projFilter !== 'all' && (()=>{
               const _pj = visibleProjects.find(p=>p.id===projFilter);
-              if (!_pj || (!_pj.memo && !(_pj.links?.length>0))) return null;
-              return (
-                <div style={{ padding:'6px 24px',borderBottom:`1px solid ${C.border}`,background:'#fff',display:'flex',alignItems:'center',gap:16,flexShrink:0,flexWrap:'wrap' }}>
-                  {_pj.memo && <span style={{ fontSize:11,color:C.text2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:400 }}>📝 {_pj.memo}</span>}
-                  {_pj.links?.map((lk,_i)=>(
-                    <a key={_i} href={lk.url} target="_blank" rel="noreferrer" style={{ fontSize:11,color:C.blue,textDecoration:'none',whiteSpace:'nowrap',flexShrink:0 }}
-                      onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-                      onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-                      🔗 {lk.label||lk.url}
-                    </a>
-                  ))}
-                </div>
-              );
+              if (!_pj) return null;
+              const confirmedStaff = getConfirmedStaff(_pj.id);
+              const confirmedMakers = getConfirmedMakers(_pj.id);
+              const hasMemo = !!_pj.memo;
+              const hasLinks = _pj.links?.length > 0;
+              const hasStaff = confirmedStaff.length > 0;
+              const hasMakers = confirmedMakers.length > 0;
+              if (!hasMemo && !hasLinks && !hasStaff && !hasMakers) return null;
+              return (<>
+                {(hasMemo || hasLinks) && (
+                  <div style={{ padding:'6px 24px',borderBottom:`1px solid ${C.border}`,background:'#fff',display:'flex',alignItems:'center',gap:16,flexShrink:0,flexWrap:'wrap' }}>
+                    {_pj.memo && <span style={{ fontSize:11,color:C.text2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:400 }}>📝 {_pj.memo}</span>}
+                    {_pj.links?.map((lk,_i)=>(
+                      <a key={_i} href={lk.url} target="_blank" rel="noreferrer" style={{ fontSize:11,color:C.blue,textDecoration:'none',whiteSpace:'nowrap',flexShrink:0 }}
+                        onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+                        onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+                        🔗 {lk.label||lk.url}
+                      </a>
+                    ))}
+                  </div>
+                )}
+                {hasStaff && (()=>{
+                  const order = staffOrder[_pj.id] || [];
+                  const sorted = [...confirmedStaff].sort((a,b)=>{
+                    const ia = order.indexOf(String(a.staffId));
+                    const ib = order.indexOf(String(b.staffId));
+                    if (ia>=0 && ib>=0) return ia-ib;
+                    if (ia>=0) return -1;
+                    if (ib>=0) return 1;
+                    return 0;
+                  });
+                  return (
+                  <div style={{ padding:'8px 24px',borderBottom:`1px solid ${C.border}`,background:'#fefcfa',flexShrink:0 }}>
+                    <div style={{ fontSize:10,fontWeight:600,color:C.text3,letterSpacing:0.3,marginBottom:6 }}>確定スタッフ（{sorted.length}名）</div>
+                    <div style={{ display:'flex',flexWrap:'wrap',gap:6 }}>
+                      {sorted.map(s => {
+                        const roleKey = `${_pj.id}_${s.staffId}`;
+                        const role = staffRoles[roleKey] || '';
+                        const isDragging = dragStaff === String(s.staffId);
+                        return (
+                          <div key={s.staffId}
+                            draggable
+                            onDragStart={e=>{setDragStaff(String(s.staffId));e.dataTransfer.effectAllowed='move';}}
+                            onDragEnd={()=>setDragStaff(null)}
+                            onDragOver={e=>{e.preventDefault();e.dataTransfer.dropEffect='move';}}
+                            onDrop={e=>{
+                              e.preventDefault();
+                              if(!dragStaff||dragStaff===String(s.staffId)) return;
+                              const ids = sorted.map(x=>String(x.staffId));
+                              const fromIdx = ids.indexOf(dragStaff);
+                              const toIdx = ids.indexOf(String(s.staffId));
+                              if(fromIdx<0||toIdx<0) return;
+                              ids.splice(fromIdx,1);
+                              ids.splice(toIdx,0,dragStaff);
+                              setStaffOrder(prev=>({...prev,[_pj.id]:ids}));
+                              setDragStaff(null);
+                            }}
+                            style={{ display:'flex',alignItems:'center',gap:4,padding:'4px 8px',borderRadius:8,background:isDragging?C.orangeBg:'#fff',border:`1px solid ${isDragging?C.orange:C.border}`,fontSize:11,cursor:'grab',opacity:isDragging?0.6:1,transition:'opacity 0.1s,border 0.1s',touchAction:'none' }}>
+                            <span style={{ fontWeight:600,color:s.isLeader?C.orange:C.text,whiteSpace:'nowrap' }}>{s.isLeader?'★':''}{s.name}</span>
+                            <input
+                              value={role}
+                              onChange={e=>setStaffRoles(prev=>({...prev,[roleKey]:e.target.value}))}
+                              placeholder="役割"
+                              style={{ border:'none',outline:'none',fontSize:10,color:C.text2,background:'transparent',width:role?Math.max(40,role.length*12):40,padding:'2px 4px',fontFamily:'inherit' }}
+                              onFocus={e=>{e.target.style.borderBottom=`1px solid ${C.orange}`;e.target.parentElement.draggable=false;}}
+                              onBlur={e=>{e.target.style.borderBottom='none';e.target.parentElement.draggable=true;}}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  );
+                })()}
+                {hasMakers && (
+                  <div style={{ padding:'8px 24px',borderBottom:`1px solid ${C.border}`,background:'#fefcfa',flexShrink:0 }}>
+                    <div style={{ fontSize:10,fontWeight:600,color:C.text3,letterSpacing:0.3,marginBottom:6 }}>参加確定 作り手（{confirmedMakers.length}名）</div>
+                    <div style={{ display:'flex',flexWrap:'wrap',gap:6 }}>
+                      {confirmedMakers.map(m => (
+                        <div key={m.name} style={{ display:'flex',alignItems:'center',gap:4,padding:'4px 10px',borderRadius:8,background:'#fff',border:`1px solid ${C.border}`,fontSize:11 }}>
+                          <span style={{ color:'#5a9070',fontWeight:600 }}>🌿</span>
+                          <span style={{ fontWeight:500,color:C.text }}>{m.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>);
             })()}
-            {view==='kanban' && <KanbanView tasks={filteredTasks} projects={visibleProjects} members={data.members} onOpenTask={t=>setTaskModal({open:true,data:t,defaultStatus:'todo'})} onStatusChange={changeStatus} onAddTask={()=>setTaskModal({open:true,data:null,defaultStatus:'todo'})} onAddTaskWithStatus={s=>setTaskModal({open:true,data:null,defaultStatus:s})} onDuplicateTask={duplicateTask} taskOrder={taskOrder} onReorder={reorderTask} isMobile={isMobile}/>}
-            {view==='list' && <ListView tasks={filteredTasks} projects={visibleProjects} members={data.members} onOpenTask={t=>setTaskModal({open:true,data:t})}/>}
+            {view==='kanban' && (
+              <div style={{ display:'flex',flex:1,overflow:'hidden',minHeight:0 }}>
+                <KanbanView tasks={filteredTasks} projects={visibleProjects} members={data.members} onOpenTask={t=>setTaskModal({open:true,data:t,defaultStatus:'todo'})} onStatusChange={changeStatus} onAddTask={()=>setTaskModal({open:true,data:null,defaultStatus:'todo'})} onAddTaskWithStatus={s=>setTaskModal({open:true,data:null,defaultStatus:s})} onDuplicateTask={duplicateTask} taskOrder={taskOrder} onReorder={reorderTask} isMobile={isMobile} onTimerSelect={t=>setTimerTask(t)} timerTaskId={timerTask?.id}/>
+                {!isMobile && <div style={{ padding:'16px 16px 16px 0',flexShrink:0,display:'flex' }}><TimerPanel timerTask={timerTask} projects={visibleProjects} onClearTask={()=>setTimerTask(null)}/></div>}
+              </div>
+            )}
+            {view==='list' && (
+              <div style={{ display:'flex',flex:1,overflow:'hidden',minHeight:0 }}>
+                <ListView tasks={filteredTasks} projects={visibleProjects} members={data.members} onOpenTask={t=>setTaskModal({open:true,data:t})} onStatusChange={changeStatus} onDelete={deleteTask} onSave={saveTask} onTimerSelect={t=>setTimerTask(t)} timerTaskId={timerTask?.id} onAddTask={(cat)=>setTaskModal({open:true,data:null,defaultStatus:'todo',defaultTitle:cat?`【${cat}】`:undefined})} onCopyCategoryToProject={copyCategoryToProject}/>
+                {!isMobile && <div style={{ padding:'16px 16px 16px 0',flexShrink:0,display:'flex' }}><TimerPanel timerTask={timerTask} projects={visibleProjects} onClearTask={()=>setTimerTask(null)}/></div>}
+              </div>
+            )}
+            {view==='calendar' && <CalendarView tasks={filteredTasks} projects={visibleProjects} members={data.members} onOpenTask={t=>setTaskModal({open:true,data:t})} />}
             {view==='member' && <MemberView tasks={filteredTasks} projects={visibleProjects} members={data.members} memberFilter={memberFilter} onOpenTask={t=>setTaskModal({open:true,data:t})} isMobile={isMobile}/>}
           </>)}
 
@@ -1262,11 +2245,11 @@ function Workflow() {
       </div>
 
       {/* ── Modals ── */}
-      <TaskModal open={taskModal.open} onClose={()=>setTaskModal({open:false,data:null,defaultStatus:'todo'})} data={taskModal.data} projects={visibleProjects} members={data.members} defaultProjectId={projFilter} defaultStatus={taskModal.defaultStatus} onSave={saveTask} onDelete={deleteTask} isTsuge={isTsuge}/>
-      <ProjectModal open={projModal.open} onClose={()=>setProjModal({open:false,data:null})} data={projModal.data} members={data.members} onSave={saveProject} onDelete={deleteProject} isTsuge={isTsuge}/>
-      <MemberModal open={memberModal} onClose={()=>setMemberModal(false)} onSave={saveMember}/>
+      <TaskModal open={taskModal.open} onClose={()=>setTaskModal({open:false,data:null,defaultStatus:'todo'})} data={taskModal.data} projects={visibleProjects} members={data.members} defaultProjectId={projFilter} defaultStatus={taskModal.defaultStatus} defaultTitle={taskModal.defaultTitle} defaultAssigneeId={myMemberId} onSave={saveTask} onDelete={deleteTask} isTsuge={isTsuge}/>
+      <ProjectModal open={projModal.open} onClose={()=>setProjModal({open:false,data:null,defaultType:null})} data={projModal.data} defaultType={projModal.defaultType} members={data.members} onSave={saveProject} onDelete={deleteProject} isTsuge={isTsuge} adminMemberId={isTsuge ? myMemberId : null}/>
+      <MemberModal open={memberModal} onClose={()=>setMemberModal(false)} onSave={saveMember} existingMemberIds={data.members.map(m=>m.id)}/>
       <PINModal open={pinModal.open} onClose={()=>setPinModal({open:false,mode:'unlock'})} mode={pinModal.mode}
-        onSuccess={()=>{ if(pinModal.mode==='unlock') setIsTsuge(true); }}/>
+        onSuccess={()=>{}}/>
       <DuplicateModal open={dupModal.open} onClose={()=>setDupModal({open:false,project:null})} project={dupModal.project} tasks={data.tasks} members={data.members} onDuplicate={doDuplicate}/>
       {copyTasksModal && (
         <CopyTasksModal
@@ -1301,6 +2284,10 @@ function EmptyState({ icon, msg }) {
 // ── Unified Settings Page ─────────────────────────────────────────────────
 function SettingsPage() {
   const navigate = useNavigate();
+  const { isAdmin, logout, displayName } = useAuth();
+  const { ref: fbRef, set: fbSet } = require("firebase/database");
+  const { db: fbDb } = require("./firebase");
+  const hasFirebase = !!fbDb;
   // wl_* keys are JSON-encoded (Timesheet uses JSON.parse to read them)
   // wf_* keys are plain strings (Workflow uses localStorage.getItem)
   const lsJson = (k, fb='') => { try { const v = localStorage.getItem(k); if (!v) return fb; try { return JSON.parse(v); } catch { return v; } } catch { return fb; } };
@@ -1339,7 +2326,7 @@ function SettingsPage() {
     if (!wfGas) { setTestResult('⚠ URLが入力されていません'); return; }
     setTestResult('テスト中…');
     try {
-      const res = await fetch(`${wfGas}?action=getWorkflowData`);
+      const res = await fetch(`${wfGas}?action=getWorkflowData&_t=${Date.now()}`);
       const json = await res.json();
       if (json.ok) {
         const t = json.version ? new Date(json.version).toLocaleString('ja-JP') : '（データなし）';
@@ -1354,6 +2341,10 @@ function SettingsPage() {
     localStorage.setItem('wl_sheetUrl', JSON.stringify(tsSheet));
     localStorage.setItem('wf_gasUrl', wfGas);
     localStorage.setItem('wl_calGasUrl', JSON.stringify(calGasUrl));
+    // 管理者はWorkflow GAS URLをFirebaseに保存（全メンバーに共有）
+    if (isAdmin && wfGas && hasFirebase) {
+      fbSet(fbRef(fbDb, "config/wfGasUrl"), wfGas);
+    }
     setSaved('✓ 保存しました');
     setTimeout(() => setSaved(''), 2500);
   }
@@ -1437,13 +2428,15 @@ function SettingsPage() {
               12. 「デプロイ」→ 表示されたURLをコピー<br/>
               13. 上の入力欄に貼り付けて「保存」→「テスト送信」で確認
             </div>
-            <pre style={{ padding:12, background:C.cream2, borderRadius:8, fontSize:10, color:C.text2, overflowX:'auto', whiteSpace:'pre-wrap', border:`1px solid ${C.border}`, margin:0 }}>{`var CALENDAR_NAME = ''; // 例: 'マイカレンダー'。空のままでデフォルト。
+            <pre style={{ padding:12, background:C.cream2, borderRadius:8, fontSize:10, color:C.text2, overflowX:'auto', whiteSpace:'pre-wrap', border:`1px solid ${C.border}`, margin:0 }}>{`var CALENDAR_NAME = ''; // タスク用カレンダー名（空=デフォルト）
+var EVENT_CALENDAR_NAME = 'こだわりんイベント開催日'; // イベント開催日カレンダー名
 
 function doPost(e) {
   if (!e || !e.postData) return ContentService
     .createTextOutput(JSON.stringify({ ok: false, error: 'no post data' }))
     .setMimeType(ContentService.MimeType.JSON);
   var data = JSON.parse(e.postData.contents);
+
   if (data.action === 'syncCalendar') {
     var cals = CALENDAR_NAME ? CalendarApp.getCalendarsByName(CALENDAR_NAME) : [];
     var cal = cals.length ? cals[0] : CalendarApp.getDefaultCalendar();
@@ -1464,6 +2457,25 @@ function doPost(e) {
       .createTextOutput(JSON.stringify({ ok: true }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+
+  if (data.action === 'syncEventDates') {
+    var eventCals = CalendarApp.getCalendarsByName(EVENT_CALENDAR_NAME);
+    var eventCal = eventCals.length ? eventCals[0] : CalendarApp.getDefaultCalendar();
+    (data.events || []).forEach(function(ev) {
+      if (!ev.date) return;
+      var p = ev.date.split('-').map(Number);
+      var date = new Date(p[0], p[1]-1, p[2]);
+      var next = new Date(p[0], p[1]-1, p[2]+1);
+      var existing = eventCal.getEvents(date, next)
+        .filter(function(e){ return e.getTitle() === ev.name; });
+      if (!existing.length) {
+        eventCal.createAllDayEvent(ev.name, date);
+      }
+    });
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function doGet(e) {
@@ -1475,7 +2487,10 @@ function doGet(e) {
 function authorizeCalendar() {
   var cals = CALENDAR_NAME ? CalendarApp.getCalendarsByName(CALENDAR_NAME) : [];
   var cal = cals.length ? cals[0] : CalendarApp.getDefaultCalendar();
-  Logger.log('使用カレンダー: ' + cal.getName());
+  Logger.log('タスクカレンダー: ' + cal.getName());
+  var eventCals = CalendarApp.getCalendarsByName(EVENT_CALENDAR_NAME);
+  var eventCal = eventCals.length ? eventCals[0] : CalendarApp.getDefaultCalendar();
+  Logger.log('イベントカレンダー: ' + eventCal.getName());
 }`}</pre>
           </details>
         </div>
@@ -1505,6 +2520,25 @@ function authorizeCalendar() {
             ローカルデータを初期化
           </button>
         </div>
+
+        {isAdmin && (
+          <div style={{ marginTop:24 }}>
+            <div style={{ fontSize:15, fontWeight:600, color:C.text, marginBottom:14 }}>メンバー管理</div>
+            <AdminMembers wfMembers={wfMembers}/>
+          </div>
+        )}
+
+        <div style={{ marginTop:24, ...card }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div>
+              <div style={{ fontSize:12, color:C.text2 }}>ログイン中: {displayName}</div>
+            </div>
+            <button onClick={()=>{ logout(); window.location.href='/'; }}
+              style={{ padding:'8px 16px', borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', color:C.text2, cursor:'pointer', fontSize:12, fontFamily:"'Noto Sans JP',sans-serif" }}>
+              ログアウト
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1515,15 +2549,107 @@ function SettingsPageWrapper() {
   return <SettingsPage/>;
 }
 
-export default function App() {
-  return (
-    <BrowserRouter>
+function PageTitle({ title }) {
+  useEffect(() => { document.title = title; }, [title]);
+  return null;
+}
+
+function AuthGate() {
+  const isDev = window.location.hostname.includes('-dev');
+  const { firebaseUser, loading, isApproved, userProfile, isAdmin, access } = useAuth();
+
+  // 本番環境（-devがないURL）では認証をスキップ
+  if (!isDev) {
+    return (
       <Routes>
-        <Route path="/" element={<Workflow />} />
-        <Route path="/timesheet" element={<Timesheet />} />
-        <Route path="/settings" element={<SettingsPageWrapper />} />
-        <Route path="/distribution-list" element={<DistributionList />} />
+        <Route path="/" element={<><PageTitle title="Workflow"/><Workflow /></>} />
+        <Route path="/timesheet" element={<><PageTitle title="Timesheet"/><Timesheet /></>} />
+        <Route path="/settings" element={<><PageTitle title="設定"/><SettingsPageWrapper /></>} />
+        <Route path="/distribution-list" element={<><PageTitle title="配布リスト"/><DistributionList /></>} />
       </Routes>
-    </BrowserRouter>
+    );
+  }
+
+  if (loading) {
+    return <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',fontFamily:"'Noto Sans JP',sans-serif",color:'#a89f94' }}>読み込み中...</div>;
+  }
+
+  if (!firebaseUser) {
+    return <LoginPage />;
+  }
+
+  if (userProfile && !isApproved) {
+    return (
+      <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',fontFamily:"'Noto Sans JP',sans-serif",textAlign:'center',padding:20 }}>
+        <div>
+          <div style={{ fontSize:40,marginBottom:16 }}>⏳</div>
+          <div style={{ fontSize:16,fontWeight:600,color:'#3a3530',marginBottom:12 }}>承認待ち</div>
+          <div style={{ fontSize:13,color:'#7a746c',lineHeight:1.8 }}>管理者の承認をお待ちください。</div>
+          <button onClick={()=>signOutUser()}
+            style={{ marginTop:20,padding:'8px 20px',borderRadius:8,border:'1px solid #ddd8ce',background:'transparent',color:'#7a746c',cursor:'pointer',fontSize:12,fontFamily:"'Noto Sans JP',sans-serif" }}>
+            ログアウト
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const noAccess = (
+    <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',fontFamily:"'Noto Sans JP',sans-serif",textAlign:'center',padding:20 }}>
+      <div>
+        <div style={{ fontSize:40,marginBottom:16 }}>🚫</div>
+        <div style={{ fontSize:16,fontWeight:600,color:'#3a3530',marginBottom:12 }}>アクセス権限がありません</div>
+        <div style={{ fontSize:13,color:'#7a746c',marginBottom:16 }}>管理者にアクセス権の付与を依頼してください。</div>
+        <button onClick={()=>signOutUser()}
+          style={{ padding:'8px 20px',borderRadius:8,border:'1px solid #ddd8ce',background:'transparent',color:'#7a746c',cursor:'pointer',fontSize:12,fontFamily:"'Noto Sans JP',sans-serif" }}>
+          ログアウト
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <Routes>
+      <Route path="/" element={isAdmin || access.workflow ? <><PageTitle title="Workflow"/><Workflow /></> : noAccess} />
+      <Route path="/timesheet" element={isAdmin || access.timesheet ? <><PageTitle title="Timesheet"/><Timesheet /></> : noAccess} />
+      <Route path="/settings" element={<><PageTitle title="設定"/><SettingsPageWrapper /></>} />
+      <Route path="/distribution-list" element={<><PageTitle title="配布リスト"/><DistributionList /></>} />
+    </Routes>
+  );
+}
+
+function signOutUser() {
+  import("firebase/auth").then(({ signOut }) => {
+    import("./firebase").then(({ auth }) => {
+      signOut(auth);
+    });
+  });
+}
+
+function ProductionRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<><PageTitle title="Workflow"/><Workflow /></>} />
+      <Route path="/timesheet" element={<><PageTitle title="Timesheet"/><Timesheet /></>} />
+      <Route path="/settings" element={<><PageTitle title="設定"/><SettingsPageWrapper /></>} />
+      <Route path="/distribution-list" element={<><PageTitle title="配布リスト"/><DistributionList /></>} />
+    </Routes>
+  );
+}
+
+export default function App() {
+  const isDev = window.location.hostname.includes('-dev');
+  return (
+    <ErrorBoundary>
+      <BrowserRouter>
+        {isDev ? (
+          <AuthProvider>
+            <AuthGate />
+          </AuthProvider>
+        ) : (
+          <ProductionRoutes />
+        )}
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

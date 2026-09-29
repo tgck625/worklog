@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>差出人ラベル | こだわりん</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Meiryo', 'Hiragino Kaku Gothic Pro', sans-serif; background: #f5f5f5; }
+
+  .screen-only {
+    padding: 24px;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .screen-only h1 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #3a3530;
+    margin-bottom: 6px;
+  }
+  .screen-only p {
+    font-size: 13px;
+    color: #7a746c;
+    margin-bottom: 16px;
+  }
+  .print-btn {
+    display: inline-block;
+    background: #e07840;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 22px;
+    font-size: 14px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    margin-right: 10px;
+  }
+  .print-btn:hover { background: #c96830; }
+  .back-btn {
+    display: inline-block;
+    background: #fff;
+    color: #7a746c;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px 22px;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .back-btn:hover { background: #f5f5f5; }
+  .preview-note {
+    margin-top: 14px;
+    font-size: 12px;
+    color: #999;
+  }
+
+  /* ===== 印刷エリア ===== */
+  .page {
+    width: 210mm;
+    height: 297mm;
+    padding-top: 12.5mm;
+    background: #fff;
+    margin: 24px auto;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+    overflow: hidden;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 70mm);
+    grid-auto-rows: 33.9mm;
+    gap: 0;
+    width: 210mm;
+  }
+
+  .label {
+    width: 70mm;
+    height: 33.9mm;
+    padding: 1.8mm 4mm 1.8mm 6mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.5mm;
+    overflow: hidden;
+    position: relative;
+    border: none;
+  }
+
+  .lbl-logo {
+    height: 12mm;
+    display: flex;
+    align-items: center;
+  }
+  .lbl-logo img {
+    height: 100%;
+    width: auto;
+    max-width: 60mm;
+    object-fit: contain;
+    display: block;
+  }
+  .lbl-info {
+    font-size: 7pt;
+    color: #333;
+    line-height: 1.7;
+    letter-spacing: 0.02em;
+  }
+
+  @media print {
+    @page { size: 210mm 297mm; margin: 0; }
+    body { margin: 0; padding: 0; background: #fff; }
+    .screen-only { display: none; }
+    .page {
+      margin: 0;
+      box-shadow: none;
+      page-break-after: always;
+    }
+    .label { border: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="screen-only">
+  <h1>差出人ラベル（こだわりん）</h1>
+  <p>A4・3列×8行＝24枚／ページ。倍率100%・余白なしで印刷してください。</p>
+  <button class="print-btn" onclick="window.print()">🖨️ 印刷する</button>
+  <a class="back-btn" href="/distribution-list">← 配布リストに戻る</a>
+  <p class="preview-note">※ 下のプレビューは画面表示用。実際の印刷は印刷ボタンから。</p>
+</div>
+
+<div class="page">
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+const LABEL_HTML = `
+  <div class="lbl-logo"><img src="/kodawarin-logo.png" alt="こだわりん"></div>
+  <div class="lbl-info" style="margin-top:1.8mm;">〒470-0156<br>愛知県愛知郡東郷町御岳二丁目１番地１<br>(0561) 38-3873　Lawin株式会社</div>
+`;
+
+const grid = document.getElementById('grid');
+for (let i = 0; i < 24; i++) {
+  const div = document.createElement('div');
+  div.className = 'label';
+  div.innerHTML = LABEL_HTML;
+  grid.appendChild(div);
+}
+</script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "./AuthContext";
 
 const ORANGE = "#e07840";
 const CREAM  = "#faf8f4";
@@ -8,6 +9,15 @@ const TEXT3  = "#a89f94";
 
 export default function NavBar({ currentApp, tabs, activeTab, onTabChange, rightActions, runningDot }) {
   const navigate = useNavigate();
+  const isDev = window.location.hostname.includes('-dev');
+  const { isAdmin, access } = useAuth();
+
+  const allApps = [
+    { id: "workflow",  label: "Workflow",  path: "/", accessKey: "workflow" },
+    { id: "timesheet", label: "Timesheet", path: "/timesheet", accessKey: "timesheet" },
+    { id: "staffshift", label: "スタッフシフト", path: "/eventstaff-shift/", accessKey: "eventstaff" },
+  ];
+  const visibleApps = isDev ? allApps.filter(app => isAdmin || access[app.accessKey]) : allApps;
 
   return (
     <div style={{
@@ -22,11 +32,7 @@ export default function NavBar({ currentApp, tabs, activeTab, onTabChange, right
 
       {/* ── App switcher ── */}
       <div style={{ display: "flex", alignItems: "center", background: CREAM, borderRadius: 999, padding: 3, gap: 2, marginRight: 8, flexShrink: 0 }}>
-        {[
-          { id: "workflow",  label: "Workflow",  path: "/" },
-          { id: "timesheet", label: "Timesheet", path: "/timesheet" },
-          { id: "staffshift", label: "スタッフシフト", path: "/eventstaff-shift/" },
-        ].map(app => {
+        {visibleApps.map(app => {
           const active = currentApp === app.id;
           return (
             <button key={app.id} onClick={() => app.path.startsWith("/eventstaff-shift") ? (window.location.href = app.path) : navigate(app.path)} style={{
