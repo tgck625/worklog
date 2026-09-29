@@ -868,11 +868,17 @@ function buildMonthSnapshot(staffId, month) {
   const prepSnap=prepItems.map(pw=>{
     const total=calcPrepTotal(pw);
     mPrep+=total;
-    return {dt:pw.date, desc:pw.description||'事前準備', h:pw.hours||0, rate:pw.hourlyRate||0, p:total, fixed:pw.fixedAmount||0};
+    return {id:pw.id, dt:pw.date, desc:pw.description||'事前準備', h:pw.hours||0, rate:pw.hourlyRate||0, p:total, fixed:pw.fixedAmount||0};
+  });
+  // 追加費用のイベント別合計を記録
+  const extraByEvent={};
+  wevs.forEach(e=>{
+    const extras=allExtras[`${staffId}:${e.id}`]||[];
+    if(extras.length) extraByEvent[e.id]=extras.reduce((s,x)=>s+(x.amount||0),0);
   });
   const mTransport=getMonthTransport(staffId,month,mDist);
   const ctEntry=getCustomTransportEntry(staffId,month);
-  const snap = { pay:mPay, transport:mTransport, extra:mExtra, prep:mPrep,
+  const snap = { pay:mPay, transport:mTransport, extra:mExtra, prep:mPrep, prepIds:prepItems.map(pw=>pw.id), extraByEvent,
                  total:mPay+mTransport+mExtra+mPrep, dist:parseFloat(mDist.toFixed(1)),
                  events:evSnap, prepWork:prepSnap };
   if(ctEntry?.transitDays?.length) { snap.transitDays=ctEntry.transitDays; snap.transitTotal=ctEntry.transitTotal||0; snap.transitDiff=ctEntry.transitDiff||0; }
@@ -3848,20 +3854,23 @@ function renderPayment(content, right) {
         const bg = active ? 'var(--accent-light)' : 'var(--surface)';
         const pst = (load(SK.payStatus,{})[`${s.id}:${m}`]) || 'pending';
         const paidAmt = load('staff_mgmt_paid_amounts',{})[`${s.id}:${m}`];
-        // 振込後に追加された事前準備・追加費用のみを差額として検出
+        // 振込後に「本当に新規追加された」事前準備・追加費用のみを差額として検出
         let diff = 0;
         if (pst === 'paid' && cell) {
           const snap = getMonthSnapshot(s.id, m);
-          if (snap) {
-            const curPrep = allPrepWorkAll.filter(pw => pw.staffId === s.id && pw.date.startsWith(m))
-              .reduce((sum, pw) => sum + calcPrepTotal(pw), 0);
-            const snapPrep = snap.prep || 0;
-            const evIds = new Set((snap.events||[]).map(ev => ev.dt));
-            let curExtra = 0;
+          if (snap && snap.prepIds) {
+            // スナップショットに記録されたIDにない事前準備 = 振込後の新規追加
+            const snapPrepIds = new Set(snap.prepIds || []);
+            const newPrep = allPrepWorkAll.filter(pw => pw.staffId === s.id && pw.date.startsWith(m) && !snapPrepIds.has(pw.id));
+            diff += newPrep.reduce((sum, pw) => sum + calcPrepTotal(pw), 0);
+            // スナップショットに記録されたイベント別追加費用との差分
+            const snapExtraByEvent = snap.extraByEvent || {};
             events.filter(e => e.date.startsWith(m) && e.staffAssignments.some(a => a.staffId === s.id && a.status === 'worked'))
-              .forEach(e => { curExtra += (allExtras[`${s.id}:${e.id}`]||[]).reduce((sum, x) => sum + (x.amount||0), 0); });
-            const snapExtra = snap.extra || 0;
-            diff = Math.max(0, curPrep - snapPrep) + Math.max(0, curExtra - snapExtra);
+              .forEach(e => {
+                const curEvExtra = (allExtras[`${s.id}:${e.id}`]||[]).reduce((sum, x) => sum + (x.amount||0), 0);
+                const snapEvExtra = snapExtraByEvent[e.id] || 0;
+                diff += Math.max(0, curEvExtra - snapEvExtra);
+              });
           }
         }
         if (!cell) return `<td style="text-align:center;color:var(--ink-faint);padding:8px 10px;background:${bg};font-size:12px;cursor:pointer"
