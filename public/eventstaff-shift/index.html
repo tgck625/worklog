@@ -794,34 +794,43 @@ function cyclePayStatus(staffId, month) {
   const statuses = load(SK.payStatus, {});
   const key = `${staffId}:${month}`;
   const cur = statuses[key] || 'pending';
-  const next = { pending: 'confirmed', confirmed: 'paid', paid: 'pending' }[cur];
-  if (next === 'pending') {
-    delete statuses[key];
-    // スナップショット削除
+  // paid → confirmed（戻る）、confirmed → paid or pending、pending → confirmed
+  const next = { pending: 'confirmed', confirmed: 'paid', paid: 'confirmed' }[cur];
+  if (cur === 'confirmed') {
+    // confirmed → paid: 振込済にする
+    statuses[key] = 'paid';
     const snaps = load(SK.confirmedSnapshots, {});
-    delete snaps[key];
-    save(SK.confirmedSnapshots, snaps);
+    const snap = snaps[key];
     const paidAmounts = load('staff_mgmt_paid_amounts', {});
-    delete paidAmounts[key];
+    // 既にpaid_amountsがあれば（戻して再度paidにした場合）元の振込額を維持
+    if (paidAmounts[key] == null) {
+      paidAmounts[key] = snap ? snap.total : calcStaffMonthTotal(staffId, month);
+    }
     save('staff_mgmt_paid_amounts', paidAmounts);
+  } else if (cur === 'paid') {
+    // paid → confirmed: 金額確定に戻す（paid_amountsは保持）
+    statuses[key] = 'confirmed';
   } else {
-    statuses[key] = next;
-  }
-  // 金額確定にした時点でスナップショットを保存（常に最新で再生成）
-  if (next === 'confirmed') {
+    // pending → confirmed
+    statuses[key] = 'confirmed';
     const snaps = load(SK.confirmedSnapshots, {});
     snaps[key] = buildMonthSnapshot(staffId, month);
     save(SK.confirmedSnapshots, snaps);
   }
-  // 振込済にした時点の金額も記録
-  if (next === 'paid') {
-    const snaps = load(SK.confirmedSnapshots, {});
-    const snap = snaps[key];
-    const paidAmounts = load('staff_mgmt_paid_amounts', {});
-    paidAmounts[key] = snap ? snap.total : calcStaffMonthTotal(staffId, month);
-    save('staff_mgmt_paid_amounts', paidAmounts);
-  }
   save(SK.payStatus, statuses);
+}
+// confirmed から未確定に完全リセット
+function resetPayStatus(staffId, month) {
+  const key = `${staffId}:${month}`;
+  const statuses = load(SK.payStatus, {});
+  delete statuses[key];
+  save(SK.payStatus, statuses);
+  const snaps = load(SK.confirmedSnapshots, {});
+  delete snaps[key];
+  save(SK.confirmedSnapshots, snaps);
+  const paidAmounts = load('staff_mgmt_paid_amounts', {});
+  delete paidAmounts[key];
+  save('staff_mgmt_paid_amounts', paidAmounts);
 }
 // スタッフ×月のスナップショットを作成
 function buildMonthSnapshot(staffId, month) {
@@ -3791,7 +3800,8 @@ function renderPayment(content, right) {
           const pst = (load(SK.payStatus,{})[`${s.id}:${m}`]) || 'pending';
           const pa = pst === 'paid' ? load('staff_mgmt_paid_amounts',{})[`${s.id}:${m}`] : null;
           const useTotal = (pa != null) ? pa : snap.total;
-          matrix[m][s.id] = { pay: snap.pay, trans: snap.transport, extra: snap.extra||0, prep: snap.prep||0, total: useTotal, count: cnt };
+          const liveTotal = (pst === 'paid') ? calcStaffMonthTotal(s.id, m) : useTotal;
+          matrix[m][s.id] = { pay: snap.pay, trans: snap.transport, extra: snap.extra||0, prep: snap.prep||0, total: useTotal, liveTotal, count: cnt };
           staffTotals[s.id] += useTotal;
           monthTotals[m]    += useTotal;
           grandTotal        += useTotal;
@@ -3839,7 +3849,7 @@ function renderPayment(content, right) {
         const bg = active ? 'var(--accent-light)' : 'var(--surface)';
         const pst = (load(SK.payStatus,{})[`${s.id}:${m}`]) || 'pending';
         const paidAmt = load('staff_mgmt_paid_amounts',{})[`${s.id}:${m}`];
-        const diff = pst==='paid' && cell && paidAmt != null ? Math.max(0, cell.total - paidAmt) : 0;
+        const diff = pst==='paid' && cell && paidAmt != null ? Math.max(0, (cell.liveTotal || cell.total) - paidAmt) : 0;
         if (!cell) return `<td style="text-align:center;color:var(--ink-faint);padding:8px 10px;background:${bg};font-size:12px;cursor:pointer"
                               onclick="paymentSelectedStaff=${s.id};_openPayMonths.clear();renderPage()">－</td>`;
         return `<td style="text-align:center;padding:6px 10px;background:${bg};font-size:12px">
@@ -3848,6 +3858,7 @@ function renderPayment(content, right) {
             <div style="font-size:10px;color:var(--ink-soft)">${cell.count}件${cell.prep ? ' <span style="color:var(--purple)">+準備</span>' : ''}</div>
           </div>
           <div onclick="event.stopPropagation();cyclePayStatus(${s.id},'${m}');renderPage()" style="cursor:pointer;user-select:none">${payStatusBadge(pst, diff)}</div>
+          ${pst==='confirmed' ? `<div onclick="event.stopPropagation();if(confirm('未確定に戻しますか？スナップショットと振込記録が削除されます')){resetPayStatus(${s.id},'${m}');renderPage()}" style="cursor:pointer;font-size:9px;color:var(--ink-faint);margin-top:2px;text-decoration:underline">未確定に戻す</div>` : ''}
         </td>`;
       }).join('');
       return `<tr style="border-bottom:1px solid var(--surface-3)">
@@ -5733,9 +5744,6 @@ function savePrepWork(staffId, editId) {
     allPrep.push({ id, staffId, date, description, hours, hourlyRate });
   }
   save(SK.prepWork, allPrep);
-  // 振込済/確定済の月ならスナップショットと金額を自動更新
-  const prepMonth = date.slice(0, 7);
-  refreshPaidSnapshots(staffId, prepMonth);
   closeModal();
   renderPage();
 }
@@ -5748,7 +5756,6 @@ function deletePrepWork(id) {
   const delMonth = target?.date?.slice(0, 7);
   const filtered = allPrep.filter(x => x.id !== id);
   save(SK.prepWork, filtered);
-  if (delStaffId && delMonth) refreshPaidSnapshots(delStaffId, delMonth);
   closeModal();
   renderPage();
 }
