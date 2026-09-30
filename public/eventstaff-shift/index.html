@@ -636,6 +636,14 @@ function schedulePush() {
 async function pushToGAS() {
   const url = localStorage.getItem(SK.gasUrl);
   if (!url) return;
+  // スタッフデータが空の場合はGASを上書きしない（データ消失防止）
+  const localStaffs = JSON.parse(localStorage.getItem(SK.staffs) || '[]');
+  if (!localStaffs.length) {
+    console.warn('[pushToGAS] スタッフデータが空のため送信をスキップ');
+    _syncStatus = 'error';
+    updateSyncStatus();
+    return;
+  }
   _syncStatus = 'syncing';
   updateSyncStatus();
   try {
