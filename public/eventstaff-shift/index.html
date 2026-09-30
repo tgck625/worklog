@@ -464,6 +464,36 @@ function restoreSnapshot(idx) {
   alert('復元しました。GASにも送信しました。');
 }
 
+// GASバックアップから復元
+async function restoreFromGASBackup() {
+  const url = localStorage.getItem(SK.gasUrl);
+  if (!url) { alert('GAS URLが設定されていません'); return; }
+  try {
+    const listRes = await fetch(`${url}?action=getBackups`);
+    const listJson = await listRes.json();
+    if (!listJson.ok || !listJson.backups.length) { alert('GASバックアップが見つかりません'); return; }
+    const items = listJson.backups.sort((a,b) => b.version - a.version);
+    const choice = items.map((b,i) => `${i}: ${b.label}`).join('\n');
+    const idx = prompt('復元するバックアップの番号を入力:\n' + choice);
+    if (idx === null) return;
+    const selected = items[parseInt(idx)];
+    if (!selected) { alert('無効な番号です'); return; }
+    if (!confirm(`「${selected.label}」のバックアップに復元しますか？`)) return;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'restoreBackup', index: selected.index })
+    });
+    const json = await res.json();
+    if (!json.ok) { alert('復元失敗: ' + (json.error||'不明')); return; }
+    if (json.data) {
+      applySyncData(json.data);
+      renderSidebar(); renderPage();
+    }
+    alert('GASバックアップから復元しました');
+  } catch(e) { alert('復元エラー: ' + e.message); }
+}
+
 // 10分ごとに自動スナップショット
 setInterval(() => saveSnapshot(), 10 * 60 * 1000);
 
@@ -4458,6 +4488,7 @@ function renderSettings(content) {
           GAS送信のたびに自動保存（最大5件）。また10分ごとにこのデバイスにも自動保存されます。
         </p>
         <button class="btn btn-primary" onclick="saveSnapshot('手動 '+new Date().toLocaleString('ja-JP'));renderPage();alert('バックアップしました')">今すぐバックアップ</button>
+        <button class="btn" style="margin-left:8px" onclick="restoreFromGASBackup()">GASバックアップから復元</button>
         ${(()=>{
           const snaps = JSON.parse(localStorage.getItem(SNAPSHOT_KEY)||'[]');
           if (!snaps.length) return '<p style="font-size:13px;color:var(--ink-soft);margin-top:12px">まだバックアップはありません</p>';
