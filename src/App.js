@@ -1941,7 +1941,7 @@ function Workflow() {
   };
   const activeProjects = visibleProjects.filter(p=>!p.closed);
   const closedProjects = visibleProjects.filter(p=>p.closed).sort((a,b)=>(b.eventDate||b.end||'').localeCompare(a.eventDate||a.end||''));
-  const eventProjects = activeProjects.filter(p=>p.type==='event').sort((a,b)=>(b.eventDate||'').localeCompare(a.eventDate||''));
+  const eventProjects = activeProjects.filter(p=>p.type==='event').sort((a,b)=>(a.eventDate||'9999').localeCompare(b.eventDate||'9999'));
   const otherProjects = activeProjects.filter(p=>p.type!=='event').sort((a,b)=>(b.start||b.end||'').localeCompare(a.start||a.end||''));
   const groupByMonth = (projects, dateKey) => {
     const groups = {};
@@ -1951,7 +1951,7 @@ function Workflow() {
       if (!groups[month]) groups[month] = [];
       groups[month].push(p);
     });
-    return Object.entries(groups).sort((a,b)=> a[0]==='日付なし'?1:b[0]==='日付なし'?-1:b[0].localeCompare(a[0]));
+    return Object.entries(groups).sort((a,b)=> a[0]==='日付なし'?1:b[0]==='日付なし'?-1:a[0].localeCompare(b[0]));
   };
   const eventByMonth = groupByMonth(eventProjects, p=>p.eventDate);
   const closedByMonth = groupByMonth(closedProjects, p=>p.eventDate||p.end);
