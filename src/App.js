@@ -1345,9 +1345,9 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
   const [dragOverCat, setDragOverCat] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null); // null | 'todo' | 'doing' | 'done' | 'skip'
   const [memberFilterLocal, setMemberFilterLocal] = useState(null); // null | memberId
-  const [collapsedCats, setCollapsedCats] = useState(() => { try { const s = JSON.parse(localStorage.getItem('wf_collapsedCats')); return s?.length ? new Set(s) : new Set(); } catch { return new Set(); } });
+  const [openedCats, setOpenedCats] = useState(() => { try { const s = JSON.parse(localStorage.getItem('wf_openedCats')); return s?.length ? new Set(s) : new Set(); } catch { return new Set(); } });
   const activeMembers = members.filter(m=>!m.closed);
-  const toggleCollapse = (cat) => setCollapsedCats(prev => { const s = new Set(prev); s.has(cat) ? s.delete(cat) : s.add(cat); try { localStorage.setItem('wf_collapsedCats', JSON.stringify([...s])); } catch {} return s; });
+  const toggleCollapse = (cat) => setOpenedCats(prev => { const s = new Set(prev); s.has(cat) ? s.delete(cat) : s.add(cat); try { localStorage.setItem('wf_openedCats', JSON.stringify([...s])); } catch {} return s; });
   // Ordered project list matching sidebar: events by date, then others
   const orderedProjects = (() => {
     const active = projects.filter(p=>!p.closed);
@@ -1647,18 +1647,24 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
           <div key={cat} style={{ marginBottom:20 }}>
             <div style={{ display:'flex',alignItems:'center',gap:8,padding:'10px 0 6px',borderBottom:`2px solid ${color}44`,cursor:'pointer' }}
               onClick={()=>toggleCollapse(cat)}>
-              <span style={{ fontSize:10,color:C.text3,width:10,flexShrink:0 }}>{collapsedCats.has(cat)?'▶':'▼'}</span>
+              <span style={{ fontSize:10,color:C.text3,width:10,flexShrink:0 }}>{openedCats.has(cat)?'▼':'▶'}</span>
               <div style={{ width:8,height:8,borderRadius:'50%',background:color,flexShrink:0 }}/>
               <span style={{ fontSize:13,fontWeight:600,color }}>{cat}</span>
               <span style={{ fontSize:11,color:C.text3 }}>({catTasks.length})</span>
+              {/* All done/skip badge */}
+              {catTasks.length > 0 && catTasks.every(t=>t.status==='done'||t.status==='skip') && (
+                <span style={{ fontSize:9,padding:'1px 6px',borderRadius:999,background:C.green+'20',color:C.green,border:`1px solid ${C.green}44`,fontWeight:600 }}>完了</span>
+              )}
               {/* Member avatars in this category */}
               {(() => {
                 const mids = new Set();
+                const hasUnassigned = catTasks.some(t=>!(t.assigneeIds||[]).length);
                 catTasks.forEach(t=>(t.assigneeIds||[]).forEach(id=>mids.add(id)));
                 const catMembers = [...mids].map(id=>members.find(m=>m.id===id)).filter(Boolean);
-                return catMembers.length > 0 ? (
-                  <div style={{ display:'flex',gap:2,marginLeft:4 }} onClick={e=>e.stopPropagation()}>
+                return (catMembers.length > 0 || hasUnassigned) ? (
+                  <div style={{ display:'flex',gap:2,marginLeft:4,alignItems:'center' }} onClick={e=>e.stopPropagation()}>
                     {catMembers.map(m=><Avatar key={m.id} name={m.name} color={m.color} size={18} fs={8}/>)}
+                    {hasUnassigned && <span style={{ display:'inline-flex',alignItems:'center',justifyContent:'center',width:18,height:18,borderRadius:'50%',background:C.cream3,color:C.text3,fontSize:8,fontWeight:600,border:`1px dashed ${C.border}` }}>?</span>}
                   </div>
                 ) : null;
               })()}
@@ -1701,7 +1707,7 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
                 <button onClick={e=>{e.stopPropagation();moveCat(cat,1);}} disabled={ci===categories.length-1||(ci===categories.length-2&&categories[categories.length-1]==='その他')} style={{ padding:'0 4px',border:`1px solid ${C.border}`,borderRadius:4,background:C.cream2,color:(ci>=categories.length-2)?C.text3+'55':C.text3,cursor:(ci>=categories.length-2)?'default':'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.6 }}>▼</button>
               </span>}
             </div>
-            {!collapsedCats.has(cat) && <table style={{ width:'100%',borderCollapse:'collapse' }}>
+            {openedCats.has(cat) && <table style={{ width:'100%',borderCollapse:'collapse' }}>
               <thead><tr>{(bulkMode?['']:(onTimerSelect?['']:[])).concat(['タスク名','ステータス','担当者','期日','目安','']).map((h,i)=>(
                 <th key={h||`empty${i}`} style={{...thStyle,...(i===0&&onTimerSelect?{width:24,padding:'8px 4px'}:{})}}>{h}</th>
               ))}</tr></thead>
