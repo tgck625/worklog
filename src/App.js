@@ -413,6 +413,7 @@ function TaskModal({ open, onClose, data, projects, members, defaultProjectId, d
   const [isPrivate,setIsPrivate]=useState(false);
   const [starred,setStarred]=useState(false);
   const [checklist,setChecklist]=useState([]);
+  const [links,setLinks]=useState([]);
   const [newCheckItem,setNewCheckItem]=useState('');
   const checkComposingRef=useRef(false);
   const checkEnterRef=useRef(0);
@@ -420,8 +421,8 @@ function TaskModal({ open, onClose, data, projects, members, defaultProjectId, d
 
   useEffect(()=>{
     if(!open) return;
-    if(data){ setTitle(data.title); setProjectId(data.projectId); setAssigneeIds(data.assigneeIds||[]); setDue(data.due||''); setStatus(data.status); setPriority(data.priority); setMemo(data.memo||''); setEstimatedMin(data.estimatedMin||''); setManual(data.manual||''); setIsPrivate(!!data.isPrivate); setChecklist(data.checklist||[]); setStarred(!!data.starred); }
-    else { const t=defaultTitle||'【】'; setTitle(t); setProjectId(defaultProjectId!=='all'?defaultProjectId:(projects[0]?.id||'')); setAssigneeIds(defaultAssigneeId?[defaultAssigneeId]:[]); setDue(''); setStatus(defaultStatus||'todo'); setPriority('mid'); setMemo(''); setEstimatedMin(''); setManual(''); setIsPrivate(false); setChecklist([]); setStarred(false); }
+    if(data){ setTitle(data.title); setProjectId(data.projectId); setAssigneeIds(data.assigneeIds||[]); setDue(data.due||''); setStatus(data.status); setPriority(data.priority); setMemo(data.memo||''); setEstimatedMin(data.estimatedMin||''); setManual(data.manual||''); setIsPrivate(!!data.isPrivate); setChecklist(data.checklist||[]); setLinks(data.links||[]); setStarred(!!data.starred); }
+    else { const t=defaultTitle||'【】'; setTitle(t); setProjectId(defaultProjectId!=='all'?defaultProjectId:(projects[0]?.id||'')); setAssigneeIds(defaultAssigneeId?[defaultAssigneeId]:[]); setDue(''); setStatus(defaultStatus||'todo'); setPriority('mid'); setMemo(''); setEstimatedMin(''); setManual(''); setIsPrivate(false); setChecklist([]); setLinks([]); setStarred(false); }
     setNewCheckItem('');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[open]);
@@ -443,7 +444,7 @@ function TaskModal({ open, onClose, data, projects, members, defaultProjectId, d
       footer={<>
         {data && <Btn variant="danger" style={{ marginRight:'auto' }} onClick={()=>{ if(window.confirm('このタスクを削除しますか？')){onDelete(data.id);onClose();} }}>削除</Btn>}
         <Btn onClick={onClose}>キャンセル</Btn>
-        <Btn variant="primary" onClick={()=>{ if(!title.trim()){alert('タスク名を入力してください');return;} onSave({id:data?.id||genId(),title:title.trim(),projectId,assigneeIds,due,status,priority,memo,estimatedMin:estimatedMin?Number(estimatedMin):0,manual,isPrivate,starred,checklist}); onClose(); }}>保存</Btn>
+        <Btn variant="primary" onClick={()=>{ if(!title.trim()){alert('タスク名を入力してください');return;} onSave({id:data?.id||genId(),title:title.trim(),projectId,assigneeIds,due,status,priority,memo,estimatedMin:estimatedMin?Number(estimatedMin):0,manual,isPrivate,starred,checklist,links:links.filter(l=>l.url.trim())}); onClose(); }}>保存</Btn>
       </>}>
       <FG label="タスク名"><Input ref={titleRef} value={title} onChange={e=>setTitle(e.target.value)} placeholder="タスクの内容を入力" autoFocus/></FG>
       <FG label="プロジェクト">
@@ -527,6 +528,24 @@ function TaskModal({ open, onClose, data, projects, members, defaultProjectId, d
       <button onClick={()=>setStarred(!starred)} style={{ display:'flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:999,border:`1px solid ${starred?'#d4a020':C.border}`,background:starred?'#fef8e8':'transparent',color:starred?'#b8860b':C.text3,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:starred?600:400,transition:'all 0.15s',marginBottom:4 }}>
         <span style={{ fontSize:16 }}>{starred?'★':'☆'}</span>今日やる
       </button>
+      <FG label="関連リンク">
+        <div style={{ display:'flex',flexDirection:'column',gap:6 }}>
+          {links.map((link,i)=>(
+            <div key={i} style={{ display:'flex',alignItems:'center',gap:6 }}>
+              <input value={link.label} onChange={e=>setLinks(ls=>ls.map((l,j)=>j===i?{...l,label:e.target.value}:l))} placeholder="リンク名"
+                style={{ width:100,padding:'5px 8px',borderRadius:6,border:`1px solid ${C.border}`,fontSize:12,fontFamily:'inherit',color:C.text,outline:'none' }}/>
+              <input value={link.url} onChange={e=>setLinks(ls=>ls.map((l,j)=>j===i?{...l,url:e.target.value}:l))} placeholder="https://..."
+                style={{ flex:1,padding:'5px 8px',borderRadius:6,border:`1px solid ${C.border}`,fontSize:12,fontFamily:'inherit',color:C.text,outline:'none' }}/>
+              <button onClick={()=>setLinks(ls=>ls.filter((_,j)=>j!==i))} style={{ background:'none',border:'none',color:C.text3,cursor:'pointer',fontSize:12,padding:'0 2px',fontFamily:'inherit',flexShrink:0 }}
+                onMouseEnter={e=>e.currentTarget.style.color=C.red} onMouseLeave={e=>e.currentTarget.style.color=C.text3}>✕</button>
+            </div>
+          ))}
+          <button onClick={()=>setLinks(ls=>[...ls,{label:'',url:''}])}
+            style={{ padding:'4px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',alignSelf:'flex-start' }}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>＋ リンク追加</button>
+        </div>
+      </FG>
       <FG label="マニュアル・メモ"><Textarea value={manual} onChange={e=>setManual(e.target.value)} placeholder="作業手順・マニュアル（任意）" style={{ minHeight:100 }}/></FG>
       <FG label="チェックリスト">
         <div style={{ display:'flex',flexDirection:'column',gap:4 }}>
