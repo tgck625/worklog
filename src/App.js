@@ -2508,7 +2508,14 @@ function Workflow() {
         activeTab={tab}
         onTabChange={setTab}
         rightActions={<>
-          <span style={{ fontSize:10, color:syncStatus==='error'?C.red:syncStatus==='syncing'||syncStatus==='pending'?C.amber:C.text3, transition:'color 0.3s', whiteSpace:'nowrap' }}>
+          <span onClick={()=>{
+              if(wfGasUrl){
+                syncVersionRef.current=0;
+                localDirtyRef.current=false;
+                fetchFromGAS(wfGasUrl);
+              }
+            }} style={{ fontSize:10, color:syncStatus==='error'?C.red:syncStatus==='syncing'||syncStatus==='pending'?C.amber:C.text3, transition:'color 0.3s', whiteSpace:'nowrap', cursor:'pointer' }}
+            title="タップで強制同期">
             {!wfGasUrl?'⚠ GAS未接続':syncStatus==='syncing'?'⟳ 同期中…':syncStatus==='pending'?'…':syncStatus==='error'?'⚠ 同期失敗':lastSyncedAt?`✓ ${lastSyncedAt.getHours().toString().padStart(2,'0')}:${lastSyncedAt.getMinutes().toString().padStart(2,'0')} 同期済`:'接続中…'}
             {` P:${data.projects.length} T:${data.tasks.length}`}
           </span>
