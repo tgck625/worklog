@@ -1326,9 +1326,9 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
   const [dragOverCat, setDragOverCat] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null); // null | 'todo' | 'doing' | 'done' | 'skip'
   const [memberFilterLocal, setMemberFilterLocal] = useState(null); // null | memberId
-  const [collapsedCats, setCollapsedCats] = useState(new Set());
+  const [collapsedCats, setCollapsedCats] = useState(() => { try { const s = JSON.parse(localStorage.getItem('wf_collapsedCats')); return s?.length ? new Set(s) : new Set(); } catch { return new Set(); } });
   const activeMembers = members.filter(m=>!m.closed);
-  const toggleCollapse = (cat) => setCollapsedCats(prev => { const s = new Set(prev); s.has(cat) ? s.delete(cat) : s.add(cat); return s; });
+  const toggleCollapse = (cat) => setCollapsedCats(prev => { const s = new Set(prev); s.has(cat) ? s.delete(cat) : s.add(cat); try { localStorage.setItem('wf_collapsedCats', JSON.stringify([...s])); } catch {} return s; });
   // Ordered project list matching sidebar: events by date, then others
   const orderedProjects = (() => {
     const active = projects.filter(p=>!p.closed);
