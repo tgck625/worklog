@@ -1644,8 +1644,23 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
         const catTasks = catMap.get(cat);
         const color = cat === 'その他' ? C.text3 : catColors[ci % catColors.length];
         return (
-          <div key={cat} style={{ marginBottom:20 }}>
-            <div style={{ display:'flex',alignItems:'center',gap:8,padding:'10px 0 6px',borderBottom:`2px solid ${color}44`,cursor:'pointer' }}
+          <div key={cat} style={{ marginBottom:20 }}
+            draggable={cat!=='その他'}
+            onDragStart={e=>{if(cat==='その他'){e.preventDefault();return;}setDragCat(cat);e.dataTransfer.effectAllowed='move';}}
+            onDragOver={e=>{if(cat==='その他')return;e.preventDefault();setDragOverCat(cat);}}
+            onDragEnd={()=>{
+              if(dragCat && dragOverCat && dragCat!==dragOverCat) {
+                const reorderCats = categories.filter(c=>c!=='その他');
+                const arr = [...reorderCats];
+                const fi = arr.indexOf(dragCat), ti = arr.indexOf(dragOverCat);
+                arr.splice(fi,1); arr.splice(ti,0,dragCat);
+                if(categories.includes('その他')) arr.push('その他');
+                onCatOrderChange(arr);
+              }
+              setDragCat(null);setDragOverCat(null);
+            }}
+            onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget))setDragOverCat(null);}}>
+            <div style={{ display:'flex',alignItems:'center',gap:8,padding:'10px 0 6px',borderBottom:`2px solid ${dragOverCat===cat?C.orange:color+'44'}`,cursor:'pointer',background:dragCat===cat?C.orangeBg+'88':'transparent',transition:'border-color 0.15s' }}
               onClick={()=>toggleCollapse(cat)}>
               <span style={{ fontSize:10,color:C.text3,width:10,flexShrink:0 }}>{openedCats.has(cat)?'▼':'▶'}</span>
               <div style={{ width:8,height:8,borderRadius:'50%',background:color,flexShrink:0 }}/>
