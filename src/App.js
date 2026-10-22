@@ -1514,7 +1514,7 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
       </div>
       {/* Floating bulk bar (portal to body) */}
       {bulkMode && bulkIds.size > 0 && createPortal(
-        <div style={{ position:'fixed',top:90,right:16,zIndex:9000,background:'#fff',borderRadius:12,padding:'10px 16px',display:'flex',alignItems:'center',gap:8,boxShadow:'0 4px 20px rgba(58,53,48,0.25)',border:`1px solid ${C.border}`,flexWrap:'wrap' }}>
+        <div style={{ position:'fixed',top:320,right:16,zIndex:9000,background:'#fff',borderRadius:12,padding:'10px 16px',display:'flex',flexDirection:'column',alignItems:'stretch',gap:8,boxShadow:'0 4px 20px rgba(58,53,48,0.25)',border:`1px solid ${C.border}`,maxWidth:220 }}>
           <span style={{ fontSize:12,color:C.text2,fontWeight:600 }}>{bulkIds.size}件選択</span>
           <div style={{ position:'relative' }}>
             <button onClick={e=>{e.stopPropagation();setBulkAssigneeOpen(!bulkAssigneeOpen);setBulkDueOpen(false);setBulkCopyOpen(false);}}
