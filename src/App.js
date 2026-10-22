@@ -1406,8 +1406,15 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
   // カテゴリ名→色の安定マップ（catOrderベースで固定）
   const catColorMap = (() => {
     const m = {};
+    const baseColorMap = {};
+    let colorIdx = 0;
+    const baseName = (cat) => cat.replace(/[\(（].+[\)）]$/, '').trim();
     const ordered = [...(catOrder||[]), ...allCats.filter(c=>!(catOrder||[]).includes(c))].filter(c=>c!=='その他');
-    ordered.forEach((c,i) => { m[c] = catColors[i % catColors.length]; });
+    ordered.forEach(c => {
+      const base = baseName(c);
+      if (!(base in baseColorMap)) { baseColorMap[base] = catColors[colorIdx++ % catColors.length]; }
+      m[c] = baseColorMap[base];
+    });
     return m;
   })();
 
