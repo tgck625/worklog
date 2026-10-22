@@ -1373,7 +1373,8 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
   // Filter by status and member
   const filtered = tasks.filter(t => {
     if (statusFilter && t.status !== statusFilter) return false;
-    if (memberFilterLocal && !(t.assigneeIds||[]).includes(memberFilterLocal)) return false;
+    if (memberFilterLocal === '__unassigned__' && (t.assigneeIds||[]).length > 0) return false;
+    if (memberFilterLocal && memberFilterLocal !== '__unassigned__' && !(t.assigneeIds||[]).includes(memberFilterLocal)) return false;
     return true;
   });
   // Sort by due date (earliest first, no due last) then group by category
@@ -1542,6 +1543,7 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
         <select value={memberFilterLocal||''} onChange={e=>setMemberFilterLocal(e.target.value||null)}
           style={{ padding:'3px 8px',borderRadius:6,border:`1px solid ${memberFilterLocal?C.orange:C.border}`,background:memberFilterLocal?C.orange+'18':'transparent',color:memberFilterLocal?C.text:C.text3,fontSize:10,fontFamily:'inherit',outline:'none' }}>
           <option value="">全メンバー</option>
+          <option value="__unassigned__">未割当</option>
           {activeMembers.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
         {(statusFilter||memberFilterLocal) && <span style={{ fontSize:10,color:C.text3 }}>({filtered.length}/{tasks.length}件)</span>}
