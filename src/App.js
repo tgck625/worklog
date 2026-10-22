@@ -1499,7 +1499,7 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
   return (
     <div style={{ flex:1,overflowY:'auto',padding:'16px 24px' }} onClick={()=>{setAssigneeOpen(null);setCopyCatOpen(null);setBulkAssigneeOpen(false);}}>
       {/* Bulk mode bar */}
-      <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:12 }}>
+      <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:12,position:'sticky',top:0,zIndex:100,background:C.cream,paddingTop:4,paddingBottom:4 }}>
         {!bulkMode ? (
           <button onClick={()=>{setBulkMode(true);setBulkIds(new Set());}}
             style={{ padding:'4px 12px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit' }}
