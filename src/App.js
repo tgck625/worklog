@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import Timesheet from "./Timesheet";
 import NavBar from "./NavBar";
@@ -1511,9 +1512,9 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
             style={{ padding:'4px 10px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit' }}>終了</button>
         </>)}
       </div>
-      {/* Floating bulk bar */}
-      {bulkMode && bulkIds.size > 0 && (
-        <div style={{ position:'fixed',top:90,right:16,zIndex:400,background:'#fff',borderRadius:12,padding:'10px 16px',display:'flex',alignItems:'center',gap:8,boxShadow:'0 4px 20px rgba(58,53,48,0.25)',border:`1px solid ${C.border}`,flexWrap:'wrap' }}>
+      {/* Floating bulk bar (portal to body) */}
+      {bulkMode && bulkIds.size > 0 && createPortal(
+        <div style={{ position:'fixed',top:90,right:16,zIndex:9000,background:'#fff',borderRadius:12,padding:'10px 16px',display:'flex',alignItems:'center',gap:8,boxShadow:'0 4px 20px rgba(58,53,48,0.25)',border:`1px solid ${C.border}`,flexWrap:'wrap' }}>
           <span style={{ fontSize:12,color:C.text2,fontWeight:600 }}>{bulkIds.size}件選択</span>
           <div style={{ position:'relative' }}>
             <button onClick={e=>{e.stopPropagation();setBulkAssigneeOpen(!bulkAssigneeOpen);setBulkDueOpen(false);setBulkCopyOpen(false);}}
@@ -1587,7 +1588,7 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
           <button onClick={()=>{setBulkMode(false);setBulkIds(new Set());setBulkAssigneeOpen(false);setBulkCopyOpen(false);setBulkDueOpen(false);}}
             style={{ padding:'5px 10px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit' }}>✕</button>
         </div>
-      )}
+      , document.body)}
       {categories.map((cat, ci) => {
         const catTasks = catMap.get(cat);
         const color = cat === 'その他' ? C.text3 : catColors[ci % catColors.length];
