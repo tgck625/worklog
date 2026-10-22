@@ -1525,22 +1525,25 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
         {(statusFilter||memberFilterLocal) && <span style={{ fontSize:10,color:C.text3 }}>({filtered.length}/{tasks.length}件)</span>}
         {bulkMode && <>
           <div style={{ width:1,height:16,background:C.border,margin:'0 4px' }}/>
-          <span style={{ fontSize:12,color:C.text2,fontWeight:600 }}>{bulkIds.size}件選択中</span>
+          <span style={{ fontSize:10,color:C.text2,fontWeight:600 }}>{bulkIds.size}件選択中</span>
         </>}
-      </div>
-      {/* Floating bulk bar (portal to body) — always shown, toggles bulk mode or shows actions */}
-      {createPortal(
-        <div style={{ position:'fixed',top:320,right:16,zIndex:9000,background:'#fff',borderRadius:12,padding:'10px 16px',display:'flex',flexDirection:'column',alignItems:'stretch',gap:8,boxShadow:'0 4px 20px rgba(58,53,48,0.25)',border:`1px solid ${C.border}`,maxWidth:220 }}>
+        <span style={{ marginLeft:'auto',position:'relative' }}>
           {!bulkMode ? (
             <button onClick={()=>{setBulkMode(true);setBulkIds(new Set());}}
-              style={{ padding:'6px 14px',borderRadius:6,border:'none',background:C.orange,color:'#fff',cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:600 }}>一括操作</button>
-          ) : (<>
-            <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between' }}>
-              <span style={{ fontSize:12,color:C.text2,fontWeight:600 }}>{bulkIds.size}件選択</span>
-              <button onClick={()=>{setBulkMode(false);setBulkIds(new Set());setBulkAssigneeOpen(false);setBulkCopyOpen(false);setBulkDueOpen(false);}}
-                style={{ padding:'2px 8px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit' }}>✕</button>
-            </div>
-          {bulkIds.size > 0 && <><div style={{ position:'relative' }}>
+              style={{ padding:'3px 10px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit' }}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>一括操作</button>
+          ) : (
+            <button onClick={()=>{setBulkMode(false);setBulkIds(new Set());setBulkAssigneeOpen(false);setBulkCopyOpen(false);setBulkDueOpen(false);}}
+              style={{ padding:'3px 10px',borderRadius:6,border:`1px solid ${C.orange}`,background:C.orange,color:'#fff',cursor:'pointer',fontSize:10,fontFamily:'inherit',fontWeight:600 }}>選択終了</button>
+          )}
+        </span>
+      </div>
+      {/* Floating bulk action panel — only when selecting */}
+      {bulkMode && bulkIds.size > 0 && createPortal(
+        <div style={{ position:'fixed',top:320,right:16,zIndex:9000,background:'#fff',borderRadius:12,padding:'10px 16px',display:'flex',flexDirection:'column',alignItems:'stretch',gap:8,boxShadow:'0 4px 20px rgba(58,53,48,0.25)',border:`1px solid ${C.border}`,maxWidth:220 }}>
+          <span style={{ fontSize:12,color:C.text2,fontWeight:600 }}>{bulkIds.size}件選択</span>
+          <div style={{ position:'relative' }}>
             <button onClick={e=>{e.stopPropagation();setBulkAssigneeOpen(!bulkAssigneeOpen);setBulkDueOpen(false);setBulkCopyOpen(false);}}
               style={{ padding:'5px 14px',borderRadius:6,border:'none',background:C.orange,color:'#fff',cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:600 }}>担当者変更</button>
             {bulkAssigneeOpen && (
@@ -1609,8 +1612,8 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
               </div>
             )}
           </div>}
-          </>}
-          </>)}
+          <button onClick={()=>{setBulkMode(false);setBulkIds(new Set());setBulkAssigneeOpen(false);setBulkCopyOpen(false);setBulkDueOpen(false);}}
+            style={{ padding:'5px 10px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit' }}>✕</button>
         </div>
       , document.body)}
       {categories.map((cat, ci) => {
