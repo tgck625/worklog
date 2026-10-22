@@ -119,7 +119,7 @@ function Avatar({ name, color, size=24, fs=11, title }) {
   return <div title={title||name} style={{ width:size,height:size,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:fs,fontWeight:700,flexShrink:0,background:color,color:'#fff',letterSpacing:-0.5 }}>{name.slice(0,2)}</div>;
 }
 function StatusBadge({ status }) {
-  const map = { todo:['未着手',C.text3,'#f0ebe2',C.border], doing:['進行中',C.blue,'#edf1f8',C.blue+'55'], done:['完了',C.green,'#edf5f0',C.green+'55'], skip:['今回不要','#aaa','#f0f0f0','#ccc'] };
+  const map = { todo:['未着手',C.orange,'#fdf0e8',C.orange+'55'], doing:['進行中',C.blue,'#edf1f8',C.blue+'55'], done:['完了',C.text3,'#f0ede6',C.border], skip:['今回不要','#aaa','#f0f0f0','#ccc'] };
   const [label,color,bg,border] = map[status]||['','','',''];
   return <span style={{ display:'inline-flex',alignItems:'center',padding:'2px 8px',borderRadius:999,fontSize:11,fontWeight:500,background:bg,color,border:`1px solid ${border}`,whiteSpace:'nowrap' }}>{label}</span>;
 }
@@ -1392,15 +1392,18 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
     const availMembers=(pj?.visibleMemberIds?.length>0?members.filter(m=>pj.visibleMemberIds.includes(m.id)):members).filter(m=>!m.closed);
     const displayTitle = stripCategory(t.title);
     const isSkip = t.status==='skip';
-    const skipStyle = isSkip ? { opacity:0.4 } : {};
+    const isDone = t.status==='done';
+    const dimStyle = isSkip ? { opacity:0.4 } : isDone ? { opacity:0.55 } : {};
+    const rowBg = isSkip ? '#f5f4f2' : isDone ? '#f5f3ef' : '';
+    const hoverBg = isSkip ? '#eeedea' : isDone ? '#edeae5' : C.cream2;
     return (
-      <tr key={t.id} style={isSkip?{background:'#f5f4f2'}:{}}
-        onMouseEnter={e=>Array.from(e.currentTarget.cells).forEach(td=>td.style.background=isSkip?'#eeedea':C.cream2)}
-        onMouseLeave={e=>Array.from(e.currentTarget.cells).forEach(td=>td.style.background=isSkip?'#f5f4f2':'')}>
+      <tr key={t.id} style={rowBg?{background:rowBg}:{}}
+        onMouseEnter={e=>Array.from(e.currentTarget.cells).forEach(td=>td.style.background=hoverBg)}
+        onMouseLeave={e=>Array.from(e.currentTarget.cells).forEach(td=>td.style.background=rowBg||'')}>
         {bulkMode && <td style={{ ...tdStyle,padding:'8px 4px 8px 12px',width:24 }} onClick={e=>e.stopPropagation()}>
           <input type="checkbox" checked={bulkIds.has(t.id)} onChange={()=>toggleBulk(t.id)} style={{ accentColor:C.orange,cursor:'pointer',width:16,height:16 }}/>
         </td>}
-        {onTimerSelect && !bulkMode && <td style={{ ...tdStyle,padding:'8px 4px 8px 12px',width:24,...skipStyle }} onClick={e=>e.stopPropagation()}>
+        {onTimerSelect && !bulkMode && <td style={{ ...tdStyle,padding:'8px 4px 8px 12px',width:24,...dimStyle }} onClick={e=>e.stopPropagation()}>
           <button onClick={()=>onTimerSelect(t)}
             title="タイマー" style={{ background:'none',border:'none',cursor:'pointer',color:timerTaskId===t.id?C.orange:C.text3,fontSize:14,padding:'2px 4px',borderRadius:6,fontFamily:'inherit',lineHeight:1 }}
             onMouseEnter={e=>{ e.currentTarget.style.color=C.orange; e.currentTarget.style.background=C.orangeBg; }}
@@ -1408,14 +1411,14 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
             ⏱
           </button>
         </td>}
-        <td style={{ ...tdStyle,cursor:'pointer',background:timerTaskId===t.id?C.orangeBg:undefined,...skipStyle }} onClick={()=>onOpenTask(t)}>
+        <td style={{ ...tdStyle,cursor:'pointer',background:timerTaskId===t.id?C.orangeBg:undefined,...dimStyle }} onClick={()=>onOpenTask(t)}>
           <div style={{ display:'flex',alignItems:'center',gap:6 }}><PriorityDot priority={t.priority}/>{displayTitle}{t.manual&&<span title="メモあり" style={{ fontSize:9,color:C.blue,background:C.blue+'14',padding:'1px 5px',borderRadius:999 }}>📝</span>}{t.checklist?.length>0&&<span style={{ fontSize:9,color:t.checklist.filter(c=>c.checked).length===t.checklist.length?C.green:C.text3,background:C.cream2,padding:'1px 6px',borderRadius:999 }}>☑ {t.checklist.filter(c=>c.checked).length}/{t.checklist.length}</span>}</div>
         </td>
-        <td style={{ ...tdStyle,cursor:'pointer',...skipStyle }} onClick={e=>{ e.stopPropagation(); const next=t.status==='todo'?'doing':t.status==='doing'?'done':t.status==='done'?'skip':t.status==='skip'?'todo':'todo'; onStatusChange(t.id,next); }}
+        <td style={{ ...tdStyle,cursor:'pointer',...dimStyle }} onClick={e=>{ e.stopPropagation(); const next=t.status==='todo'?'doing':t.status==='doing'?'done':t.status==='done'?'skip':t.status==='skip'?'todo':'todo'; onStatusChange(t.id,next); }}
           title="クリックでステータス変更">
           <div style={{ display:'flex',alignItems:'center',gap:4 }}><StatusBadge status={t.status}/><span onClick={e=>{e.stopPropagation();onSave({...t,starred:!t.starred});}} style={{ cursor:'pointer',fontSize:14,color:t.starred?'#d4a020':C.text3+'55',lineHeight:1 }} title="今日やる">{t.starred?'★':'☆'}</span></div>
         </td>
-        <td style={{ ...tdStyle,position:'relative',cursor:'pointer',...skipStyle }}
+        <td style={{ ...tdStyle,position:'relative',cursor:'pointer',...dimStyle }}
           onClick={e=>{ e.stopPropagation(); setAssigneeOpen(assigneeOpen===t.id?null:t.id); }}>
           {mbs.length>0
             ? <div style={{ display:'flex',alignItems:'center',gap:4,flexWrap:'wrap' }}>
@@ -1439,7 +1442,7 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
             </div>
           )}
         </td>
-        <td style={{ ...tdStyle,...skipStyle }} onClick={e=>e.stopPropagation()}>
+        <td style={{ ...tdStyle,...dimStyle }} onClick={e=>e.stopPropagation()}>
           <input type="date" value={t.due||''} onChange={e=>onSave({...t,due:e.target.value})}
             style={{ border:'none',background:'transparent',color:ds.overdue?ds.bg:t.due?C.text:C.text3,fontSize:11,fontFamily:'inherit',cursor:'pointer',outline:'none',padding:0,fontWeight:ds.overdue?700:400 }}/>
           {ds.overdue && t.status!=='done' && t.status!=='skip' && <div style={{ fontSize:9,color:'#fff',background:ds.bg,borderRadius:999,padding:'1px 5px',marginTop:1,display:'inline-block',fontWeight:600 }}>{ds.overdue}日超過</div>}
@@ -1468,7 +1471,7 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
             );
           })()}
         </td>
-        <td style={{ ...tdStyle,whiteSpace:'nowrap',...skipStyle }} onClick={e=>e.stopPropagation()}>
+        <td style={{ ...tdStyle,whiteSpace:'nowrap',...dimStyle }} onClick={e=>e.stopPropagation()}>
           <NumInput value={t.estimatedMin||''} step={5} onCommit={n=>onSave({...t,estimatedMin:n||''})}
             style={{ width:40,border:'none',background:'transparent',color:t.estimatedMin?C.text2:C.text3,fontSize:11,fontFamily:'inherit',outline:'none',padding:0,textAlign:'right' }}/>
           {t.estimatedMin ? <span style={{ fontSize:10,color:C.text3 }}>m</span> : null}
