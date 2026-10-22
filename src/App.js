@@ -2138,11 +2138,11 @@ function Workflow() {
   const fetchFromGAS = useCallback(async (url) => {
     try {
       setGasFetchDebug('取得中...');
-      const res = await fetch(`${url}?action=getWorkflowData&_t=${Date.now()}`);
+      const res = await fetch(`${url}?action=getWorkflowData&_t=${Date.now()}&_r=${Math.random()}`, { cache:'no-store' });
       const json = await res.json();
       if (json.ok) {
         setLastSyncedAt(new Date());
-        if (json.data && json.version > syncVersionRef.current) {
+        if (json.data && json.version >= syncVersionRef.current) {
           const merged = json.data;
           // データ同期: 未pushの変更がある場合はリモートで上書きしない
           setData(prev => {
@@ -2160,14 +2160,17 @@ function Workflow() {
               if (prev) schedulePushRef.current?.(prev);
               return prev;
             }
+            // 同じバージョンかつタスク数も同じならスキップ
+            if (json.version === syncVersionRef.current && remoteTasks === localTasks) {
+              setGasFetchDebug(`same v${json.version} T:${remoteTasks}`);
+              return prev;
+            }
             syncVersionRef.current = json.version;
             if (prev?.catOrder && !merged.catOrder) merged.catOrder = prev.catOrder;
             saveData(merged);
             setGasFetchDebug(`OK P:${(merged.projects||[]).length} T:${(merged.tasks||[]).length}`);
             return merged;
           });
-        } else {
-          setGasFetchDebug(`skip v${json.version}<=v${syncVersionRef.current}`);
         }
       } else {
         setGasFetchDebug(`NG: ${JSON.stringify(json).slice(0,50)}`);
