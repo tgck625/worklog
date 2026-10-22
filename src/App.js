@@ -2482,7 +2482,7 @@ function Workflow() {
         </div>
       )}
       <div style={{ background:'#333',color:'#0f0',fontSize:10,padding:'6px 12px',fontFamily:'monospace',whiteSpace:'pre-wrap',zIndex:9999 }}>
-        {`ID:${_debugInfo.myMemberId||'なし'} | GAS:${_debugInfo.gasUrl} | fetch:${_debugInfo.gasFetch} | 全PJ:${_debugInfo.totalProjects} | 表示PJ:${_debugInfo.visibleCount} | 自分含むPJ:${_debugInfo.projectsWithMe} | admin:${_debugInfo.isTsuge} | sync:${_debugInfo.syncStatus||'idle'} | members:${_debugInfo.membersCount}\n`}
+        {`ID:${_debugInfo.myMemberId||'なし'} | GAS:${_debugInfo.gasUrl} | fetch:${_debugInfo.gasFetch} | 全T:${data.tasks.length} | 選択PJ:${projFilter} | 選択T:${data.tasks.filter(t=>t.projectId===projFilter).length} | fT:${filteredTasks.length} | admin:${_debugInfo.isTsuge} | sync:${_debugInfo.syncStatus||'idle'}\n`}
         {_debugInfo.sampleVisibleMemberIds.map(p=>`${p.name}: [${p.vids||'空'}]`).join(' | ')}
       </div>
       <style>{`
