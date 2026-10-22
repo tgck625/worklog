@@ -34,7 +34,7 @@ const C = {
   orange:'#e07840', orange2:'#c96830', orangeBg:'#fdf0e8', orangeBorder:'#f0c8a8',
   green:'#5a9070', blue:'#5878a0', red:'#b85050', amber:'#c08030',
 };
-const PALETTE = ['#e07840','#5a9070','#5878a0','#b85050','#c08030','#7870c0','#608090','#9870a0','#6888a8','#a07050'];
+const PALETTE = ['#e07840','#2e8b57','#4a72a8','#c04848','#b87820','#6858c0','#c84878','#1a8a8a','#8850a8','#8b6040','#d04880','#2868b0','#488a28','#7848b0','#a87818','#b83838','#187898','#6060c0','#a84868','#388858'];
 const KEY = 'kodawarin_tasks';
 const PIN_KEY = 'wf_tsuge_pin';
 
@@ -54,6 +54,8 @@ function loadData() {
     d.projects = (d.projects||[]).map(p => ({ type:'other', ...p }));
     d.tasks = (d.tasks||[]).map(t => { if(t.eventId&&!t.projectId){t.projectId=t.eventId;delete t.eventId;} return t; });
     d.tasks = d.tasks.map(t => { if (!t.assigneeIds) { t.assigneeIds = t.assigneeId ? [t.assigneeId] : []; } return t; });
+    // migrate catOrder from localStorage to data
+    if (!d.catOrder) { try { const co = JSON.parse(localStorage.getItem('wf_listCatOrder')); if (co?.length) d.catOrder = co; } catch {} }
     return d;
   } catch { return getDefaultData(); }
 }
@@ -112,11 +114,11 @@ function getDoneOverdue(t) {
 }
 
 // ── Primitive UI ──────────────────────────────────────────────────────────
-function Avatar({ name, color, size=24, fs=11 }) {
-  return <div style={{ width:size,height:size,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:fs,fontWeight:700,flexShrink:0,background:color+'28',color }}>{name[0]}</div>;
+function Avatar({ name, color, size=24, fs=11, title }) {
+  return <div title={title||name} style={{ width:size,height:size,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:fs,fontWeight:700,flexShrink:0,background:color,color:'#fff',letterSpacing:-0.5 }}>{name.slice(0,2)}</div>;
 }
 function StatusBadge({ status }) {
-  const map = { todo:['未着手',C.text3,'#f0ebe2',C.border], doing:['進行中',C.blue,'#edf1f8',C.blue+'55'], done:['完了',C.green,'#edf5f0',C.green+'55'] };
+  const map = { todo:['未着手',C.text3,'#f0ebe2',C.border], doing:['進行中',C.blue,'#edf1f8',C.blue+'55'], done:['完了',C.green,'#edf5f0',C.green+'55'], skip:['今回不要','#aaa','#f0f0f0','#ccc'] };
   const [label,color,bg,border] = map[status]||['','','',''];
   return <span style={{ display:'inline-flex',alignItems:'center',padding:'2px 8px',borderRadius:999,fontSize:11,fontWeight:500,background:bg,color,border:`1px solid ${border}`,whiteSpace:'nowrap' }}>{label}</span>;
 }
@@ -328,7 +330,7 @@ function DuplicateModal({ open, onClose, project, tasks, members, onDuplicate })
 // ── Copy Tasks Modal ──────────────────────────────────────────────────────
 function CopyTasksModal({ currentProjectId, projects, tasks, onClose, onCopy }) {
   const [srcId, setSrcId] = useState('');
-  const srcOptions = projects.filter(p => p.id !== currentProjectId);
+  const srcOptions = projects.filter(p => p.id !== currentProjectId && !p.closed).sort((a,b)=>(a.eventDate||'9999').localeCompare(b.eventDate||'9999'));
   const srcProject = projects.find(p => p.id === srcId);
   const currentProject = projects.find(p => p.id === currentProjectId);
   const srcTasks = tasks.filter(t => t.projectId === srcId);
@@ -344,7 +346,7 @@ function CopyTasksModal({ currentProjectId, projects, tasks, onClose, onCopy }) 
         const offset = daysDiff(due, srcBase);
         due = addDays(currentBase, offset);
       }
-      return { ...t, id: genId(), projectId: currentProjectId, status: 'todo', due, doneAt: undefined };
+      return { ...t, id: genId(), projectId: currentProjectId, status: 'todo', due, doneAt: undefined, checklist:(t.checklist||[]).map(c=>({...c,id:genId(),checked:false})) };
     });
     onCopy(newTasks);
   }
@@ -355,7 +357,12 @@ function CopyTasksModal({ currentProjectId, projects, tasks, onClose, onCopy }) 
       <FG label="コピー元プロジェクト">
         <Select value={srcId} onChange={e=>setSrcId(e.target.value)}>
           <option value="">-- 選択 --</option>
-          {srcOptions.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+          {srcOptions.filter(p=>p.type==='event').length>0 && <optgroup label="イベント">
+            {srcOptions.filter(p=>p.type==='event').map(p=><option key={p.id} value={p.id}>{p.name}{p.eventDate ? ` (${p.eventDate})` : ''}</option>)}
+          </optgroup>}
+          {srcOptions.filter(p=>p.type!=='event').length>0 && <optgroup label="その他">
+            {srcOptions.filter(p=>p.type!=='event').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+          </optgroup>}
         </Select>
       </FG>
       {srcProject && (
@@ -403,12 +410,18 @@ function TaskModal({ open, onClose, data, projects, members, defaultProjectId, d
   const [estimatedMin,setEstimatedMin]=useState('');
   const [manual,setManual]=useState('');
   const [isPrivate,setIsPrivate]=useState(false);
+  const [starred,setStarred]=useState(false);
+  const [checklist,setChecklist]=useState([]);
+  const [newCheckItem,setNewCheckItem]=useState('');
+  const checkComposingRef=useRef(false);
+  const checkEnterRef=useRef(0);
   const titleRef=useRef(null);
 
   useEffect(()=>{
     if(!open) return;
-    if(data){ setTitle(data.title); setProjectId(data.projectId); setAssigneeIds(data.assigneeIds||[]); setDue(data.due||''); setStatus(data.status); setPriority(data.priority); setMemo(data.memo||''); setEstimatedMin(data.estimatedMin||''); setManual(data.manual||''); setIsPrivate(!!data.isPrivate); }
-    else { const t=defaultTitle||'【】'; setTitle(t); setProjectId(defaultProjectId!=='all'?defaultProjectId:(projects[0]?.id||'')); setAssigneeIds(defaultAssigneeId?[defaultAssigneeId]:[]); setDue(''); setStatus(defaultStatus||'todo'); setPriority('mid'); setMemo(''); setEstimatedMin(''); setManual(''); setIsPrivate(false); }
+    if(data){ setTitle(data.title); setProjectId(data.projectId); setAssigneeIds(data.assigneeIds||[]); setDue(data.due||''); setStatus(data.status); setPriority(data.priority); setMemo(data.memo||''); setEstimatedMin(data.estimatedMin||''); setManual(data.manual||''); setIsPrivate(!!data.isPrivate); setChecklist(data.checklist||[]); setStarred(!!data.starred); }
+    else { const t=defaultTitle||'【】'; setTitle(t); setProjectId(defaultProjectId!=='all'?defaultProjectId:(projects[0]?.id||'')); setAssigneeIds(defaultAssigneeId?[defaultAssigneeId]:[]); setDue(''); setStatus(defaultStatus||'todo'); setPriority('mid'); setMemo(''); setEstimatedMin(''); setManual(''); setIsPrivate(false); setChecklist([]); setStarred(false); }
+    setNewCheckItem('');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[open]);
 
@@ -420,16 +433,16 @@ function TaskModal({ open, onClose, data, projects, members, defaultProjectId, d
 
   const selProj = projects.find(p=>p.id===projectId);
   const relLabel = selProj && due ? getRelLabel(selProj, due) : null;
-  const availableMembers = (selProj?.visibleMemberIds?.length > 0)
+  const availableMembers = ((selProj?.visibleMemberIds?.length > 0)
     ? members.filter(m => selProj.visibleMemberIds.includes(m.id))
-    : members;
+    : members).filter(m => !m.closed);
 
   return (
     <Modal open={open} onClose={onClose} title={data?'タスクを編集':'タスクを追加'}
       footer={<>
         {data && <Btn variant="danger" style={{ marginRight:'auto' }} onClick={()=>{ if(window.confirm('このタスクを削除しますか？')){onDelete(data.id);onClose();} }}>削除</Btn>}
         <Btn onClick={onClose}>キャンセル</Btn>
-        <Btn variant="primary" onClick={()=>{ if(!title.trim()){alert('タスク名を入力してください');return;} onSave({id:data?.id||genId(),title:title.trim(),projectId,assigneeIds,due,status,priority,memo,estimatedMin:estimatedMin?Number(estimatedMin):0,manual,isPrivate}); onClose(); }}>保存</Btn>
+        <Btn variant="primary" onClick={()=>{ if(!title.trim()){alert('タスク名を入力してください');return;} onSave({id:data?.id||genId(),title:title.trim(),projectId,assigneeIds,due,status,priority,memo,estimatedMin:estimatedMin?Number(estimatedMin):0,manual,isPrivate,starred,checklist}); onClose(); }}>保存</Btn>
       </>}>
       <FG label="タスク名"><Input ref={titleRef} value={title} onChange={e=>setTitle(e.target.value)} placeholder="タスクの内容を入力" autoFocus/></FG>
       <FG label="プロジェクト">
@@ -460,7 +473,34 @@ function TaskModal({ open, onClose, data, projects, members, defaultProjectId, d
         </div>
       </FG>
       <FG label="期日">
-        <Input type="date" value={due} onChange={e=>setDue(e.target.value)}/>
+        <div style={{ display:'flex',alignItems:'center',gap:8 }}>
+          <Input type="date" value={due} onChange={e=>setDue(e.target.value)} style={{ flex:1 }}/>
+          {selProj && (selProj.eventDate || selProj.end) && (() => {
+            const base = selProj.eventDate||selProj.end;
+            const diff = due ? daysDiff(due, base) : null;
+            const absDiff = diff!==null ? Math.abs(diff) : '';
+            const dir = diff!==null ? (diff<=0?'before':'after') : 'before';
+            const weeksVal = absDiff!=='' && absDiff%7===0 ? absDiff/7 : '';
+            return (
+              <div style={{ display:'flex',alignItems:'center',gap:4,flexShrink:0,flexWrap:'wrap' }}>
+                <input type="number" min="0" placeholder="N" value={absDiff}
+                  onChange={e=>{ const n=parseInt(e.target.value); if(!isNaN(n)&&n>=0) setDue(addDays(base, dir==='before'?-n:n)); }}
+                  style={{ width:40,padding:'4px 6px',border:`1px solid ${C.border}`,borderRadius:6,fontSize:12,fontFamily:'inherit',textAlign:'center',outline:'none' }}/>
+                <span style={{ fontSize:11,color:C.text3 }}>日</span>
+                <span style={{ fontSize:11,color:C.text3+'88' }}>/</span>
+                <input type="number" min="0" placeholder="N" value={weeksVal}
+                  onChange={e=>{ const n=parseInt(e.target.value); if(!isNaN(n)&&n>=0) setDue(addDays(base, dir==='before'?-n*7:n*7)); }}
+                  style={{ width:40,padding:'4px 6px',border:`1px solid ${C.border}`,borderRadius:6,fontSize:12,fontFamily:'inherit',textAlign:'center',outline:'none' }}/>
+                <span style={{ fontSize:11,color:C.text3 }}>週</span>
+                <select value={dir} onChange={e=>{ if(absDiff!==''&&absDiff>0) setDue(addDays(base, e.target.value==='before'?-absDiff:absDiff)); }}
+                  style={{ padding:'3px 4px',border:`1px solid ${C.border}`,borderRadius:6,fontSize:11,fontFamily:'inherit',color:C.text2,outline:'none',background:'#fff' }}>
+                  <option value="before">前</option>
+                  <option value="after">後</option>
+                </select>
+              </div>
+            );
+          })()}
+        </div>
         {relLabel && <div style={{ fontSize:11,color:C.orange,marginTop:3 }}>{relLabel}</div>}
       </FG>
       <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12 }}>
@@ -469,6 +509,7 @@ function TaskModal({ open, onClose, data, projects, members, defaultProjectId, d
             <option value="todo">未着手</option>
             <option value="doing">進行中</option>
             <option value="done">完了</option>
+            <option value="skip">今回不要</option>
           </Select>
         </FG>
         <FG label="優先度">
@@ -482,14 +523,42 @@ function TaskModal({ open, onClose, data, projects, members, defaultProjectId, d
           <Input type="number" min="0" value={estimatedMin} onChange={e=>setEstimatedMin(e.target.value)} placeholder="例: 30"/>
         </FG>
       </div>
-      <FG label="メモ"><Textarea value={memo} onChange={e=>setMemo(e.target.value)} placeholder="詳細や備考（任意）"/></FG>
-      <FG label="マニュアル"><Textarea value={manual} onChange={e=>setManual(e.target.value)} placeholder="作業手順・マニュアル（任意）" style={{ minHeight:100 }}/></FG>
-      {isTsuge && (
-        <label style={{ display:'flex',alignItems:'center',gap:8,fontSize:12,color:C.text2,cursor:'pointer' }}>
-          <input type="checkbox" checked={isPrivate} onChange={e=>setIsPrivate(e.target.checked)}/>
-          非公開（柘植のみ表示）
-        </label>
-      )}
+      <button onClick={()=>setStarred(!starred)} style={{ display:'flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:999,border:`1px solid ${starred?'#d4a020':C.border}`,background:starred?'#fef8e8':'transparent',color:starred?'#b8860b':C.text3,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:starred?600:400,transition:'all 0.15s',marginBottom:4 }}>
+        <span style={{ fontSize:16 }}>{starred?'★':'☆'}</span>今日やる
+      </button>
+      <FG label="マニュアル・メモ"><Textarea value={manual} onChange={e=>setManual(e.target.value)} placeholder="作業手順・マニュアル（任意）" style={{ minHeight:100 }}/></FG>
+      <FG label="チェックリスト">
+        <div style={{ display:'flex',flexDirection:'column',gap:4 }}>
+          {checklist.map((item,i)=>(
+            <div key={item.id} style={{ display:'flex',alignItems:'center',gap:6,padding:'4px 8px',borderRadius:8,background:item.checked?C.cream2:'transparent',border:`1px solid ${C.border}` }}>
+              <input type="checkbox" checked={!!item.checked} onChange={()=>setChecklist(cl=>cl.map((c,j)=>j===i?{...c,checked:!c.checked}:c))} style={{ accentColor:C.green,cursor:'pointer',flexShrink:0 }}/>
+              <input value={item.text} onChange={e=>setChecklist(cl=>cl.map((c,j)=>j===i?{...c,text:e.target.value}:c))}
+                style={{ flex:1,fontSize:12,color:item.checked?C.text3:C.text,textDecoration:item.checked?'line-through':'none',border:'none',background:'transparent',outline:'none',fontFamily:'inherit',padding:'2px 0' }}/>
+              <div style={{ display:'flex',flexDirection:'column',gap:0,flexShrink:0 }}>
+                <button disabled={i===0} onClick={()=>setChecklist(cl=>{const a=[...cl];[a[i-1],a[i]]=[a[i],a[i-1]];return a;})}
+                  style={{ background:'none',border:'none',cursor:i===0?'default':'pointer',color:i===0?C.text3+'55':C.text3,fontSize:8,padding:0,lineHeight:1,fontFamily:'inherit' }}>▲</button>
+                <button disabled={i===checklist.length-1} onClick={()=>setChecklist(cl=>{const a=[...cl];[a[i],a[i+1]]=[a[i+1],a[i]];return a;})}
+                  style={{ background:'none',border:'none',cursor:i===checklist.length-1?'default':'pointer',color:i===checklist.length-1?C.text3+'55':C.text3,fontSize:8,padding:0,lineHeight:1,fontFamily:'inherit' }}>▼</button>
+              </div>
+              <button onClick={()=>setChecklist(cl=>cl.filter((_,j)=>j!==i))} style={{ background:'none',border:'none',color:C.text3,cursor:'pointer',fontSize:12,padding:'0 2px',fontFamily:'inherit',flexShrink:0 }}
+                onMouseEnter={e=>e.currentTarget.style.color=C.red} onMouseLeave={e=>e.currentTarget.style.color=C.text3}>✕</button>
+            </div>
+          ))}
+          <div style={{ display:'flex',gap:6 }}>
+            <input value={newCheckItem} onChange={e=>{setNewCheckItem(e.target.value);checkEnterRef.current=0;}} placeholder="項目を追加…"
+              onCompositionStart={()=>checkComposingRef.current=true}
+              onCompositionEnd={()=>{checkComposingRef.current=false;checkEnterRef.current=0;}}
+              onKeyDown={e=>{ if(e.key==='Enter'&&!checkComposingRef.current&&newCheckItem.trim()){ e.preventDefault(); checkEnterRef.current++; if(checkEnterRef.current>=2){ setChecklist(cl=>[...cl,{id:genId(),text:newCheckItem.trim(),checked:false}]); setNewCheckItem(''); checkEnterRef.current=0; } } }}
+              style={{ flex:1,padding:'6px 10px',borderRadius:8,border:`1px solid ${C.border}`,fontSize:12,fontFamily:'inherit',color:C.text,outline:'none' }}/>
+            <button onClick={()=>{ if(newCheckItem.trim()){ setChecklist(cl=>[...cl,{id:genId(),text:newCheckItem.trim(),checked:false}]); setNewCheckItem(''); checkEnterRef.current=0; } }}
+              style={{ padding:'4px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.cream2,color:C.text2,cursor:'pointer',fontSize:12,fontFamily:'inherit' }}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text2;}}>＋</button>
+          </div>
+          {newCheckItem.trim()&&checkEnterRef.current>=1&&<div style={{ fontSize:10,color:C.text3 }}>Enterをもう1回押して追加</div>}
+          {checklist.length>0 && <div style={{ fontSize:10,color:C.text3 }}>{checklist.filter(c=>c.checked).length}/{checklist.length} 完了</div>}
+        </div>
+      </FG>
     </Modal>
   );
 }
@@ -592,7 +661,7 @@ function ProjectModal({ open, onClose, data, members, onSave, onDelete, isTsuge,
         {(members||[]).length>0 ? (
           <>
             <div style={{ display:'flex',flexWrap:'wrap',gap:8,marginBottom:6 }}>
-              {(members||[]).map(m=>{
+              {(members||[]).filter(m=>!m.closed).map(m=>{
                 const checked = visibleMemberIds.includes(m.id);
                 return (
                   <label key={m.id} style={{ display:'flex',alignItems:'center',gap:6,fontSize:12,color:C.text,cursor:'pointer',padding:'5px 10px',borderRadius:999,border:`1px solid ${checked?m.color:C.border}`,background:checked?m.color+'22':'transparent',transition:'all 0.12s' }}>
@@ -629,62 +698,26 @@ function ProjectModal({ open, onClose, data, members, onSave, onDelete, isTsuge,
 
 // ── Member Modal ──────────────────────────────────────────────────────────
 function MemberModal({ open, onClose, onSave, existingMemberIds }) {
-  const [fbUsers, setFbUsers] = useState({});
-  const [selected, setSelected] = useState([]);
-  useEffect(()=>{
-    if(!open) return;
-    setSelected([]);
-    import("firebase/database").then(({ ref: fbRef, onValue })=>{
-      import("./firebase").then(({ db: fbDb })=>{
-        if (!fbDb) return;
-        const unsub = onValue(fbRef(fbDb, "users"), (snap)=>{ setFbUsers(snap.val()||{}); });
-        return ()=>unsub();
-      });
-    });
-  },[open]);
-  const availableUsers = Object.entries(fbUsers)
-    .filter(([,u])=>u.status==='approved')
-    .filter(([uid])=>!(existingMemberIds||[]).includes(uid));
+  const [name, setName] = useState('');
+  const composingRef = useRef(false);
+  const enterCountRef = useRef(0);
+  useEffect(()=>{ if(open){ setName(''); enterCountRef.current=0; } },[open]);
   function handleAdd() {
-    selected.forEach((uid,i)=>{
-      const u = fbUsers[uid];
-      if(u) {
-        onSave({ id:uid, name:u.displayName, color:PALETTE[(i+1)%PALETTE.length] });
-        // Firebase の memberId も自動設定
-        import("firebase/database").then(({ ref: fbRef, update: fbUpdate })=>{
-          import("./firebase").then(({ db: fbDb })=>{
-            if (fbDb) fbUpdate(fbRef(fbDb, `users/${uid}`), { memberId: uid });
-          });
-        });
-      }
-    });
+    const n = name.trim();
+    if(!n) return;
+    onSave({ id: genId(), name: n, color: PALETTE[((existingMemberIds||[]).length+1)%PALETTE.length] });
     onClose();
   }
   return (
     <Modal open={open} onClose={onClose} title="メンバーを追加"
-      footer={<><Btn onClick={onClose}>キャンセル</Btn><Btn variant="primary" onClick={handleAdd} disabled={selected.length===0}>追加 ({selected.length})</Btn></>}>
-      {availableUsers.length===0
-        ? <div style={{ fontSize:12,color:C.text3,textAlign:'center',padding:20 }}>追加できるメンバーがいません</div>
-        : <>
-          <div style={{ fontSize:11,color:C.text3,marginBottom:10 }}>登録済みメンバーから選択してください（複数可）</div>
-          <div style={{ display:'flex',flexDirection:'column',gap:6 }}>
-            {availableUsers.map(([uid,u])=>{
-              const checked = selected.includes(uid);
-              return (
-                <label key={uid} onClick={()=>setSelected(prev=>checked?prev.filter(id=>id!==uid):[...prev,uid])}
-                  style={{ display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:10,border:`1px solid ${checked?C.orange:C.border}`,background:checked?C.orangeBg:'#fff',cursor:'pointer',transition:'all 0.12s' }}>
-                  <div style={{ width:18,height:18,borderRadius:4,border:`2px solid ${checked?C.orange:C.border}`,background:checked?C.orange:'transparent',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700,flexShrink:0 }}>
-                    {checked&&'✓'}
-                  </div>
-                  <div>
-                    <div style={{ fontSize:13,fontWeight:500,color:C.text }}>{u.displayName}</div>
-                    <div style={{ fontSize:11,color:C.text3 }}>{u.email}</div>
-                  </div>
-                </label>
-              );
-            })}
-          </div>
-        </>}
+      footer={<><Btn onClick={onClose}>キャンセル</Btn><Btn variant="primary" onClick={handleAdd} disabled={!name.trim()}>追加</Btn></>}>
+      <FG label="メンバー名">
+        <Input value={name} onChange={e=>{setName(e.target.value);enterCountRef.current=0;}} placeholder="名前を入力" autoFocus
+          onCompositionStart={()=>composingRef.current=true}
+          onCompositionEnd={()=>{composingRef.current=false;enterCountRef.current=0;}}
+          onKeyDown={e=>{ if(e.key==='Enter'&&!composingRef.current){ e.preventDefault(); enterCountRef.current++; if(enterCountRef.current>=2) handleAdd(); } }}/>
+        {name.trim()&&<div style={{ fontSize:10,color:C.text3,marginTop:3 }}>Enterをもう1回押して確定</div>}
+      </FG>
     </Modal>
   );
 }
@@ -699,16 +732,24 @@ function stripCategory(title) {
 }
 
 // ── Kanban ────────────────────────────────────────────────────────────────
-function KanbanView({ tasks, projects, members, onOpenTask, onStatusChange, onAddTask, onDuplicateTask, taskOrder, onReorder, isMobile, onAddTaskWithStatus, onTimerSelect, timerTaskId }) {
+function KanbanView({ tasks, projects, members, onOpenTask, onStatusChange, onAddTask, onDuplicateTask, onCopyTaskToProject, taskOrder, onReorder, isMobile, onAddTaskWithStatus, onTimerSelect, timerTaskId }) {
   const dragId = useRef(null);
   const dragSourceCol = useRef(null);
   const dragOverCard = useRef(null);
+  const [copyToOpen, setCopyToOpen] = useState(null);
+  const kanbanOrderedProjects = (() => {
+    const active = projects.filter(p=>!p.closed);
+    const ev = active.filter(p=>p.type==='event').sort((a,b)=>(a.eventDate||'9999').localeCompare(b.eventDate||'9999'));
+    const ot = active.filter(p=>p.type!=='event').sort((a,b)=>(b.start||b.end||'').localeCompare(a.start||a.end||''));
+    return [...ev,...ot];
+  })();
   const [groupByCategory, setGroupByCategory] = useState(()=>{ try { return localStorage.getItem('wf_kanban_catGroup')==='true'; } catch { return false; } });
   const toggleCatGroup = () => { setGroupByCategory(prev => { const v=!prev; try{localStorage.setItem('wf_kanban_catGroup',String(v))}catch{} return v; }); };
   const statuses = [
     { key:'todo', label:'未着手', color:C.text3 },
     { key:'doing', label:'進行中', color:C.blue },
     { key:'done', label:'完了', color:C.green },
+    { key:'skip', label:'今回不要', color:'#aaa' },
   ];
 
   function getSortedColTasks(colKey) {
@@ -743,7 +784,7 @@ function KanbanView({ tasks, projects, members, onOpenTask, onStatusChange, onAd
     const displayTitle = groupByCategory ? stripCategory(t.title) : t.title;
     const cat = extractCategory(t.title);
     return (
-      <div key={t.id} draggable onClick={()=>onTimerSelect?onTimerSelect(t):onOpenTask(t)}
+      <div key={t.id} draggable onClick={()=>onOpenTask(t)}
         onDragStart={()=>{ dragId.current=t.id; dragSourceCol.current=st.key; }}
         onDragEnd={()=>{ dragId.current=null; dragSourceCol.current=null; dragOverCard.current=null; }}
         onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); dragOverCard.current=t.id; }}
@@ -804,6 +845,15 @@ function KanbanView({ tasks, projects, members, onOpenTask, onStatusChange, onAd
                 ⧉
               </button>
             )}
+            {onCopyTaskToProject && <div style={{ display:'inline-block',position:'relative' }}>
+              <button onClick={e=>{ e.stopPropagation(); setCopyToOpen(copyToOpen===t.id?null:t.id); }}
+                title="他プロジェクトにコピー" style={{ padding:'1px 6px',borderRadius:999,border:`1px solid ${C.border}`,background:C.cream2,color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.5 }}
+                onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.green; e.currentTarget.style.color=C.green; }}
+                onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; }}>
+                ➜
+              </button>
+              {copyToOpen===t.id && <ProjectPickerDropdown projects={kanbanOrderedProjects} excludeId={t.projectId} onSelect={pid=>{ onCopyTaskToProject(t,pid); setCopyToOpen(null); }}/>}
+            </div>}
             <button onClick={e=>{ e.stopPropagation(); if(window.confirm('削除しますか？')) onStatusChange(t.id,'__delete__'); }}
               style={{ padding:'2px 7px',borderRadius:999,border:`1px solid ${C.red}44`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.5 }}
               onMouseEnter={e=>{ e.currentTarget.style.background=C.red; e.currentTarget.style.color='#fff'; e.currentTarget.style.borderColor=C.red; }}
@@ -818,7 +868,7 @@ function KanbanView({ tasks, projects, members, onOpenTask, onStatusChange, onAd
                 →完了
               </button>
             )}
-            <button onClick={e=>{ e.stopPropagation(); const next=t.status==='todo'?'doing':t.status==='doing'?'done':'todo'; onStatusChange(t.id,next); }}
+            <button onClick={e=>{ e.stopPropagation(); const next=t.status==='todo'?'doing':t.status==='doing'?'done':t.status==='done'?'skip':t.status==='skip'?'todo':'todo'; onStatusChange(t.id,next); }}
               style={{ padding:'2px 8px',borderRadius:999,border:`1px solid ${C.border}`,background:C.cream2,color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.5,whiteSpace:'nowrap' }}
               onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.orange; e.currentTarget.style.color=C.orange; e.currentTarget.style.background=C.orangeBg; }}
               onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; e.currentTarget.style.background=C.cream2; }}>
@@ -1218,11 +1268,80 @@ function TimerPanel({ timerTask, projects, onClearTask }) {
   );
 }
 
+function ProjectPickerDropdown({ projects, excludeId, onSelect, style }) {
+  const filtered = projects.filter(p=>p.id!==excludeId);
+  const events = filtered.filter(p=>p.type==='event');
+  const others = filtered.filter(p=>p.type!=='event');
+  return (
+    <div onClick={e=>e.stopPropagation()} style={{ position:'absolute',top:'100%',right:0,zIndex:100,background:'#fff',border:`1px solid ${C.border}`,borderRadius:8,boxShadow:'0 4px 16px rgba(0,0,0,0.12)',minWidth:200,maxHeight:280,overflowY:'auto',padding:4,...style }}>
+      {events.length>0 && <div style={{ fontSize:9,fontWeight:700,color:C.text3,padding:'4px 8px 2px',letterSpacing:1 }}>イベント</div>}
+      {events.map(p=>(
+        <div key={p.id} onClick={()=>onSelect(p.id)}
+          style={{ padding:'5px 10px',fontSize:11,cursor:'pointer',borderRadius:6,display:'flex',alignItems:'center',gap:6 }}
+          onMouseEnter={e=>e.currentTarget.style.background=C.cream2} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+          <div style={{ width:6,height:6,borderRadius:'50%',background:p.color,flexShrink:0 }}/>{p.name}
+        </div>
+      ))}
+      {others.length>0 && <div style={{ fontSize:9,fontWeight:700,color:C.text3,padding:'4px 8px 2px',letterSpacing:1,marginTop:events.length?4:0 }}>その他</div>}
+      {others.map(p=>(
+        <div key={p.id} onClick={()=>onSelect(p.id)}
+          style={{ padding:'5px 10px',fontSize:11,cursor:'pointer',borderRadius:6,display:'flex',alignItems:'center',gap:6 }}
+          onMouseEnter={e=>e.currentTarget.style.background=C.cream2} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+          <div style={{ width:6,height:6,borderRadius:'50%',background:p.color,flexShrink:0 }}/>{p.name}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Commit-on-blur number input ──────────────────────────────────────────
+function NumInput({ value, onCommit, placeholder, style, min, step }) {
+  const [local, setLocal] = useState(String(value ?? ''));
+  const prev = useRef(value);
+  if (value !== prev.current) { prev.current = value; setLocal(String(value ?? '')); }
+  const commit = () => { const n = parseInt(local); onCommit(isNaN(n) ? '' : n); };
+  return <input type="number" min={min??0} step={step} placeholder={placeholder||'-'} value={local}
+    onChange={e=>setLocal(e.target.value)}
+    onBlur={commit}
+    onKeyDown={e=>{ if(e.key==='Enter'){e.target.blur();} }}
+    style={style}/>;
+}
+
 // ── List View ─────────────────────────────────────────────────────────────
-function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDelete, onSave, onTimerSelect, timerTaskId, onAddTask, onCopyCategoryToProject }) {
+function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDelete, onDeleteTasks, onSave, onSaveBulk, onTimerSelect, timerTaskId, onAddTask, onCopyCategoryToProject, onDuplicateTask, onCopyTaskToProject, catOrder, onCatOrderChange, onRenameCategory, currentProject }) {
   const [assigneeOpen, setAssigneeOpen] = useState(null);
-  const [catOrder, setCatOrder] = useState(()=>{ try { return JSON.parse(localStorage.getItem('wf_listCatOrder'))||[]; } catch { return []; } });
   const [copyCatOpen, setCopyCatOpen] = useState(null);
+  const [copyToOpen, setCopyToOpen] = useState(null);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkIds, setBulkIds] = useState(new Set());
+  const [bulkAssigneeOpen, setBulkAssigneeOpen] = useState(false);
+  const [bulkCopyOpen, setBulkCopyOpen] = useState(false);
+  const [bulkDueOpen, setBulkDueOpen] = useState(false);
+  const [bulkDueDate, setBulkDueDate] = useState('');
+  const [bulkDueDaysBefore, setBulkDueDaysBefore] = useState('');
+  const [bulkDueDir, setBulkDueDir] = useState('before');
+  const [catReorderOpen, setCatReorderOpen] = useState(false);
+  const [dragCat, setDragCat] = useState(null);
+  const [dragOverCat, setDragOverCat] = useState(null);
+  const activeMembers = members.filter(m=>!m.closed);
+  // Ordered project list matching sidebar: events by date, then others
+  const orderedProjects = (() => {
+    const active = projects.filter(p=>!p.closed);
+    const ev = active.filter(p=>p.type==='event').sort((a,b)=>(a.eventDate||'9999').localeCompare(b.eventDate||'9999'));
+    const ot = active.filter(p=>p.type!=='event').sort((a,b)=>(b.start||b.end||'').localeCompare(a.start||a.end||''));
+    return [...ev,...ot];
+  })();
+  function toggleBulk(id) { setBulkIds(prev=>{const s=new Set(prev);s.has(id)?s.delete(id):s.add(id);return s;}); }
+  function bulkAddAssignee(memberId) {
+    const updated = tasks.filter(t=>bulkIds.has(t.id)&&!(t.assigneeIds||[]).includes(memberId))
+      .map(t=>({...t,assigneeIds:[...(t.assigneeIds||[]),memberId]}));
+    if(updated.length) onSaveBulk(updated);
+  }
+  function bulkRemoveAssignee(memberId) {
+    const updated = tasks.filter(t=>bulkIds.has(t.id)&&(t.assigneeIds||[]).includes(memberId))
+      .map(t=>({...t,assigneeIds:(t.assigneeIds||[]).filter(id=>id!==memberId)}));
+    if(updated.length) onSaveBulk(updated);
+  }
   if (!tasks.length) return <div style={{ flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:C.text3,gap:10 }}><div style={{ fontSize:36 }}>📋</div><div style={{ fontSize:14,color:C.text2 }}>タスクがありません</div>{onAddTask&&<button onClick={onAddTask} style={{ marginTop:8,padding:'8px 20px',borderRadius:10,border:`1.5px dashed ${C.border2}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:12,fontFamily:'inherit' }} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border2;e.currentTarget.style.color=C.text3;}}>＋ タスク追加</button>}</div>;
   const thStyle = { textAlign:'left',fontSize:10,fontWeight:600,color:C.text3,letterSpacing:0.5,textTransform:'uppercase',padding:'8px 12px',borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap' };
   const tdStyle = { padding:'8px 12px',borderBottom:`1px solid ${C.border}`,verticalAlign:'middle' };
@@ -1250,8 +1369,7 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
     const ni = idx+dir;
     if(ni<0||ni>=curr.length) return;
     [curr[idx],curr[ni]]=[curr[ni],curr[idx]];
-    setCatOrder(curr);
-    localStorage.setItem('wf_listCatOrder', JSON.stringify(curr));
+    onCatOrderChange(curr);
   }
   const catColors = ['#5856d6','#1a6bbf','#e07840','#34c759','#ff9500','#ff3b30','#8e8e93'];
 
@@ -1260,20 +1378,37 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
     const mbs=(t.assigneeIds||[]).map(id=>members.find(m=>m.id===id)).filter(Boolean);
     const ds=getDueStyle(t.due);
     const rel=pj&&t.due?getRelLabel(pj,t.due):null;
-    const availMembers=pj?.visibleMemberIds?.length>0?members.filter(m=>pj.visibleMemberIds.includes(m.id)):members;
+    const availMembers=(pj?.visibleMemberIds?.length>0?members.filter(m=>pj.visibleMemberIds.includes(m.id)):members).filter(m=>!m.closed);
     const displayTitle = stripCategory(t.title);
+    const isSkip = t.status==='skip';
+    const skipStyle = isSkip ? { opacity:0.4 } : {};
     return (
-      <tr key={t.id}
-        onMouseEnter={e=>Array.from(e.currentTarget.cells).forEach(td=>td.style.background=C.cream2)}
-        onMouseLeave={e=>Array.from(e.currentTarget.cells).forEach(td=>td.style.background='')}>
-        <td style={{ ...tdStyle,cursor:'pointer',background:timerTaskId===t.id?C.orangeBg:undefined }} onClick={()=>onTimerSelect?onTimerSelect(t):onOpenTask(t)}>
-          <div style={{ display:'flex',alignItems:'center',gap:6 }}><PriorityDot priority={t.priority}/>{displayTitle}{t.isPrivate&&<span style={{ fontSize:9,color:C.orange,background:C.orangeBg,border:`1px solid ${C.orangeBorder}`,padding:'1px 5px',borderRadius:999 }}>🔐</span>}</div>
+      <tr key={t.id} style={isSkip?{background:'#f5f4f2'}:{}}
+        onMouseEnter={e=>Array.from(e.currentTarget.cells).forEach(td=>td.style.background=isSkip?'#eeedea':C.cream2)}
+        onMouseLeave={e=>Array.from(e.currentTarget.cells).forEach(td=>td.style.background=isSkip?'#f5f4f2':'')}>
+        {bulkMode && <td style={{ ...tdStyle,padding:'8px 4px 8px 12px',width:24 }} onClick={e=>e.stopPropagation()}>
+          <input type="checkbox" checked={bulkIds.has(t.id)} onChange={()=>toggleBulk(t.id)} style={{ accentColor:C.orange,cursor:'pointer',width:16,height:16 }}/>
+        </td>}
+        {onTimerSelect && !bulkMode && <td style={{ ...tdStyle,padding:'8px 4px 8px 12px',width:24,...skipStyle }} onClick={e=>e.stopPropagation()}>
+          <button onClick={()=>onTimerSelect(t)}
+            title="タイマー" style={{ background:'none',border:'none',cursor:'pointer',color:timerTaskId===t.id?C.orange:C.text3,fontSize:14,padding:'2px 4px',borderRadius:6,fontFamily:'inherit',lineHeight:1 }}
+            onMouseEnter={e=>{ e.currentTarget.style.color=C.orange; e.currentTarget.style.background=C.orangeBg; }}
+            onMouseLeave={e=>{ e.currentTarget.style.color=timerTaskId===t.id?C.orange:C.text3; e.currentTarget.style.background='none'; }}>
+            ⏱
+          </button>
+        </td>}
+        <td style={{ ...tdStyle,cursor:'pointer',background:timerTaskId===t.id?C.orangeBg:undefined,...skipStyle }} onClick={()=>onOpenTask(t)}>
+          <div style={{ display:'flex',alignItems:'center',gap:6 }}><PriorityDot priority={t.priority}/>{displayTitle}{t.manual&&<span title="メモあり" style={{ fontSize:9,color:C.blue,background:C.blue+'14',padding:'1px 5px',borderRadius:999 }}>📝</span>}{t.checklist?.length>0&&<span style={{ fontSize:9,color:t.checklist.filter(c=>c.checked).length===t.checklist.length?C.green:C.text3,background:C.cream2,padding:'1px 6px',borderRadius:999 }}>☑ {t.checklist.filter(c=>c.checked).length}/{t.checklist.length}</span>}</div>
         </td>
-        <td style={{ ...tdStyle,position:'relative',cursor:'pointer' }}
+        <td style={{ ...tdStyle,cursor:'pointer',...skipStyle }} onClick={e=>{ e.stopPropagation(); const next=t.status==='todo'?'doing':t.status==='doing'?'done':t.status==='done'?'skip':t.status==='skip'?'todo':'todo'; onStatusChange(t.id,next); }}
+          title="クリックでステータス変更">
+          <div style={{ display:'flex',alignItems:'center',gap:4 }}><StatusBadge status={t.status}/><span onClick={e=>{e.stopPropagation();onSave({...t,starred:!t.starred});}} style={{ cursor:'pointer',fontSize:14,color:t.starred?'#d4a020':C.text3+'55',lineHeight:1 }} title="今日やる">{t.starred?'★':'☆'}</span></div>
+        </td>
+        <td style={{ ...tdStyle,position:'relative',cursor:'pointer',...skipStyle }}
           onClick={e=>{ e.stopPropagation(); setAssigneeOpen(assigneeOpen===t.id?null:t.id); }}>
           {mbs.length>0
             ? <div style={{ display:'flex',alignItems:'center',gap:4,flexWrap:'wrap' }}>
-                {mbs.map(m=><div key={m.id} style={{ display:'flex',alignItems:'center',gap:3 }}><Avatar name={m.name} color={m.color} size={18}/><span style={{ fontSize:12 }}>{m.name}</span></div>)}
+                {mbs.map(m=><Avatar key={m.id} name={m.name} color={m.color} size={22} fs={10} title={m.name}/>)}
                 <span style={{ color:C.text3,fontSize:10 }}>▾</span>
               </div>
             : <span style={{ color:C.text3,fontSize:12 }}>未割当 ▾</span>}
@@ -1293,16 +1428,56 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
             </div>
           )}
         </td>
-        <td style={{ ...tdStyle }} onClick={e=>e.stopPropagation()}>
+        <td style={{ ...tdStyle,...skipStyle }} onClick={e=>e.stopPropagation()}>
           <input type="date" value={t.due||''} onChange={e=>onSave({...t,due:e.target.value})}
-            style={{ border:'none',background:'transparent',color:t.due?C.text:C.text3,fontSize:11,fontFamily:'inherit',cursor:'pointer',outline:'none',padding:0 }}/>
-          {rel && <div style={{ fontSize:9,color:C.text3,marginTop:1 }}>{rel}</div>}
+            style={{ border:'none',background:'transparent',color:ds.overdue?ds.bg:t.due?C.text:C.text3,fontSize:11,fontFamily:'inherit',cursor:'pointer',outline:'none',padding:0,fontWeight:ds.overdue?700:400 }}/>
+          {ds.overdue && t.status!=='done' && t.status!=='skip' && <div style={{ fontSize:9,color:'#fff',background:ds.bg,borderRadius:999,padding:'1px 5px',marginTop:1,display:'inline-block',fontWeight:600 }}>{ds.overdue}日超過</div>}
+          {pj && (pj.eventDate||pj.end) && t.status!=='skip' && (() => {
+            const base=pj.eventDate||pj.end;
+            const diff=t.due?daysDiff(t.due,base):null;
+            const ad=diff!==null?Math.abs(diff):'';
+            const dir=diff!==null?(diff<=0?'before':'after'):'before';
+            const wv=ad!==''&&ad%7===0?ad/7:'';
+            const sign=dir==='before'?-1:1;
+            return (
+              <div style={{ display:'flex',alignItems:'center',gap:2,marginTop:2 }}>
+                <NumInput value={ad} onCommit={n=>{if(n!==''&&n>=0)onSave({...t,due:addDays(base,sign*n)});}}
+                  style={{ width:28,border:'none',background:'transparent',color:C.text3,fontSize:10,fontFamily:'inherit',outline:'none',padding:0,textAlign:'right' }}/>
+                <span style={{ fontSize:10,color:C.text3 }}>日</span>
+                <span style={{ fontSize:10,color:C.text3+'66' }}>/</span>
+                <NumInput value={wv} onCommit={n=>{if(n!==''&&n>=0)onSave({...t,due:addDays(base,sign*n*7)});}}
+                  style={{ width:22,border:'none',background:'transparent',color:C.text3,fontSize:10,fontFamily:'inherit',outline:'none',padding:0,textAlign:'right' }}/>
+                <span style={{ fontSize:10,color:C.text3 }}>週</span>
+                <select value={dir} onChange={e=>{if(ad!==''&&ad>0)onSave({...t,due:addDays(base,(e.target.value==='before'?-1:1)*ad)});}}
+                  style={{ border:'none',background:'transparent',color:C.text3,fontSize:9,fontFamily:'inherit',outline:'none',padding:0 }}>
+                  <option value="before">前</option>
+                  <option value="after">後</option>
+                </select>
+              </div>
+            );
+          })()}
         </td>
-        <td style={{ ...tdStyle,cursor:'pointer' }} onClick={e=>{ e.stopPropagation(); const next=t.status==='todo'?'doing':t.status==='doing'?'done':'todo'; onStatusChange(t.id,next); }}
-          title="クリックでステータス変更">
-          <StatusBadge status={t.status}/>
+        <td style={{ ...tdStyle,whiteSpace:'nowrap',...skipStyle }} onClick={e=>e.stopPropagation()}>
+          <NumInput value={t.estimatedMin||''} step={5} onCommit={n=>onSave({...t,estimatedMin:n||''})}
+            style={{ width:40,border:'none',background:'transparent',color:t.estimatedMin?C.text2:C.text3,fontSize:11,fontFamily:'inherit',outline:'none',padding:0,textAlign:'right' }}/>
+          {t.estimatedMin ? <span style={{ fontSize:10,color:C.text3 }}>m</span> : null}
         </td>
         <td style={{ ...tdStyle,whiteSpace:'nowrap' }} onClick={e=>e.stopPropagation()}>
+          {onDuplicateTask && <button onClick={()=>onDuplicateTask(t)}
+            title="複製" style={{ background:'none',border:'none',cursor:'pointer',color:C.text3,fontSize:13,padding:'3px 6px',borderRadius:6,fontFamily:'inherit' }}
+            onMouseEnter={e=>{ e.currentTarget.style.color=C.blue; e.currentTarget.style.background=C.blue+'18'; }}
+            onMouseLeave={e=>{ e.currentTarget.style.color=C.text3; e.currentTarget.style.background='none'; }}>
+            ⧉
+          </button>}
+          {onCopyTaskToProject && <div style={{ display:'inline-block',position:'relative' }}>
+            <button onClick={()=>setCopyToOpen(copyToOpen===t.id?null:t.id)}
+              title="他プロジェクトにコピー" style={{ background:'none',border:'none',cursor:'pointer',color:C.text3,fontSize:12,padding:'3px 6px',borderRadius:6,fontFamily:'inherit' }}
+              onMouseEnter={e=>{ e.currentTarget.style.color=C.green; e.currentTarget.style.background=C.green+'18'; }}
+              onMouseLeave={e=>{ e.currentTarget.style.color=C.text3; e.currentTarget.style.background='none'; }}>
+              ➜
+            </button>
+            {copyToOpen===t.id && <ProjectPickerDropdown projects={orderedProjects} excludeId={t.projectId} onSelect={pid=>{ onCopyTaskToProject(t,pid); setCopyToOpen(null); }}/>}
+          </div>}
           <button onClick={()=>{ if(window.confirm('このタスクを削除しますか？')) onDelete(t.id); }}
             style={{ background:'none',border:'none',cursor:'pointer',color:C.text3,fontSize:14,padding:'3px 6px',borderRadius:6,fontFamily:'inherit' }}
             onMouseEnter={e=>{ e.currentTarget.style.color=C.red; e.currentTarget.style.background=C.red+'18'; }}
@@ -1321,7 +1496,98 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
   };
 
   return (
-    <div style={{ flex:1,overflowY:'auto',padding:'16px 24px' }} onClick={()=>{setAssigneeOpen(null);setCopyCatOpen(null);}}>
+    <div style={{ flex:1,overflowY:'auto',padding:'16px 24px' }} onClick={()=>{setAssigneeOpen(null);setCopyCatOpen(null);setBulkAssigneeOpen(false);}}>
+      {/* Bulk mode bar */}
+      <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:12 }}>
+        {!bulkMode ? (
+          <button onClick={()=>{setBulkMode(true);setBulkIds(new Set());}}
+            style={{ padding:'4px 12px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit' }}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>一括操作</button>
+        ) : (<>
+          <span style={{ fontSize:12,color:C.text2,fontWeight:600 }}>{bulkIds.size}件選択中</span>
+          <span style={{ fontSize:11,color:C.text3 }}>（右下のバーで操作）</span>
+          <button onClick={()=>{setBulkMode(false);setBulkIds(new Set());setBulkAssigneeOpen(false);setBulkCopyOpen(false);setBulkDueOpen(false);}}
+            style={{ padding:'4px 10px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit' }}>終了</button>
+        </>)}
+      </div>
+      {/* Floating bulk bar */}
+      {bulkMode && bulkIds.size > 0 && (
+        <div style={{ position:'fixed',top:90,right:16,zIndex:400,background:'#fff',borderRadius:12,padding:'10px 16px',display:'flex',alignItems:'center',gap:8,boxShadow:'0 4px 20px rgba(58,53,48,0.25)',border:`1px solid ${C.border}`,flexWrap:'wrap' }}>
+          <span style={{ fontSize:12,color:C.text2,fontWeight:600 }}>{bulkIds.size}件選択</span>
+          <div style={{ position:'relative' }}>
+            <button onClick={e=>{e.stopPropagation();setBulkAssigneeOpen(!bulkAssigneeOpen);setBulkDueOpen(false);setBulkCopyOpen(false);}}
+              style={{ padding:'5px 14px',borderRadius:6,border:'none',background:C.orange,color:'#fff',cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:600 }}>担当者変更</button>
+            {bulkAssigneeOpen && (
+              <div onClick={e=>e.stopPropagation()} style={{ position:'absolute',top:'100%',right:0,zIndex:500,background:'#fff',border:`1px solid ${C.border}`,borderRadius:10,padding:8,display:'flex',flexDirection:'column',gap:4,minWidth:180,boxShadow:'0 4px 16px rgba(58,53,48,0.15)',marginTop:4 }}>
+                <div style={{ fontSize:10,color:C.text3,fontWeight:600,padding:'2px 6px' }}>担当者を追加/解除</div>
+                {activeMembers.map(m=>{
+                  const allHave = [...bulkIds].every(id=>{ const t=tasks.find(x=>x.id===id); return (t?.assigneeIds||[]).includes(m.id); });
+                  return (
+                    <div key={m.id} style={{ display:'flex',alignItems:'center',gap:8,padding:'6px 8px',borderRadius:6,cursor:'pointer',background:allHave?m.color+'18':'transparent' }}
+                      onClick={()=>{ allHave ? bulkRemoveAssignee(m.id) : bulkAddAssignee(m.id); }}>
+                      <Avatar name={m.name} color={m.color} size={22} fs={10}/>
+                      <span style={{ fontSize:12,color:C.text,flex:1 }}>{m.name}</span>
+                      {allHave && <span style={{ fontSize:11,color:m.color }}>✓</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div style={{ position:'relative' }}>
+            <button onClick={e=>{e.stopPropagation();setBulkDueOpen(!bulkDueOpen);setBulkAssigneeOpen(false);setBulkCopyOpen(false);}}
+              style={{ padding:'5px 14px',borderRadius:6,border:'none',background:C.blue,color:'#fff',cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:600 }}>期日設定</button>
+            {bulkDueOpen && (
+              <div onClick={e=>e.stopPropagation()} style={{ position:'absolute',top:'100%',right:0,zIndex:500,background:'#fff',border:`1px solid ${C.border}`,borderRadius:10,padding:12,display:'flex',flexDirection:'column',gap:8,minWidth:220,boxShadow:'0 4px 16px rgba(58,53,48,0.15)',marginTop:4 }}>
+                <div style={{ fontSize:10,color:C.text3,fontWeight:600 }}>期日を設定</div>
+                <input type="date" value={bulkDueDate} onChange={e=>{setBulkDueDate(e.target.value);setBulkDueDaysBefore('');}}
+                  style={{ padding:'5px 8px',border:`1px solid ${C.border}`,borderRadius:6,fontSize:12,fontFamily:'inherit' }}/>
+                {(() => { const proj = currentProject || (bulkIds.size>0 ? projects.find(p=>p.id===tasks.find(t=>bulkIds.has(t.id))?.projectId) : null); const base = proj?.eventDate||proj?.end; const sign=bulkDueDir==='before'?-1:1; return base ? (<>
+                  <div style={{ display:'flex',alignItems:'center',gap:6,flexWrap:'wrap' }}>
+                    <input type="number" min="0" placeholder="N" value={bulkDueDaysBefore}
+                      onChange={e=>{const n=parseInt(e.target.value);setBulkDueDaysBefore(e.target.value);if(!isNaN(n)&&n>=0)setBulkDueDate(addDays(base,sign*n));}}
+                      style={{ width:46,padding:'5px 6px',border:`1px solid ${C.border}`,borderRadius:6,fontSize:12,fontFamily:'inherit',textAlign:'center' }}/>
+                    <span style={{ fontSize:11,color:C.text3 }}>日</span>
+                    <span style={{ fontSize:10,color:C.text3+'88' }}>/</span>
+                    <input type="number" min="0" placeholder="N"
+                      value={bulkDueDaysBefore && parseInt(bulkDueDaysBefore)%7===0 ? parseInt(bulkDueDaysBefore)/7 : ''}
+                      onChange={e=>{const n=parseInt(e.target.value);if(!isNaN(n)&&n>=0){setBulkDueDaysBefore(String(n*7));setBulkDueDate(addDays(base,sign*n*7));}}}
+                      style={{ width:46,padding:'5px 6px',border:`1px solid ${C.border}`,borderRadius:6,fontSize:12,fontFamily:'inherit',textAlign:'center' }}/>
+                    <span style={{ fontSize:11,color:C.text3 }}>週</span>
+                    <select value={bulkDueDir} onChange={e=>{setBulkDueDir(e.target.value);const n=parseInt(bulkDueDaysBefore);if(!isNaN(n)&&n>=0)setBulkDueDate(addDays(base,(e.target.value==='before'?-1:1)*n));}}
+                      style={{ padding:'4px 6px',border:`1px solid ${C.border}`,borderRadius:6,fontSize:11,fontFamily:'inherit',color:C.text2,outline:'none' }}>
+                      <option value="before">前</option>
+                      <option value="after">後</option>
+                    </select>
+                  </div>
+                  <div style={{ fontSize:10,color:C.text3 }}>開催日: {base}</div>
+                </>) : null; })()}
+                <button onClick={()=>{
+                  if(!bulkDueDate) return;
+                  const updated=tasks.filter(t=>bulkIds.has(t.id)).map(t=>({...t,due:bulkDueDate}));
+                  if(updated.length) onSaveBulk(updated);
+                  setBulkDueOpen(false);setBulkDueDate('');setBulkDueDaysBefore('');
+                }} disabled={!bulkDueDate}
+                  style={{ padding:'6px 12px',borderRadius:6,border:'none',background:bulkDueDate?C.blue:C.cream3,color:bulkDueDate?'#fff':C.text3,cursor:bulkDueDate?'pointer':'default',fontSize:12,fontFamily:'inherit',fontWeight:600 }}>
+                  {bulkIds.size}件に適用
+                </button>
+              </div>
+            )}
+          </div>
+          {onCopyTaskToProject && <div style={{ position:'relative' }}>
+            <button onClick={e=>{e.stopPropagation();setBulkCopyOpen(!bulkCopyOpen);setBulkAssigneeOpen(false);setBulkDueOpen(false);}}
+              style={{ padding:'5px 14px',borderRadius:6,border:'none',background:C.green,color:'#fff',cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:600 }}>コピー</button>
+            {bulkCopyOpen && (
+              <div style={{ position:'absolute',top:'100%',right:0,marginTop:4 }}>
+                <ProjectPickerDropdown projects={orderedProjects} onSelect={pid=>{ const selected=tasks.filter(t=>bulkIds.has(t.id)); onCopyTaskToProject(selected,pid); setBulkCopyOpen(false); setBulkIds(new Set()); setBulkMode(false); }} style={{ left:'auto',right:0 }}/>
+              </div>
+            )}
+          </div>}
+          <button onClick={()=>{setBulkMode(false);setBulkIds(new Set());setBulkAssigneeOpen(false);setBulkCopyOpen(false);setBulkDueOpen(false);}}
+            style={{ padding:'5px 10px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit' }}>✕</button>
+        </div>
+      )}
       {categories.map((cat, ci) => {
         const catTasks = catMap.get(cat);
         const color = cat === 'その他' ? C.text3 : catColors[ci % catColors.length];
@@ -1334,39 +1600,45 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
               <button onClick={()=>onAddTask(cat)} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>＋</button>
+              {cat!=='その他' && onRenameCategory && <button onClick={()=>{
+                const newName = window.prompt(`【${cat}】のカテゴリ名を変更`, cat);
+                if(newName && newName.trim() && newName.trim()!==cat) onRenameCategory(cat, newName.trim(), catTasks);
+              }} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
+                  title="カテゴリ名を一括変更"
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>✏ 名前変更</button>}
+              {cat!=='その他' && <button onClick={()=>{if(window.confirm(`【${cat}】のタスク${catTasks.length}件をすべて削除しますか？`)){onDeleteTasks(catTasks.map(t=>t.id));}}} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
+                  title="このカテゴリのタスクを一括削除"
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor='#F76E6E';e.currentTarget.style.color='#F76E6E';}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>🗑 削除</button>}
               {cat!=='その他' && onCopyCategoryToProject && <span style={{ position:'relative' }}>
                 <button onClick={e=>{e.stopPropagation();setCopyCatOpen(copyCatOpen===cat?null:cat);}} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
                   title="このカテゴリのタスクを他プロジェクトにコピー"
                   onMouseEnter={e=>{e.currentTarget.style.borderColor=C.blue;e.currentTarget.style.color=C.blue;}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>📋 コピー</button>
                 {copyCatOpen===cat && (
-                  <div onClick={e=>e.stopPropagation()} style={{ position:'absolute',top:'100%',left:0,zIndex:300,background:'#fff',border:`1px solid ${C.border}`,borderRadius:10,padding:8,minWidth:200,boxShadow:'0 4px 16px rgba(58,53,48,0.15)',marginTop:4 }}>
-                    <div style={{ fontSize:11,color:C.text3,padding:'4px 8px',fontWeight:600 }}>コピー先プロジェクト:</div>
-                    {projects.filter(p=>!p.closed).map(p=>(
-                      <div key={p.id} onClick={()=>{
-                        if(window.confirm(`【${cat}】のタスク${catTasks.length}件を「${p.name}」にコピーしますか？`)){
-                          onCopyCategoryToProject(catTasks, p.id);
-                          setCopyCatOpen(null);
-                        }
-                      }} style={{ padding:'6px 8px',borderRadius:6,cursor:'pointer',fontSize:12,color:C.text,display:'flex',alignItems:'center',gap:6 }}
-                        onMouseEnter={e=>e.currentTarget.style.background=C.cream2}
-                        onMouseLeave={e=>e.currentTarget.style.background=''}>
-                        <span style={{ width:8,height:8,borderRadius:'50%',background:p.color,flexShrink:0 }}/>
-                        {p.name}
-                      </div>
-                    ))}
-                    {projects.filter(p=>!p.closed).length===0 && <div style={{ padding:'6px 8px',fontSize:12,color:C.text3 }}>プロジェクトがありません</div>}
+                  <div onClick={e=>e.stopPropagation()} style={{ position:'absolute',top:'100%',left:0,zIndex:300,marginTop:4 }}>
+                    <ProjectPickerDropdown projects={orderedProjects} onSelect={pid=>{
+                      const pName = orderedProjects.find(p=>p.id===pid)?.name||'';
+                      if(window.confirm(`【${cat}】のタスク${catTasks.length}件を「${pName}」にコピーしますか？`)){
+                        onCopyCategoryToProject(catTasks, pid);
+                        setCopyCatOpen(null);
+                      }
+                    }} style={{ position:'relative',top:0,right:'auto' }}/>
                   </div>
                 )}
               </span>}
-              {cat!=='その他' && <span style={{ marginLeft:'auto',display:'flex',gap:2 }}>
+              {cat!=='その他' && <span style={{ marginLeft:'auto',display:'flex',gap:2,alignItems:'center' }}>
+                {ci===0 && categories.filter(c=>c!=='その他').length>1 && <button onClick={()=>setCatReorderOpen(true)} style={{ padding:'0 6px',border:`1px solid ${C.border}`,borderRadius:4,background:C.cream2,color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.6,marginRight:4 }}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>順番変更</button>}
                 <button onClick={()=>moveCat(cat,-1)} disabled={ci===0} style={{ padding:'0 4px',border:`1px solid ${C.border}`,borderRadius:4,background:C.cream2,color:ci===0?C.text3+'55':C.text3,cursor:ci===0?'default':'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.6 }}>▲</button>
                 <button onClick={()=>moveCat(cat,1)} disabled={ci===categories.length-1||(ci===categories.length-2&&categories[categories.length-1]==='その他')} style={{ padding:'0 4px',border:`1px solid ${C.border}`,borderRadius:4,background:C.cream2,color:(ci>=categories.length-2)?C.text3+'55':C.text3,cursor:(ci>=categories.length-2)?'default':'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.6 }}>▼</button>
               </span>}
             </div>
             <table style={{ width:'100%',borderCollapse:'collapse' }}>
-              <thead><tr>{['タスク名','担当者','期日','ステータス',''].map(h=>(
-                <th key={h} style={thStyle}>{h}</th>
+              <thead><tr>{(bulkMode?['']:(onTimerSelect?['']:[])).concat(['タスク名','ステータス','担当者','期日','目安','']).map((h,i)=>(
+                <th key={h||`empty${i}`} style={{...thStyle,...(i===0&&onTimerSelect?{width:24,padding:'8px 4px'}:{})}}>{h}</th>
               ))}</tr></thead>
               <tbody>{catTasks.map(t => renderRow(t))}</tbody>
             </table>
@@ -1376,97 +1648,141 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
       {onAddTask && <button onClick={onAddTask} style={{ display:'flex',alignItems:'center',justifyContent:'center',gap:5,width:'100%',padding:'8px',borderRadius:10,border:`1.5px dashed ${C.border2}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:12,fontFamily:'inherit',transition:'all 0.12s',marginTop:2 }}
         onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
         onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border2;e.currentTarget.style.color=C.text3;}}>＋ タスク追加</button>}
+
+      {/* Category reorder modal */}
+      {catReorderOpen && (() => {
+        const reorderCats = categories.filter(c=>c!=='その他');
+        return (
+          <div style={{ position:'fixed',inset:0,zIndex:5000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.3)' }} onClick={()=>{setCatReorderOpen(false);setDragCat(null);setDragOverCat(null);}}>
+            <div onClick={e=>e.stopPropagation()} style={{ background:'#fff',borderRadius:14,padding:20,minWidth:280,maxWidth:400,maxHeight:'70vh',overflowY:'auto',boxShadow:'0 8px 32px rgba(0,0,0,0.2)',animation:'modal-in 0.15s ease-out' }}>
+              <div style={{ fontSize:14,fontWeight:600,color:C.text,marginBottom:12 }}>カテゴリ順番変更</div>
+              <div style={{ fontSize:11,color:C.text3,marginBottom:12 }}>ドラッグで並び替え</div>
+              {reorderCats.map((cat,i) => (
+                <div key={cat}
+                  draggable
+                  onDragStart={()=>setDragCat(cat)}
+                  onDragOver={e=>{e.preventDefault();setDragOverCat(cat);}}
+                  onDragEnd={()=>{
+                    if(dragCat && dragOverCat && dragCat!==dragOverCat) {
+                      const arr = [...reorderCats];
+                      const fi = arr.indexOf(dragCat), ti = arr.indexOf(dragOverCat);
+                      arr.splice(fi,1); arr.splice(ti,0,dragCat);
+                      if(categories.includes('その他')) arr.push('その他');
+                      onCatOrderChange(arr);
+                    }
+                    setDragCat(null);setDragOverCat(null);
+                  }}
+                  style={{
+                    display:'flex',alignItems:'center',gap:10,padding:'10px 12px',marginBottom:4,
+                    borderRadius:8,border:`1px solid ${dragOverCat===cat?C.orange:C.border}`,
+                    background:dragCat===cat?C.orangeBg:dragOverCat===cat?C.orange+'12':'#fff',
+                    cursor:'grab',transition:'all 0.1s',userSelect:'none',
+                  }}>
+                  <span style={{ color:C.text3,fontSize:14,cursor:'grab' }}>☰</span>
+                  <span style={{ fontSize:13,color:C.text,flex:1 }}>{cat}</span>
+                  <span style={{ fontSize:10,color:C.text3 }}>({catMap.get(cat)?.length||0})</span>
+                </div>
+              ))}
+              <button onClick={()=>{setCatReorderOpen(false);setDragCat(null);setDragOverCat(null);}}
+                style={{ marginTop:12,width:'100%',padding:'8px',borderRadius:8,border:'none',background:C.orange,color:'#fff',cursor:'pointer',fontSize:13,fontFamily:'inherit',fontWeight:600 }}>
+                閉じる
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
 
 // ── Member View ───────────────────────────────────────────────────────────
-function MemberView({ tasks, projects, members, memberFilter, onOpenTask, isMobile }) {
-  const show = memberFilter==='all' ? members : members.filter(m=>m.id===memberFilter);
+function MemberView({ tasks, projects, members, memberFilter, onOpenTask, onSave, onStatusChange, isMobile }) {
+  const show = (memberFilter==='all' ? members : members.filter(m=>m.id===memberFilter)).filter(m=>!m.closed);
+  const [selectedMember, setSelectedMember] = useState(()=>show[0]?.id||null);
+  const [sf, setSf] = useState(null);
+  const [sortKey, setSortKey] = useState('due');
   if (!show.length) return <div style={{ flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:C.text3,gap:10 }}><div style={{ fontSize:36 }}>👥</div></div>;
-  if (isMobile) return (
-    <div style={{ overflowX:'auto',overflowY:'visible',padding:'16px 16px',display:'flex',flexDirection:'row',gap:14,alignItems:'flex-start' }}>
-      {show.map(m=>{
-        const mt=tasks.filter(t=>(t.assigneeIds||[]).includes(m.id));
-        const todoCount=mt.filter(t=>t.status==='todo').length;
-        const doingCount=mt.filter(t=>t.status==='doing').length;
-        const doneCount=mt.filter(t=>t.status==='done').length;
-        return (
-          <div key={m.id} style={{ width:280,flexShrink:0,background:'#fff',border:`1px solid ${C.border}`,borderRadius:14,overflow:'hidden' }}>
-            <div style={{ padding:'12px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10 }}>
-              <Avatar name={m.name} color={m.color} size={32} fs={14}/>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:14,fontWeight:600,color:C.text }}>{m.name}</div>
-                <div style={{ display:'flex',gap:8,marginTop:3 }}>
-                  <span style={{ fontSize:10,color:C.text3 }}>未着手 <strong style={{ color:C.text2 }}>{todoCount}</strong></span>
-                  <span style={{ fontSize:10,color:C.blue }}>進行中 <strong>{doingCount}</strong></span>
-                  <span style={{ fontSize:10,color:C.green }}>完了 <strong>{doneCount}</strong></span>
-                </div>
-              </div>
-            </div>
-            <div style={{ padding:8,display:'flex',flexDirection:'column',gap:3,maxHeight:320,overflowY:'auto' }}>
-              {mt.length===0 ? <div style={{ padding:14,textAlign:'center',color:C.text3,fontSize:12 }}>タスクなし</div>
-                : mt.map(t=>{
-                  const pj=projects.find(p=>p.id===t.projectId);
-                  const ds=getDueStyle(t.due);
-                  return (
-                    <div key={t.id} onClick={()=>onOpenTask(t)} style={{ display:'flex',flexDirection:'column',gap:3,padding:'8px 10px',borderRadius:8,cursor:'pointer',transition:'background 0.1s',borderLeft:`3px solid ${pj?.color||C.border}` }}
-                      onMouseEnter={e=>e.currentTarget.style.background=C.cream2}
-                      onMouseLeave={e=>e.currentTarget.style.background=''}>
-                      <div style={{ fontSize:13,color:C.text,fontWeight:500 }}>{t.title}</div>
-                      {pj && <div style={{ fontSize:11,color:pj.color }}>● {pj.name}</div>}
-                      {t.due && <div style={{ fontSize:11,padding:'1px 6px',borderRadius:999,background:ds.bg,color:ds.color,border:`1px solid ${ds.border}`,alignSelf:'flex-start' }}>{fmtDate(t.due)}</div>}
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+  const sel = show.find(m=>m.id===selectedMember) || show[0];
+  const mt = tasks.filter(t=>(t.assigneeIds||[]).includes(sel.id));
+  const filtered = sf==='starred' ? mt.filter(t=>t.starred) : sf ? mt.filter(t=>t.status===sf) : mt;
+  const starCount = mt.filter(t=>t.starred).length;
+  const sorted = [...filtered].sort((a,b)=>{
+    if(sortKey==='due') return (a.due||'9999').localeCompare(b.due||'9999');
+    if(sortKey==='project') { const pa=projects.find(p=>p.id===a.projectId); const pb=projects.find(p=>p.id===b.projectId); const pc=(pa?.name||'').localeCompare(pb?.name||''); return pc!==0?pc:(a.due||'9999').localeCompare(b.due||'9999'); }
+    if(sortKey==='status') { const order={todo:0,doing:1,done:2,skip:3}; const sc=(order[a.status]??9)-(order[b.status]??9); return sc!==0?sc:(a.due||'9999').localeCompare(b.due||'9999'); }
+    return 0;
+  });
+  const todoCount=mt.filter(t=>t.status==='todo').length;
+  const doingCount=mt.filter(t=>t.status==='doing').length;
+  const doneCount=mt.filter(t=>t.status==='done').length;
+  const sBtnStyle=(st,color,active)=>({ fontSize:11,color:active?'#fff':color,cursor:'pointer',padding:'3px 10px',borderRadius:999,border:'none',background:active?color:'transparent',fontFamily:'inherit',fontWeight:active?700:400,transition:'all 0.12s' });
+  const thStyle={ textAlign:'left',fontSize:10,fontWeight:600,color:C.text3,letterSpacing:0.5,padding:'8px 12px',borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap' };
+  const td={ padding:'8px 12px',borderBottom:`1px solid ${C.border}`,verticalAlign:'middle' };
   return (
-    <div style={{ flex:1,overflowY:'auto',padding:'16px 24px',display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:16,alignContent:'start' }}>
-      {show.map(m=>{
-        const mt=tasks.filter(t=>(t.assigneeIds||[]).includes(m.id));
-        const todoCount=mt.filter(t=>t.status==='todo').length;
-        const doingCount=mt.filter(t=>t.status==='doing').length;
-        const doneCount=mt.filter(t=>t.status==='done').length;
-        return (
-          <div key={m.id} style={{ background:'#fff',border:`1px solid ${C.border}`,borderRadius:14,overflow:'hidden' }}>
-            <div style={{ padding:'12px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10 }}>
-              <Avatar name={m.name} color={m.color} size={32} fs={14}/>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:14,fontWeight:600,color:C.text }}>{m.name}</div>
-                <div style={{ display:'flex',gap:8,marginTop:3 }}>
-                  <span style={{ fontSize:10,color:C.text3 }}>未着手 <strong style={{ color:C.text2 }}>{todoCount}</strong></span>
-                  <span style={{ fontSize:10,color:C.blue }}>進行中 <strong>{doingCount}</strong></span>
-                  <span style={{ fontSize:10,color:C.green }}>完了 <strong>{doneCount}</strong></span>
+    <div style={{ flex:1,display:'flex',flexDirection:'column',overflow:'hidden' }}>
+      {/* Member tabs */}
+      <div className="nb-tabs" style={{ display:'flex',alignItems:'center',gap:0,borderBottom:`1px solid ${C.border}`,padding:'0 16px',flexShrink:0,overflowX:'auto',WebkitOverflowScrolling:'touch' }}>
+        {show.map(m=>{
+          const active=sel.id===m.id;
+          const mCount=tasks.filter(t=>(t.assigneeIds||[]).includes(m.id)).length;
+          return (
+            <button key={m.id} onClick={()=>{setSelectedMember(m.id);setSf(null);}} style={{
+              display:'flex',alignItems:'center',gap:6,padding:'10px 16px',border:'none',borderBottom:active?`2px solid ${m.color}`:'2px solid transparent',
+              background:'transparent',cursor:'pointer',fontFamily:'inherit',fontSize:12,fontWeight:active?600:400,
+              color:active?m.color:C.text2,transition:'all 0.15s',whiteSpace:'nowrap',
+            }}>
+              <Avatar name={m.name} color={m.color} size={20} fs={9}/>
+              {m.name}
+              <span style={{ fontSize:10,color:active?m.color:C.text3,opacity:0.7 }}>{mCount}</span>
+            </button>
+          );
+        })}
+      </div>
+      {/* Status filter + sort bar */}
+      <div style={{ display:'flex',alignItems:'center',gap:6,padding:'10px 20px',flexShrink:0,flexWrap:'wrap' }}>
+        <span style={{ fontSize:12,color:C.text2,fontWeight:600 }}>{sel.name}</span>
+        <span style={{ fontSize:11,color:C.text3 }}>— {mt.length}件</span>
+        <div style={{ display:'flex',gap:3,marginLeft:8 }}>
+          <button onClick={()=>setSf(sf==='starred'?null:'starred')} style={sBtnStyle('starred','#b8860b',sf==='starred')}>★ 今日やる {starCount}</button>
+          <button onClick={()=>setSf(sf==='todo'?null:'todo')} style={sBtnStyle('todo',C.text2,sf==='todo')}>未着手 {todoCount}</button>
+          <button onClick={()=>setSf(sf==='doing'?null:'doing')} style={sBtnStyle('doing',C.blue,sf==='doing')}>進行中 {doingCount}</button>
+          <button onClick={()=>setSf(sf==='done'?null:'done')} style={sBtnStyle('done',C.green,sf==='done')}>完了 {doneCount}</button>
+        </div>
+        <div style={{ marginLeft:'auto',display:'flex',alignItems:'center',gap:4 }}>
+          <span style={{ fontSize:10,color:C.text3 }}>並替:</span>
+          {[['due','期日順'],['project','PJ順'],['status','状態順']].map(([k,l])=>(
+            <button key={k} onClick={()=>setSortKey(k)} style={{ fontSize:10,padding:'2px 8px',borderRadius:999,border:`1px solid ${sortKey===k?C.orange:C.border}`,background:sortKey===k?C.orangeBg:'transparent',color:sortKey===k?C.orange:C.text3,cursor:'pointer',fontFamily:'inherit',fontWeight:sortKey===k?600:400 }}>{l}</button>
+          ))}
+        </div>
+      </div>
+      {/* Task table */}
+      <div style={{ flex:1,overflowY:'auto',padding:'0 20px 20px' }}>
+        {filtered.length===0 ? <div style={{ padding:'20px 0',color:C.text3,fontSize:12,textAlign:'center' }}>{sf?'該当タスクなし':'タスクなし'}</div>
+          : <div style={{ display:'flex',flexDirection:'column',gap:0 }}>
+            {sorted.map(t=>{
+              const pj=projects.find(p=>p.id===t.projectId);
+              const ds=getDueStyle(t.due);
+              const isSkip=t.status==='skip';
+              return (
+                <div key={t.id} onClick={()=>onOpenTask(t)} style={{ display:'inline-flex',alignItems:'center',gap:12,padding:'8px 12px',borderBottom:`1px solid ${C.border}`,cursor:'pointer',transition:'background 0.1s',...(isSkip?{opacity:0.4}:{}) }}
+                  onMouseEnter={e=>e.currentTarget.style.background=C.cream2}
+                  onMouseLeave={e=>e.currentTarget.style.background=''}>
+                  <div style={{ minWidth:0 }}>
+                    {pj && <div style={{ fontSize:10,color:pj.color,display:'flex',alignItems:'center',gap:4,marginBottom:2 }}><span style={{ width:6,height:6,borderRadius:'50%',background:pj.color,flexShrink:0 }}/>{pj.name}</div>}
+                    <div style={{ fontSize:13,color:C.text,fontWeight:500 }}>{t.title}</div>
+                  </div>
+                  <div style={{ display:'flex',alignItems:'center',gap:4 }} onClick={e=>e.stopPropagation()}>
+                    <select value={t.status} onChange={e=>{if(onStatusChange) onStatusChange(t.id,e.target.value);}} style={{ fontSize:11,padding:'2px 4px',borderRadius:6,border:`1px solid ${C.border}`,background:'#fff',color:C.text,fontFamily:'inherit',cursor:'pointer' }}>
+                      <option value="todo">未着手</option><option value="doing">進行中</option><option value="done">完了</option><option value="skip">今回不要</option>
+                    </select>
+                    {onSave&&<span onClick={()=>onSave({...t,starred:!t.starred})} style={{ cursor:'pointer',fontSize:14,color:t.starred?'#d4a020':C.text3+'55',lineHeight:1 }} title="今日やる">{t.starred?'★':'☆'}</span>}
+                  </div>
+                  {t.due && <span style={{ fontSize:10,padding:'2px 6px',borderRadius:999,background:ds.bg,color:ds.color,border:`1px solid ${ds.border}`,whiteSpace:'nowrap',flexShrink:0 }}>{fmtDate(t.due)}{ds.overdue && !isSkip?` +${ds.overdue}d`:''}</span>}
                 </div>
-              </div>
-            </div>
-            <div style={{ padding:8,display:'flex',flexDirection:'column',gap:3,maxHeight:280,overflowY:'auto' }}>
-              {mt.length===0 ? <div style={{ padding:14,textAlign:'center',color:C.text3,fontSize:12 }}>タスクなし</div>
-                : mt.map(t=>{
-                  const pj=projects.find(p=>p.id===t.projectId);
-                  const ds=getDueStyle(t.due);
-                  return (
-                    <div key={t.id} onClick={()=>onOpenTask(t)} style={{ display:'flex',flexDirection:'column',gap:3,padding:'8px 10px',borderRadius:8,cursor:'pointer',transition:'background 0.1s',borderLeft:`3px solid ${pj?.color||C.border}` }}
-                      onMouseEnter={e=>e.currentTarget.style.background=C.cream2}
-                      onMouseLeave={e=>e.currentTarget.style.background=''}>
-                      <div style={{ display:'flex',alignItems:'center',gap:6 }}>
-                        <StatusBadge status={t.status}/>
-                        <span style={{ flex:1,fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{t.title}</span>
-                        {t.due && <span style={{ fontSize:10,padding:'2px 6px',borderRadius:999,background:ds.bg,color:ds.color,border:`1px solid ${ds.border}`,whiteSpace:'nowrap' }}>{fmtDate(t.due)}{ds.overdue?` +${ds.overdue}d`:''}</span>}
-                      </div>
-                      {pj && <div style={{ fontSize:10,color:pj.color,paddingLeft:2 }}>● {pj.name}</div>}
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        );
-      })}
+              );
+            })}
+          </div>}
+      </div>
     </div>
   );
 }
@@ -1577,7 +1893,7 @@ function CalendarView({ tasks, projects, members, onOpenTask }) {
                   onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.boxShadow='none'; }}>
                   <span style={{ fontSize:14, flexShrink:0 }}>{isDone?'✅':t.status==='progress'?'🔵':'⬜'}</span>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:500, color:C.text, textDecoration:isDone?'line-through':'none', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.title}</div>
+                    <div style={{ fontSize:13, fontWeight:500, color:C.text, textDecoration:isDone?'line-through':'none', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.starred&&<span style={{ color:'#d4a020',marginRight:3 }}>★</span>}{t.title}</div>
                     <div style={{ display:'flex', gap:8, marginTop:2, fontSize:11, color:C.text3 }}>
                       {proj && <span style={{ color:C.text2 }}>{proj.name}</span>}
                       {assignees.length > 0 && <span>👤 {assignees.join(', ')}</span>}
@@ -1604,7 +1920,7 @@ function Workflow() {
   const [tab, setTab] = useState('tasks');
   const [projFilter, setProjFilter] = useState(() => { try { return localStorage.getItem('wf_projFilter') || 'all'; } catch { return 'all'; } });
   const setProjFilterSaved = (v) => { setProjFilter(v); try { localStorage.setItem('wf_projFilter', v); } catch {} };
-  const [view, setView] = useState('kanban');
+  const [view, setView] = useState(()=>{ try { return localStorage.getItem('wf_view')||'kanban'; } catch { return 'kanban'; } });
   const [memberFilter, setMemberFilter] = useState('all');
   const isDev = window.location.hostname.includes('-dev');
   const { isAdmin, memberId: authMemberId, displayName: authDisplayName } = useAuth();
@@ -1616,7 +1932,9 @@ function Workflow() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [closedProjOpen, setClosedProjOpen] = useState(false);
-  const [openMonths, setOpenMonths] = useState(()=>{ const m=new Date().toISOString().slice(0,7); return {event:{[m]:true},other:{[m]:true}}; });
+  const [bulkCloseMode, setBulkCloseMode] = useState(false);
+  const [bulkCloseIds, setBulkCloseIds] = useState(new Set());
+  const [openMonths, setOpenMonths] = useState(()=>{ const m=new Date().toISOString().slice(0,7); return {event:{[m]:true},other:{[m]:true},closed:{}}; });
   const toggleMonth = (section,month)=>setOpenMonths(prev=>({...prev,[section]:{...prev[section],[month]:!prev[section][month]}}));
   const [timerTask, setTimerTask] = useState(null);
   useEffect(() => {
@@ -1686,7 +2004,8 @@ function Workflow() {
   const [taskOrder, setTaskOrder] = useState(() => { try { const v = localStorage.getItem('wf_taskOrder'); return v ? JSON.parse(v) : {}; } catch { return {}; } });
 
   // ── GAS Sync ────────────────────────────────────────────────────────────
-  const [wfGasUrl, setWfGasUrl] = useState(() => { try { return localStorage.getItem('wf_gasUrl') || ''; } catch { return ''; } });
+  const WF_GAS_DEFAULT = 'https://script.google.com/macros/s/AKfycbyZ1OwbcqN5fBECUSyXDuv51_35S1fBz7C3Z6UyXN86nuQ73GYkPn9qgJwaLi0WwZE-/exec';
+  const [wfGasUrl, setWfGasUrl] = useState(() => { try { return localStorage.getItem('wf_gasUrl') || WF_GAS_DEFAULT; } catch { return WF_GAS_DEFAULT; } });
   // FirebaseからWorkflow GAS URLを取得（管理者が設定した共有URL）
   useEffect(() => {
     import("firebase/database").then(({ ref: fbRef, onValue })=>{
@@ -1703,7 +2022,11 @@ function Workflow() {
   const [syncStatus, setSyncStatus] = useState('');
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const syncVersionRef = useRef(0);
+  const localDirtyRef = useRef(false); // ローカルに未push変更があるか
+  const pushFailCountRef = useRef(0);  // push連続失敗回数
+  const [pushFailed, setPushFailed] = useState(false); // UI警告用
   const pushTimerRef = useRef(null);
+  const schedulePushRef = useRef(null);
   const wfGasUrlRef = useRef(wfGasUrl);
   useEffect(() => { wfGasUrlRef.current = wfGasUrl; }, [wfGasUrl]);
 
@@ -1716,17 +2039,29 @@ function Workflow() {
       if (json.ok) {
         setLastSyncedAt(new Date());
         if (json.data && json.version > syncVersionRef.current) {
-          syncVersionRef.current = json.version;
-          // es_ev_ プロジェクト（eventstaff-shiftで作成）はGAS上書きから保護
-          const local = loadData();
-          const localEsProjs = (local.projects||[]).filter(p => String(p.id).startsWith('es_ev_'));
-          const localEsTasks = (local.tasks||[]).filter(t => String(t.projectId).startsWith('es_ev_'));
-          const gasProjs = (json.data.projects||[]).filter(p => !String(p.id).startsWith('es_ev_'));
-          const gasTasks = (json.data.tasks||[]).filter(t => !String(t.projectId).startsWith('es_ev_'));
-          const merged = { ...json.data, projects: [...gasProjs, ...localEsProjs], tasks: [...gasTasks, ...localEsTasks] };
-          saveData(merged);
-          setData(merged);
-          setGasFetchDebug(`OK GAS:${(json.data.projects||[]).length} gasNonEs:${gasProjs.length} localEs:${localEsProjs.length} merged:${merged.projects.length}`);
+          const merged = json.data;
+          // データ同期: 未pushの変更がある場合はリモートで上書きしない
+          setData(prev => {
+            const localTasks = prev?.tasks?.length || 0;
+            const remoteTasks = (merged.tasks||[]).length;
+            // 未pushのローカル変更がある場合、リモートで上書きしない（ローカルを優先してpushを再試行）
+            if (localDirtyRef.current) {
+              setGasFetchDebug(`BLOCKED(dirty): push未完了のためリモート拒否 L=${localTasks} R=${remoteTasks}`);
+              if (prev) schedulePushRef.current?.(prev);
+              return prev;
+            }
+            // pushは完了しているが、リモートが大幅に少ない場合もブロック（安全策）
+            if (localTasks > 0 && remoteTasks < localTasks && (localTasks - remoteTasks) >= 3) {
+              setGasFetchDebug(`BLOCKED: local=${localTasks} > remote=${remoteTasks} (${localTasks-remoteTasks}件減少を阻止)`);
+              if (prev) schedulePushRef.current?.(prev);
+              return prev;
+            }
+            syncVersionRef.current = json.version;
+            if (prev?.catOrder && !merged.catOrder) merged.catOrder = prev.catOrder;
+            saveData(merged);
+            setGasFetchDebug(`OK P:${(merged.projects||[]).length} T:${(merged.tasks||[]).length}`);
+            return merged;
+          });
         } else {
           setGasFetchDebug(`skip v${json.version}<=v${syncVersionRef.current}`);
         }
@@ -1751,21 +2086,59 @@ function Workflow() {
     const url = wfGasUrlRef.current;
     if (!url) return;
     clearTimeout(pushTimerRef.current);
+    localDirtyRef.current = true;
     setSyncStatus('pending');
-    pushTimerRef.current = setTimeout(async () => {
-      setSyncStatus('syncing');
-      try {
-        const res = await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'saveWorkflowData', data: d }) });
-        const json = await res.json();
-        if (json.ok) {
-          syncVersionRef.current = json.version;
-          setLastSyncedAt(new Date());
-          setSyncStatus('synced');
-          setTimeout(() => setSyncStatus(''), 3000);
-        } else { setSyncStatus('error'); }
-      } catch { setSyncStatus('error'); }
-    }, 1500);
+    pushTimerRef.current = setTimeout(() => attemptPush(url, d, 0), 1500);
   }
+
+  async function attemptPush(url, d, retryCount) {
+    setSyncStatus('syncing');
+    try {
+      const res = await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'saveWorkflowData', data: d }) });
+      const json = await res.json();
+      if (json.ok) {
+        syncVersionRef.current = json.version;
+        localDirtyRef.current = false;
+        pushFailCountRef.current = 0;
+        setPushFailed(false);
+        setLastSyncedAt(new Date());
+        setSyncStatus('synced');
+        setTimeout(() => setSyncStatus(''), 3000);
+      } else {
+        handlePushFail(url, d, retryCount);
+      }
+    } catch {
+      handlePushFail(url, d, retryCount);
+    }
+  }
+
+  function handlePushFail(url, d, retryCount) {
+    pushFailCountRef.current += 1;
+    if (retryCount < 3) {
+      // 5秒、15秒、45秒で自動リトライ
+      const delay = 5000 * Math.pow(3, retryCount);
+      setSyncStatus(`retry ${retryCount + 1}/3...`);
+      setTimeout(() => attemptPush(url, d, retryCount + 1), delay);
+    } else {
+      setSyncStatus('error');
+      setPushFailed(true);
+      // ローカルバックアップを追加保存
+      try { localStorage.setItem('kodawarin_tasks_backup', localStorage.getItem('kodawarin_tasks')); } catch {}
+    }
+  }
+  schedulePushRef.current = schedulePush;
+
+  // ページを閉じる前に未保存データがあれば警告
+  useEffect(() => {
+    const handler = (e) => {
+      if (localDirtyRef.current) {
+        e.preventDefault();
+        e.returnValue = 'サーバーに保存されていない変更があります。';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
 
   const updateRef = useRef(null);
   updateRef.current = (d) => { setData(d); saveData(d); schedulePush(d); };
@@ -1787,6 +2160,11 @@ function Workflow() {
     update({ ...data, tasks });
   }
   function deleteTask(id) { update({ ...data, tasks:data.tasks.filter(t=>t.id!==id) }); }
+  function deleteTasks(ids) { const s=new Set(ids); update({ ...data, tasks:data.tasks.filter(t=>!s.has(t.id)) }); }
+  function saveBulkTasks(updatedTasks) {
+    const map = new Map(updatedTasks.map(t=>[t.id,t]));
+    update({ ...data, tasks:data.tasks.map(t=>map.has(t.id)?map.get(t.id):t) });
+  }
   function changeStatus(id, status) {
     if (status==='__delete__') { deleteTask(id); return; }
     update({ ...data, tasks:data.tasks.map(t=>{
@@ -1835,6 +2213,7 @@ function Workflow() {
     update({ ...data, projects:data.projects.filter(p=>p.id!==id), tasks:data.tasks.filter(t=>t.projectId!==id) });
   }
   function saveMember(m) { update({ ...data, members:[...data.members,m] }); }
+  function updateMember(id, updates) { update({ ...data, members:data.members.map(m=>m.id===id?{...m,...updates}:m) }); }
   function deleteMember(id) {
     update({ ...data, members:data.members.filter(m=>m.id!==id), tasks:data.tasks.map(t=>({...t,assigneeIds:(t.assigneeIds||[]).filter(aid=>aid!==id)})) });
   }
@@ -1900,19 +2279,34 @@ function Workflow() {
   }, [data]);
 
   function duplicateTask(t) {
-    const newTask = { ...t, id:genId(), title:t.title+' (コピー)', status:'todo' };
+    const newTask = { ...t, id:genId(), title:t.title+' (コピー)', status:'todo', checklist:(t.checklist||[]).map(c=>({...c,id:genId(),checked:false})) };
     update({ ...data, tasks:[...data.tasks, newTask] });
+  }
+
+  function copyTaskToProject(tasksOrTask, targetProjectId) {
+    const arr = Array.isArray(tasksOrTask) ? tasksOrTask : [tasksOrTask];
+    const newTasks = arr.map(t=>({ ...t, id:genId(), projectId:targetProjectId, status:'todo', checklist:(t.checklist||[]).map(c=>({...c,id:genId(),checked:false})) }));
+    update({ ...data, tasks:[...data.tasks, ...newTasks] });
   }
 
   function copyCategoryToProject(categoryTasks, targetProjectId) {
     const targetProj = data.projects.find(p=>p.id===targetProjectId);
     if (!targetProj) return;
     const newTasks = categoryTasks.map(t => ({
-      ...t, id:genId(), projectId:targetProjectId, status:'todo', due:'',
+      ...t, id:genId(), projectId:targetProjectId, status:'todo', due:'', doneAt:undefined,
+      checklist:(t.checklist||[]).map(c=>({...c,id:genId(),checked:false})),
     }));
-    // Remove doneAt from copied tasks
-    newTasks.forEach(t => { delete t.doneAt; });
     update({ ...data, tasks:[...data.tasks, ...newTasks] });
+  }
+
+  function renameCategory(oldCat, newCat, catTasks) {
+    const updatedTasks = data.tasks.map(t => {
+      if (!catTasks.some(ct => ct.id === t.id)) return t;
+      return { ...t, title: t.title.replace(`【${oldCat}】`, `【${newCat}】`) };
+    });
+    // catOrderも更新
+    const newCatOrder = (data.catOrder||[]).map(c => c === oldCat ? newCat : c);
+    update({ ...data, tasks: updatedTasks, catOrder: newCatOrder });
   }
 
   // Visible projects: admin sees all, members see only projects they're added to
@@ -1931,6 +2325,7 @@ function Workflow() {
     myMemberId,
     gasUrl: wfGasUrl ? '有' : '無',
     totalProjects: data.projects.length,
+    totalTasks: data.tasks.length,
     visibleCount: visibleProjects.length,
     projectsWithMe: data.projects.filter(p => (p.visibleMemberIds||[]).includes(myMemberId)).length,
     sampleVisibleMemberIds: data.projects.slice(0,3).map(p => ({ name: p.name?.slice(0,10), vids: (p.visibleMemberIds||[]).join(',').slice(0,30) })),
@@ -1957,6 +2352,14 @@ function Workflow() {
   const closedByMonth = groupByMonth(closedProjects, p=>p.eventDate||p.end);
 
   const closedProjectIds = new Set(closedProjects.map(p=>p.id));
+  const memberMap = Object.fromEntries((data.members||[]).map(m=>[m.id,m]));
+  const projMemberDots = {};
+  data.tasks.forEach(t=>{
+    if(!t.assigneeIds||!t.assigneeIds.length) return;
+    if(!projMemberDots[t.projectId]) projMemberDots[t.projectId]=new Set();
+    t.assigneeIds.forEach(mid=>{ const m=memberMap[mid]; if(m&&!m.closed&&m.color) projMemberDots[t.projectId].add(m.color); });
+  });
+  const getDotsFor = pid => projMemberDots[pid] ? [...projMemberDots[pid]] : [];
   const filteredTasks = data.tasks
     .filter(t=>{ const pj=data.projects.find(p=>p.id===t.projectId); return pj ? visibleProjects.some(vp=>vp.id===pj.id) : isTsuge; })
     .filter(t=>!t.isPrivate||isTsuge)
@@ -1967,6 +2370,13 @@ function Workflow() {
 
   return (
     <div style={{ height:'100vh',background:C.cream,color:C.text,fontFamily:"'Noto Sans JP',sans-serif",fontSize:13,display:'flex',flexDirection:'column',overflow:'hidden' }}>
+      {pushFailed && (
+        <div style={{ background:'#d32f2f',color:'#fff',fontSize:13,padding:'10px 16px',fontFamily:"'Noto Sans JP',sans-serif",zIndex:10000,display:'flex',alignItems:'center',gap:12 }}>
+          <span style={{ fontSize:18 }}>!</span>
+          <span>サーバーへの保存に失敗しています。データはこの端末にのみ保存されています。ページを閉じないでください。</span>
+          <button onClick={()=>{ if(wfGasUrlRef.current && data) attemptPush(wfGasUrlRef.current, data, 0); }} style={{ marginLeft:'auto',padding:'4px 16px',background:'#fff',color:'#d32f2f',border:'none',borderRadius:4,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap' }}>再送信</button>
+        </div>
+      )}
       <div style={{ background:'#333',color:'#0f0',fontSize:10,padding:'6px 12px',fontFamily:'monospace',whiteSpace:'pre-wrap',zIndex:9999 }}>
         {`ID:${_debugInfo.myMemberId||'なし'} | GAS:${_debugInfo.gasUrl} | fetch:${_debugInfo.gasFetch} | 全PJ:${_debugInfo.totalProjects} | 表示PJ:${_debugInfo.visibleCount} | 自分含むPJ:${_debugInfo.projectsWithMe} | admin:${_debugInfo.isTsuge} | sync:${_debugInfo.syncStatus||'idle'} | members:${_debugInfo.membersCount}\n`}
         {_debugInfo.sampleVisibleMemberIds.map(p=>`${p.name}: [${p.vids||'空'}]`).join(' | ')}
@@ -1979,6 +2389,9 @@ function Workflow() {
         ::-webkit-scrollbar-thumb { background:${C.cream3}; border-radius:3px; }
         select option { background:#fff; }
         input[type="date"]::-webkit-calendar-picker-indicator { opacity:0.5; cursor:pointer; }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+        input[type="number"] { -moz-appearance:textfield; }
         @keyframes modal-in { from{opacity:0;transform:scale(0.97) translateY(-6px)} to{opacity:1;transform:scale(1) translateY(0)} }
         @keyframes modal-up { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:translateY(0)} }
         @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
@@ -1991,9 +2404,10 @@ function Workflow() {
         activeTab={tab}
         onTabChange={setTab}
         rightActions={<>
-          {wfGasUrl && <span style={{ fontSize:10, color:syncStatus==='error'?C.red:syncStatus==='syncing'||syncStatus==='pending'?C.amber:C.text3, transition:'color 0.3s', whiteSpace:'nowrap' }}>
-            {syncStatus==='syncing'?'⟳ 同期中…':syncStatus==='pending'?'…':syncStatus==='error'?'⚠ 同期失敗':lastSyncedAt?`✓ ${lastSyncedAt.getHours().toString().padStart(2,'0')}:${lastSyncedAt.getMinutes().toString().padStart(2,'0')} 同期済`:'接続中…'}
-          </span>}
+          <span style={{ fontSize:10, color:syncStatus==='error'?C.red:syncStatus==='syncing'||syncStatus==='pending'?C.amber:C.text3, transition:'color 0.3s', whiteSpace:'nowrap' }}>
+            {!wfGasUrl?'⚠ GAS未接続':syncStatus==='syncing'?'⟳ 同期中…':syncStatus==='pending'?'…':syncStatus==='error'?'⚠ 同期失敗':lastSyncedAt?`✓ ${lastSyncedAt.getHours().toString().padStart(2,'0')}:${lastSyncedAt.getMinutes().toString().padStart(2,'0')} 同期済`:'接続中…'}
+            {` P:${data.projects.length} T:${data.tasks.length}`}
+          </span>
           {authMemberId && (
             <span style={{ padding:'5px 10px',borderRadius:999,border:`1px solid ${C.blue}`,background:C.blue+'18',color:C.blue,fontSize:11,fontFamily:'inherit',maxWidth:120,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis' }}>
               {data.members.find(m=>m.id===authMemberId)?.name || authDisplayName}
@@ -2014,15 +2428,40 @@ function Workflow() {
         <div style={{ width:230,background:'#fff',borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column',flexShrink:0,overflowY:'auto',
           ...(isMobile ? { position:'fixed',top:52,left:0,height:'calc(100% - 52px)',zIndex:300,transform:sidebarOpen?'translateX(0)':'translateX(-100%)',transition:'transform 0.25s ease' } : {}) }}>
           <div style={{ padding:'16px 12px 8px' }}>
+            {/* Bulk close bar */}
+            {bulkCloseMode ? (
+              <div style={{ display:'flex',alignItems:'center',gap:6,padding:'6px 4px 10px',borderBottom:`1px solid ${C.border}`,marginBottom:6 }}>
+                <span style={{ fontSize:11,color:C.text2,flex:1 }}>{bulkCloseIds.size}件選択中</span>
+                <button onClick={()=>{
+                  if(bulkCloseIds.size===0) return;
+                  if(!window.confirm(`${bulkCloseIds.size}件のプロジェクトを終了しますか？`)) return;
+                  update({...data, projects:data.projects.map(p=>bulkCloseIds.has(p.id)?{...p,closed:true}:p)});
+                  if(bulkCloseIds.has(projFilter)) setProjFilterSaved('all');
+                  setBulkCloseIds(new Set()); setBulkCloseMode(false);
+                }} disabled={bulkCloseIds.size===0}
+                  style={{ padding:'3px 10px',borderRadius:6,border:'none',background:bulkCloseIds.size>0?C.orange:C.cream3,color:bulkCloseIds.size>0?'#fff':C.text3,cursor:bulkCloseIds.size>0?'pointer':'default',fontSize:11,fontFamily:'inherit',fontWeight:600 }}>終了する</button>
+                <button onClick={()=>{setBulkCloseMode(false);setBulkCloseIds(new Set());}}
+                  style={{ padding:'3px 8px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit' }}>取消</button>
+              </div>
+            ) : (
+              <div style={{ display:'flex',alignItems:'center',gap:6,padding:'0 4px 6px' }}>
+                <div style={{ flex:1 }}/>
+                <button onClick={()=>setBulkCloseMode(true)}
+                  style={{ padding:'2px 8px',borderRadius:4,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit' }}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}
+                  title="複数プロジェクトを一括終了">一括終了</button>
+              </div>
+            )}
             {/* All */}
-            <SidebarItem label="すべて" color={C.text3} count={data.tasks.filter(t=>!closedProjectIds.has(t.projectId)).length} active={projFilter==='all'} onClick={()=>{ setProjFilterSaved('all'); if(isMobile) setSidebarOpen(false); }}/>
+            <SidebarItem label="すべて" color={C.text3} count={data.tasks.filter(t=>!closedProjectIds.has(t.projectId)).length} active={!bulkCloseMode&&projFilter==='all'} onClick={()=>{ if(bulkCloseMode) return; setProjFilterSaved('all'); if(isMobile) setSidebarOpen(false); }}/>
 
             {/* Events */}
             <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 4px 6px' }}>
               <span style={{ fontSize:10,fontWeight:700,letterSpacing:1,color:C.text3,textTransform:'uppercase' }}>イベント</span>
-              <button onClick={()=>setProjModal({open:true,data:null,defaultType:'event'})} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
+              {!bulkCloseMode && <button onClick={()=>setProjModal({open:true,data:null,defaultType:'event'})} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
                 onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.orange; e.currentTarget.style.color=C.orange; }}
-                onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; }}>＋</button>
+                onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; }}>＋</button>}
             </div>
             {eventByMonth.map(([month, ps])=>{ const label = month==='日付なし'?'日付なし':`${month.slice(0,4)}年${parseInt(month.slice(5))}月`; const isOpen = openMonths.event?.[month]; return <div key={month}>
               <div onClick={()=>toggleMonth('event',month)} style={{ display:'flex',alignItems:'center',gap:4,padding:'4px 8px',cursor:'pointer',borderRadius:4 }}
@@ -2031,17 +2470,29 @@ function Workflow() {
                 <span style={{ fontSize:10,color:C.text3,fontWeight:600 }}>{label}</span>
                 <span style={{ fontSize:9,color:C.text3,opacity:0.6 }}>({ps.length})</span>
               </div>
-              {isOpen && ps.map(p=><SidebarItem key={p.id} label={p.name} color={p.color} count={data.tasks.filter(t=>t.projectId===p.id).length} active={projFilter===p.id} onClick={()=>{ setProjFilterSaved(p.id); if(isMobile) setSidebarOpen(false); }} onContextMenu={e=>{ e.preventDefault(); setProjModal({open:true,data:p}); }} isPrivate={p.isPrivate} restricted={p.visibleMemberIds&&p.visibleMemberIds.length>0}/>)}
+              {isOpen && ps.map(p=>bulkCloseMode ? (
+                <label key={p.id} style={{ display:'flex',alignItems:'center',gap:6,padding:'5px 8px 5px 12px',cursor:'pointer',borderRadius:6,fontSize:12,color:bulkCloseIds.has(p.id)?C.orange:C.text }}
+                  onMouseEnter={e=>e.currentTarget.style.background=C.cream2} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <input type="checkbox" checked={bulkCloseIds.has(p.id)} onChange={()=>setBulkCloseIds(prev=>{const s=new Set(prev);s.has(p.id)?s.delete(p.id):s.add(p.id);return s;})} style={{ accentColor:C.orange }}/>
+                  <span style={{ overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{p.name}</span>
+                </label>
+              ) : <SidebarItem key={p.id} label={p.name} color={p.color} count={data.tasks.filter(t=>t.projectId===p.id).length} active={projFilter===p.id} onClick={()=>{ setProjFilterSaved(p.id); if(isMobile) setSidebarOpen(false); }} onContextMenu={e=>{ e.preventDefault(); setProjModal({open:true,data:p}); }} isPrivate={p.isPrivate} restricted={p.visibleMemberIds&&p.visibleMemberIds.length>0} memberDots={getDotsFor(p.id)}/>)}
             </div>; })}
 
             {/* Other */}
             <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 4px 6px' }}>
               <span style={{ fontSize:10,fontWeight:700,letterSpacing:1,color:C.text3,textTransform:'uppercase' }}>その他</span>
-              <button onClick={()=>setProjModal({open:true,data:null,defaultType:'other'})} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
+              {!bulkCloseMode && <button onClick={()=>setProjModal({open:true,data:null,defaultType:'other'})} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
                 onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.orange; e.currentTarget.style.color=C.orange; }}
-                onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; }}>＋</button>
+                onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.text3; }}>＋</button>}
             </div>
-            {otherProjects.map(p=><SidebarItem key={p.id} label={p.name} color={p.color} count={data.tasks.filter(t=>t.projectId===p.id).length} active={projFilter===p.id} onClick={()=>{ setProjFilterSaved(p.id); if(isMobile) setSidebarOpen(false); }} onContextMenu={e=>{ e.preventDefault(); setProjModal({open:true,data:p}); }} isPrivate={p.isPrivate} restricted={p.visibleMemberIds&&p.visibleMemberIds.length>0}/>)}
+            {otherProjects.map(p=>bulkCloseMode ? (
+              <label key={p.id} style={{ display:'flex',alignItems:'center',gap:6,padding:'5px 8px 5px 12px',cursor:'pointer',borderRadius:6,fontSize:12,color:bulkCloseIds.has(p.id)?C.orange:C.text }}
+                onMouseEnter={e=>e.currentTarget.style.background=C.cream2} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                <input type="checkbox" checked={bulkCloseIds.has(p.id)} onChange={()=>setBulkCloseIds(prev=>{const s=new Set(prev);s.has(p.id)?s.delete(p.id):s.add(p.id);return s;})} style={{ accentColor:C.orange }}/>
+                <span style={{ overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{p.name}</span>
+              </label>
+            ) : <SidebarItem key={p.id} label={p.name} color={p.color} count={data.tasks.filter(t=>t.projectId===p.id).length} active={projFilter===p.id} onClick={()=>{ setProjFilterSaved(p.id); if(isMobile) setSidebarOpen(false); }} onContextMenu={e=>{ e.preventDefault(); setProjModal({open:true,data:p}); }} isPrivate={p.isPrivate} restricted={p.visibleMemberIds&&p.visibleMemberIds.length>0} memberDots={getDotsFor(p.id)}/>)}
 
             {/* Closed (accordion) */}
             {closedProjects.length>0 && <>
@@ -2056,7 +2507,7 @@ function Workflow() {
                   <span style={{ fontSize:10,color:C.text3,fontWeight:600 }}>{label}</span>
                   <span style={{ fontSize:9,color:C.text3,opacity:0.6 }}>({ps.length})</span>
                 </div>
-                {isOpen && ps.map(p=><SidebarItem key={p.id} label={p.name} color={C.text3} count={data.tasks.filter(t=>t.projectId===p.id).length} active={projFilter===p.id} onClick={()=>{ setProjFilterSaved(p.id); if(isMobile) setSidebarOpen(false); }} onContextMenu={e=>{ e.preventDefault(); setProjModal({open:true,data:p}); }} isPrivate={p.isPrivate} restricted={p.visibleMemberIds&&p.visibleMemberIds.length>0}/>)}
+                {isOpen && ps.map(p=><SidebarItem key={p.id} label={p.name} color={C.text3} count={data.tasks.filter(t=>t.projectId===p.id).length} active={projFilter===p.id} onClick={()=>{ setProjFilterSaved(p.id); if(isMobile) setSidebarOpen(false); }} onContextMenu={e=>{ e.preventDefault(); setProjModal({open:true,data:p}); }} isPrivate={p.isPrivate} restricted={p.visibleMemberIds&&p.visibleMemberIds.length>0} memberDots={getDotsFor(p.id)}/>)}
               </div>; })}
             </>}
           </div>
@@ -2080,8 +2531,8 @@ function Workflow() {
                 )}
                 <div style={{ fontSize:15,fontWeight:600,color:C.text }}>{projName}</div>
                 <div style={{ display:'flex',gap:2,background:C.cream3,borderRadius:999,padding:2 }}>
-                  {[['kanban','カンバン'],['list','リスト'],['calendar','カレンダー'],['member','メンバー別']].map(([v,l])=>(
-                    <button key={v} onClick={()=>setView(v)} style={{ padding:'5px 11px',borderRadius:999,border:'none',background:view===v?'#fff':'transparent',color:view===v?C.orange:C.text2,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:view===v?500:400,boxShadow:view===v?'0 1px 3px rgba(58,53,48,0.12)':'none',transition:'all 0.12s' }}>{l}</button>
+                  {[['kanban','カンバン'],['list','リスト'],['member','メンバー別']].map(([v,l])=>(
+                    <button key={v} onClick={()=>{setView(v);try{localStorage.setItem('wf_view',v);}catch{}}} style={{ padding:'5px 11px',borderRadius:999,border:'none',background:view===v?'#fff':'transparent',color:view===v?C.orange:C.text2,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:view===v?500:400,boxShadow:view===v?'0 1px 3px rgba(58,53,48,0.12)':'none',transition:'all 0.12s' }}>{l}</button>
                   ))}
                 </div>
               </div>
@@ -2098,7 +2549,7 @@ function Workflow() {
                 )}
                 <Select value={memberFilter} onChange={e=>setMemberFilter(e.target.value)} style={{ width:'auto',padding:'5px 10px' }}>
                   <option value="all">全メンバー</option>
-                  {data.members.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+                  {data.members.filter(m=>!m.closed).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
                 </Select>
               </div>
             </div>
@@ -2195,18 +2646,18 @@ function Workflow() {
             })()}
             {view==='kanban' && (
               <div style={{ display:'flex',flex:1,overflow:'hidden',minHeight:0 }}>
-                <KanbanView tasks={filteredTasks} projects={visibleProjects} members={data.members} onOpenTask={t=>setTaskModal({open:true,data:t,defaultStatus:'todo'})} onStatusChange={changeStatus} onAddTask={()=>setTaskModal({open:true,data:null,defaultStatus:'todo'})} onAddTaskWithStatus={s=>setTaskModal({open:true,data:null,defaultStatus:s})} onDuplicateTask={duplicateTask} taskOrder={taskOrder} onReorder={reorderTask} isMobile={isMobile} onTimerSelect={t=>setTimerTask(t)} timerTaskId={timerTask?.id}/>
+                <KanbanView tasks={filteredTasks} projects={visibleProjects} members={data.members} onOpenTask={t=>setTaskModal({open:true,data:t,defaultStatus:'todo'})} onStatusChange={changeStatus} onAddTask={()=>setTaskModal({open:true,data:null,defaultStatus:'todo'})} onAddTaskWithStatus={s=>setTaskModal({open:true,data:null,defaultStatus:s})} onDuplicateTask={duplicateTask} onCopyTaskToProject={copyTaskToProject} taskOrder={taskOrder} onReorder={reorderTask} isMobile={isMobile} onTimerSelect={t=>setTimerTask(t)} timerTaskId={timerTask?.id}/>
                 {!isMobile && <div style={{ padding:'16px 16px 16px 0',flexShrink:0,display:'flex' }}><TimerPanel timerTask={timerTask} projects={visibleProjects} onClearTask={()=>setTimerTask(null)}/></div>}
               </div>
             )}
             {view==='list' && (
               <div style={{ display:'flex',flex:1,overflow:'hidden',minHeight:0 }}>
-                <ListView tasks={filteredTasks} projects={visibleProjects} members={data.members} onOpenTask={t=>setTaskModal({open:true,data:t})} onStatusChange={changeStatus} onDelete={deleteTask} onSave={saveTask} onTimerSelect={t=>setTimerTask(t)} timerTaskId={timerTask?.id} onAddTask={(cat)=>setTaskModal({open:true,data:null,defaultStatus:'todo',defaultTitle:cat?`【${cat}】`:undefined})} onCopyCategoryToProject={copyCategoryToProject}/>
+                <ListView tasks={filteredTasks} projects={visibleProjects} members={data.members} onOpenTask={t=>setTaskModal({open:true,data:t})} onStatusChange={changeStatus} onDelete={deleteTask} onDeleteTasks={deleteTasks} onSave={saveTask} onSaveBulk={saveBulkTasks} onTimerSelect={t=>setTimerTask(t)} timerTaskId={timerTask?.id} onAddTask={(cat)=>setTaskModal({open:true,data:null,defaultStatus:'todo',defaultTitle:cat?`【${cat}】`:undefined})} onCopyCategoryToProject={copyCategoryToProject} onDuplicateTask={duplicateTask} onCopyTaskToProject={copyTaskToProject} catOrder={data.catOrder||[]} onCatOrderChange={order=>update({...data,catOrder:order})} onRenameCategory={renameCategory} currentProject={projFilter!=='all'?visibleProjects.find(p=>p.id===projFilter):null}/>
                 {!isMobile && <div style={{ padding:'16px 16px 16px 0',flexShrink:0,display:'flex' }}><TimerPanel timerTask={timerTask} projects={visibleProjects} onClearTask={()=>setTimerTask(null)}/></div>}
               </div>
             )}
             {view==='calendar' && <CalendarView tasks={filteredTasks} projects={visibleProjects} members={data.members} onOpenTask={t=>setTaskModal({open:true,data:t})} />}
-            {view==='member' && <MemberView tasks={filteredTasks} projects={visibleProjects} members={data.members} memberFilter={memberFilter} onOpenTask={t=>setTaskModal({open:true,data:t})} isMobile={isMobile}/>}
+            {view==='member' && <MemberView tasks={filteredTasks} projects={visibleProjects} members={data.members} memberFilter={memberFilter} onOpenTask={t=>setTaskModal({open:true,data:t})} onSave={saveTask} onStatusChange={changeStatus} isMobile={isMobile}/>}
           </>)}
 
           {tab==='members' && (<>
@@ -2223,20 +2674,45 @@ function Workflow() {
               <div style={{ padding:24,maxWidth:600 }}>
                 {data.members.length===0
                   ? <EmptyState icon="👤" msg="メンバーを追加してください"/>
-                  : data.members.map(m=>(
-                    <div key={m.id} style={{ display:'flex',alignItems:'center',gap:12,padding:'12px 14px',border:`1px solid ${C.border}`,borderRadius:12,background:'#fff',marginBottom:8 }}>
-                      <Avatar name={m.name} color={m.color} size={32} fs={14}/>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:13,fontWeight:600,color:C.text }}>{m.name}</div>
-                        <div style={{ fontSize:11,color:C.text3 }}>{data.tasks.filter(t=>(t.assigneeIds||[]).includes(m.id)).length}件のタスク</div>
+                  : <>
+                    {data.members.filter(m=>!m.closed).map(m=>(
+                      <div key={m.id} style={{ display:'flex',alignItems:'center',gap:12,padding:'12px 14px',border:`1px solid ${C.border}`,borderRadius:12,background:'#fff',marginBottom:8 }}>
+                        <div style={{ position:'relative',flexShrink:0 }}>
+                          <div onClick={e=>{const el=e.currentTarget.nextSibling;el.style.display=el.style.display==='none'?'flex':'none';}} style={{ cursor:'pointer' }}><Avatar name={m.name} color={m.color} size={32} fs={14}/></div>
+                          <div style={{ display:'none',position:'absolute',top:'100%',left:0,zIndex:200,background:'#fff',border:`1px solid ${C.border}`,borderRadius:8,padding:6,gap:4,flexWrap:'wrap',width:140,boxShadow:'0 4px 12px rgba(0,0,0,0.12)',marginTop:4 }}>
+                            {PALETTE.map(c=><div key={c} onClick={()=>updateMember(m.id,{color:c})} style={{ width:22,height:22,borderRadius:'50%',background:c,cursor:'pointer',border:c===m.color?'2px solid #333':'2px solid transparent' }}/>)}
+                          </div>
+                        </div>
+                        <div style={{ flex:1 }}>
+                          <input value={m.name} onChange={e=>updateMember(m.id,{name:e.target.value})}
+                            style={{ fontSize:13,fontWeight:600,color:C.text,border:'none',background:'transparent',outline:'none',fontFamily:'inherit',padding:'2px 0',width:'100%',borderBottom:`1px solid transparent` }}
+                            onFocus={e=>e.currentTarget.style.borderBottom=`1px solid ${C.orange}`}
+                            onBlur={e=>e.currentTarget.style.borderBottom='1px solid transparent'}/>
+                          <div style={{ fontSize:11,color:C.text3 }}>{data.tasks.filter(t=>(t.assigneeIds||[]).includes(m.id)).length}件のタスク</div>
+                        </div>
+                        <Btn small onClick={()=>{ if(window.confirm(`${m.name} を終了メンバーに移動しますか？`)) updateMember(m.id,{closed:true}); }} style={{ color:C.text3,borderColor:C.border }}>終了</Btn>
+                        <Btn variant="danger" small onClick={()=>{ if(window.confirm('このメンバーを削除しますか？（タスクの担当も外れます）')) deleteMember(m.id); }}>削除</Btn>
                       </div>
-                      <Btn variant="danger" small onClick={()=>{ if(window.confirm('このメンバーを削除しますか？')) deleteMember(m.id); }}>削除</Btn>
-                    </div>
-                  ))}
+                    ))}
+                    {data.members.some(m=>m.closed) && <>
+                      <div style={{ fontSize:11,fontWeight:700,color:C.text3,letterSpacing:0.5,padding:'16px 0 6px',borderTop:`1px solid ${C.border}`,marginTop:8 }}>終了したメンバー</div>
+                      {data.members.filter(m=>m.closed).map(m=>(
+                        <div key={m.id} style={{ display:'flex',alignItems:'center',gap:12,padding:'10px 14px',border:`1px solid ${C.border}`,borderRadius:12,background:C.cream2,marginBottom:8,opacity:0.7 }}>
+                          <Avatar name={m.name} color={m.color} size={32} fs={14}/>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:13,fontWeight:600,color:C.text3 }}>{m.name}</div>
+                            <div style={{ fontSize:11,color:C.text3 }}>{data.tasks.filter(t=>(t.assigneeIds||[]).includes(m.id)).length}件のタスク</div>
+                          </div>
+                          <Btn small onClick={()=>updateMember(m.id,{closed:false})} style={{ color:C.green,borderColor:C.green }}>復帰</Btn>
+                          <Btn variant="danger" small onClick={()=>{ if(window.confirm('このメンバーを削除しますか？（タスクの担当も外れます）')) deleteMember(m.id); }}>削除</Btn>
+                        </div>
+                      ))}
+                    </>}
+                  </>}
               </div>
               {data.members.length > 0 && (<>
                 <div style={{ padding:'8px 24px',fontSize:11,fontWeight:700,color:C.text3,letterSpacing:1,textTransform:'uppercase',borderTop:`1px solid ${C.border}` }}>タスク状況</div>
-                <MemberView tasks={filteredTasks} projects={visibleProjects} members={data.members} memberFilter="all" onOpenTask={t=>setTaskModal({open:true,data:t})} isMobile={isMobile}/>
+                <MemberView tasks={filteredTasks} projects={visibleProjects} members={data.members} memberFilter="all" onOpenTask={t=>setTaskModal({open:true,data:t})} onSave={saveTask} onStatusChange={changeStatus} isMobile={isMobile}/>
               </>)}
             </div>
           </>)}
@@ -2264,13 +2740,18 @@ function Workflow() {
   );
 }
 
-function SidebarItem({ label, color, count, active, onClick, onContextMenu, isPrivate, restricted }) {
+function SidebarItem({ label, color, count, active, onClick, onContextMenu, isPrivate, restricted, memberDots }) {
   return (
     <div onClick={onClick} onContextMenu={onContextMenu} style={{ display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:10,cursor:'pointer',background:active?C.orangeBg:'transparent',transition:'all 0.12s',marginBottom:2 }}
       onMouseEnter={e=>{ if(!active) e.currentTarget.style.background=C.cream2; }}
       onMouseLeave={e=>{ if(!active) e.currentTarget.style.background='transparent'; }}>
       <div style={{ width:7,height:7,borderRadius:'50%',background:color,flexShrink:0 }}/>
       <span style={{ fontSize:12,fontWeight:active?600:400,color:active?C.orange:C.text,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{label}</span>
+      {memberDots && memberDots.length > 0 && (
+        <div style={{ display:'flex',gap:2,flexShrink:0 }}>
+          {memberDots.map((mc,i)=><div key={i} style={{ width:7,height:7,borderRadius:'50%',background:mc }} title={mc}/>)}
+        </div>
+      )}
       {isPrivate && <span style={{ fontSize:9,color:C.orange }}>🔐</span>}
       {restricted && <span style={{ fontSize:9,color:C.blue }} title="表示メンバー制限あり">👥</span>}
       <span style={{ fontSize:10,color:C.text3,background:C.cream3,padding:'1px 5px',borderRadius:999,flexShrink:0 }}>{count}</span>
@@ -2341,8 +2822,8 @@ function SettingsPage() {
     localStorage.setItem('wl_sheetUrl', JSON.stringify(tsSheet));
     localStorage.setItem('wf_gasUrl', wfGas);
     localStorage.setItem('wl_calGasUrl', JSON.stringify(calGasUrl));
-    // 管理者はWorkflow GAS URLをFirebaseに保存（全メンバーに共有）
-    if (isAdmin && wfGas && hasFirebase) {
+    // Workflow GAS URLをFirebaseに保存（全デバイスで共有）
+    if (wfGas && hasFirebase) {
       fbSet(fbRef(fbDb, "config/wfGasUrl"), wfGas);
     }
     setSaved('✓ 保存しました');
@@ -2357,10 +2838,15 @@ function SettingsPage() {
     <div style={{ minHeight:'100vh', background:C.cream, fontFamily:"'Noto Sans JP',sans-serif", fontSize:13, color:C.text }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600&display=swap'); *{box-sizing:border-box;margin:0;padding:0;}`}</style>
       <div style={{ height:52, background:'#fff', borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', padding:'0 24px', gap:12, flexShrink:0 }}>
-        <button onClick={()=>navigate(-1)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:18, color:C.text2, padding:'4px 6px', borderRadius:8, lineHeight:1 }}
+        <button onClick={()=>navigate('/')} style={{ background:'none', border:'none', cursor:'pointer', fontSize:18, color:C.text2, padding:'4px 6px', borderRadius:8, lineHeight:1 }}
           onMouseEnter={e=>e.currentTarget.style.color=C.orange} onMouseLeave={e=>e.currentTarget.style.color=C.text2}>←</button>
         <span style={{ fontSize:15, fontWeight:600, color:C.text }}>設定</span>
         {saved && <span style={{ fontSize:12, color:C.green, marginLeft:'auto' }}>{saved}</span>}
+        <button onClick={()=>navigate('/')} style={{ marginLeft:'auto', padding:'6px 14px', borderRadius:999, border:`1px solid ${C.border}`, background:'#fff', color:C.text2, cursor:'pointer', fontSize:12, fontFamily:"'Noto Sans JP',sans-serif", fontWeight:500, transition:'all 0.15s' }}
+          onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
+          onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text2;}}>
+          Workflow →
+        </button>
       </div>
 
       <div style={{ maxWidth:520, margin:'32px auto', padding:'0 20px 60px' }}>
@@ -2507,9 +2993,9 @@ function authorizeCalendar() {
           {testResult && <div style={{ marginTop:8, fontSize:12, color:testResult.startsWith('✓')?C.green:testResult.startsWith('✗')?C.red:C.amber }}>{testResult}</div>}
         </div>
 
-        <button onClick={saveAll} style={{ width:'100%', padding:14, borderRadius:10, border:'none', background:C.orange, color:'#fff', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:"'Noto Sans JP',sans-serif", transition:'filter 0.15s' }}
+        <button onClick={saveAll} style={{ width:'100%', padding:14, borderRadius:10, border:'none', background:saved?C.green:C.orange, color:'#fff', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:"'Noto Sans JP',sans-serif", transition:'all 0.3s' }}
           onMouseEnter={e=>e.currentTarget.style.filter='brightness(1.08)'} onMouseLeave={e=>e.currentTarget.style.filter=''}>
-          保存
+          {saved ? '✓ 保存しました' : '保存'}
         </button>
 
         <div style={{ marginTop:24, ...card }}>
