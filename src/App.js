@@ -1324,7 +1324,11 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
   const [catReorderOpen, setCatReorderOpen] = useState(false);
   const [dragCat, setDragCat] = useState(null);
   const [dragOverCat, setDragOverCat] = useState(null);
+  const [statusFilter, setStatusFilter] = useState(null); // null | 'todo' | 'doing' | 'done' | 'skip'
+  const [memberFilterLocal, setMemberFilterLocal] = useState(null); // null | memberId
+  const [collapsedCats, setCollapsedCats] = useState(new Set());
   const activeMembers = members.filter(m=>!m.closed);
+  const toggleCollapse = (cat) => setCollapsedCats(prev => { const s = new Set(prev); s.has(cat) ? s.delete(cat) : s.add(cat); return s; });
   // Ordered project list matching sidebar: events by date, then others
   const orderedProjects = (() => {
     const active = projects.filter(p=>!p.closed);
@@ -1347,8 +1351,14 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
   const thStyle = { textAlign:'left',fontSize:10,fontWeight:600,color:C.text3,letterSpacing:0.5,textTransform:'uppercase',padding:'8px 12px',borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap' };
   const tdStyle = { padding:'8px 12px',borderBottom:`1px solid ${C.border}`,verticalAlign:'middle' };
 
+  // Filter by status and member
+  const filtered = tasks.filter(t => {
+    if (statusFilter && t.status !== statusFilter) return false;
+    if (memberFilterLocal && !(t.assigneeIds||[]).includes(memberFilterLocal)) return false;
+    return true;
+  });
   // Sort by due date (earliest first, no due last) then group by category
-  const sorted = [...tasks].sort((a,b) => { if(!a.due&&!b.due) return 0; if(!a.due) return 1; if(!b.due) return -1; return a.due.localeCompare(b.due); });
+  const sorted = [...filtered].sort((a,b) => { if(!a.due&&!b.due) return 0; if(!a.due) return 1; if(!b.due) return -1; return a.due.localeCompare(b.due); });
   const catMap = new Map();
   sorted.forEach(t => {
     const cat = extractCategory(t.title) || 'その他';
@@ -1500,23 +1510,37 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
     <div style={{ flex:1,overflowY:'auto',padding:'16px 24px' }} onClick={()=>{setAssigneeOpen(null);setCopyCatOpen(null);setBulkAssigneeOpen(false);}}>
       {/* Bulk mode bar */}
       <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:12,position:'sticky',top:0,zIndex:100,background:C.cream,paddingTop:4,paddingBottom:4 }}>
-        {!bulkMode ? (
-          <button onClick={()=>{setBulkMode(true);setBulkIds(new Set());}}
-            style={{ padding:'4px 12px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit' }}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>一括操作</button>
-        ) : (<>
+        {/* Filters */}
+        <div style={{ display:'flex',alignItems:'center',gap:4 }}>
+          {[['todo','未着手'],['doing','進行中'],['done','完了'],['skip','不要']].map(([k,l])=>(
+            <button key={k} onClick={()=>setStatusFilter(statusFilter===k?null:k)}
+              style={{ padding:'3px 8px',borderRadius:999,border:`1px solid ${statusFilter===k?C.orange:C.border}`,background:statusFilter===k?C.orange:C.cream,color:statusFilter===k?'#fff':C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit',fontWeight:statusFilter===k?600:400 }}>{l}</button>
+          ))}
+        </div>
+        <select value={memberFilterLocal||''} onChange={e=>setMemberFilterLocal(e.target.value||null)}
+          style={{ padding:'3px 8px',borderRadius:6,border:`1px solid ${memberFilterLocal?C.orange:C.border}`,background:memberFilterLocal?C.orange+'18':'transparent',color:memberFilterLocal?C.text:C.text3,fontSize:10,fontFamily:'inherit',outline:'none' }}>
+          <option value="">全メンバー</option>
+          {activeMembers.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+        {(statusFilter||memberFilterLocal) && <span style={{ fontSize:10,color:C.text3 }}>({filtered.length}/{tasks.length}件)</span>}
+        {bulkMode && <>
+          <div style={{ width:1,height:16,background:C.border,margin:'0 4px' }}/>
           <span style={{ fontSize:12,color:C.text2,fontWeight:600 }}>{bulkIds.size}件選択中</span>
-          <span style={{ fontSize:11,color:C.text3 }}>（右下のバーで操作）</span>
-          <button onClick={()=>{setBulkMode(false);setBulkIds(new Set());setBulkAssigneeOpen(false);setBulkCopyOpen(false);setBulkDueOpen(false);}}
-            style={{ padding:'4px 10px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit' }}>終了</button>
-        </>)}
+        </>}
       </div>
-      {/* Floating bulk bar (portal to body) */}
-      {bulkMode && bulkIds.size > 0 && createPortal(
+      {/* Floating bulk bar (portal to body) — always shown, toggles bulk mode or shows actions */}
+      {createPortal(
         <div style={{ position:'fixed',top:320,right:16,zIndex:9000,background:'#fff',borderRadius:12,padding:'10px 16px',display:'flex',flexDirection:'column',alignItems:'stretch',gap:8,boxShadow:'0 4px 20px rgba(58,53,48,0.25)',border:`1px solid ${C.border}`,maxWidth:220 }}>
-          <span style={{ fontSize:12,color:C.text2,fontWeight:600 }}>{bulkIds.size}件選択</span>
-          <div style={{ position:'relative' }}>
+          {!bulkMode ? (
+            <button onClick={()=>{setBulkMode(true);setBulkIds(new Set());}}
+              style={{ padding:'6px 14px',borderRadius:6,border:'none',background:C.orange,color:'#fff',cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:600 }}>一括操作</button>
+          ) : (<>
+            <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between' }}>
+              <span style={{ fontSize:12,color:C.text2,fontWeight:600 }}>{bulkIds.size}件選択</span>
+              <button onClick={()=>{setBulkMode(false);setBulkIds(new Set());setBulkAssigneeOpen(false);setBulkCopyOpen(false);setBulkDueOpen(false);}}
+                style={{ padding:'2px 8px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit' }}>✕</button>
+            </div>
+          {bulkIds.size > 0 && <><div style={{ position:'relative' }}>
             <button onClick={e=>{e.stopPropagation();setBulkAssigneeOpen(!bulkAssigneeOpen);setBulkDueOpen(false);setBulkCopyOpen(false);}}
               style={{ padding:'5px 14px',borderRadius:6,border:'none',background:C.orange,color:'#fff',cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:600 }}>担当者変更</button>
             {bulkAssigneeOpen && (
@@ -1585,8 +1609,8 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
               </div>
             )}
           </div>}
-          <button onClick={()=>{setBulkMode(false);setBulkIds(new Set());setBulkAssigneeOpen(false);setBulkCopyOpen(false);setBulkDueOpen(false);}}
-            style={{ padding:'5px 10px',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit' }}>✕</button>
+          </>}
+          </>)}
         </div>
       , document.body)}
       {categories.map((cat, ci) => {
@@ -1594,21 +1618,34 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
         const color = cat === 'その他' ? C.text3 : catColors[ci % catColors.length];
         return (
           <div key={cat} style={{ marginBottom:20 }}>
-            <div style={{ display:'flex',alignItems:'center',gap:8,padding:'10px 0 6px',borderBottom:`2px solid ${color}44` }}>
-              <div style={{ width:8,height:8,borderRadius:'50%',background:color }}/>
+            <div style={{ display:'flex',alignItems:'center',gap:8,padding:'10px 0 6px',borderBottom:`2px solid ${color}44`,cursor:'pointer' }}
+              onClick={()=>toggleCollapse(cat)}>
+              <span style={{ fontSize:10,color:C.text3,width:10,flexShrink:0 }}>{collapsedCats.has(cat)?'▶':'▼'}</span>
+              <div style={{ width:8,height:8,borderRadius:'50%',background:color,flexShrink:0 }}/>
               <span style={{ fontSize:13,fontWeight:600,color }}>{cat}</span>
               <span style={{ fontSize:11,color:C.text3 }}>({catTasks.length})</span>
-              <button onClick={()=>onAddTask(cat)} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
+              {/* Member avatars in this category */}
+              {(() => {
+                const mids = new Set();
+                catTasks.forEach(t=>(t.assigneeIds||[]).forEach(id=>mids.add(id)));
+                const catMembers = [...mids].map(id=>members.find(m=>m.id===id)).filter(Boolean);
+                return catMembers.length > 0 ? (
+                  <div style={{ display:'flex',gap:2,marginLeft:4 }} onClick={e=>e.stopPropagation()}>
+                    {catMembers.map(m=><Avatar key={m.id} name={m.name} color={m.color} size={18} fs={8}/>)}
+                  </div>
+                ) : null;
+              })()}
+              <button onClick={e=>{e.stopPropagation();onAddTask(cat);}} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>＋</button>
-              {cat!=='その他' && onRenameCategory && <button onClick={()=>{
+              {cat!=='その他' && onRenameCategory && <button onClick={e=>{e.stopPropagation();
                 const newName = window.prompt(`【${cat}】のカテゴリ名を変更`, cat);
                 if(newName && newName.trim() && newName.trim()!==cat) onRenameCategory(cat, newName.trim(), catTasks);
               }} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
                   title="カテゴリ名を一括変更"
                   onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>✏ 名前変更</button>}
-              {cat!=='その他' && <button onClick={()=>{if(window.confirm(`【${cat}】のタスク${catTasks.length}件をすべて削除しますか？`)){onDeleteTasks(catTasks.map(t=>t.id));}}} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
+              {cat!=='その他' && <button onClick={e=>{e.stopPropagation();if(window.confirm(`【${cat}】のタスク${catTasks.length}件をすべて削除しますか？`)){onDeleteTasks(catTasks.map(t=>t.id));}}} style={{ padding:'0 5px',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text3,cursor:'pointer',fontSize:11,fontFamily:'inherit',lineHeight:1.5 }}
                   title="このカテゴリのタスクを一括削除"
                   onMouseEnter={e=>{e.currentTarget.style.borderColor='#F76E6E';e.currentTarget.style.color='#F76E6E';}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>🗑 削除</button>}
@@ -1630,19 +1667,19 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
                 )}
               </span>}
               {cat!=='その他' && <span style={{ marginLeft:'auto',display:'flex',gap:2,alignItems:'center' }}>
-                {ci===0 && categories.filter(c=>c!=='その他').length>1 && <button onClick={()=>setCatReorderOpen(true)} style={{ padding:'0 6px',border:`1px solid ${C.border}`,borderRadius:4,background:C.cream2,color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.6,marginRight:4 }}
+                {ci===0 && categories.filter(c=>c!=='その他').length>1 && <button onClick={e=>{e.stopPropagation();setCatReorderOpen(true);}} style={{ padding:'0 6px',border:`1px solid ${C.border}`,borderRadius:4,background:C.cream2,color:C.text3,cursor:'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.6,marginRight:4 }}
                   onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.color=C.orange;}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text3;}}>順番変更</button>}
-                <button onClick={()=>moveCat(cat,-1)} disabled={ci===0} style={{ padding:'0 4px',border:`1px solid ${C.border}`,borderRadius:4,background:C.cream2,color:ci===0?C.text3+'55':C.text3,cursor:ci===0?'default':'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.6 }}>▲</button>
-                <button onClick={()=>moveCat(cat,1)} disabled={ci===categories.length-1||(ci===categories.length-2&&categories[categories.length-1]==='その他')} style={{ padding:'0 4px',border:`1px solid ${C.border}`,borderRadius:4,background:C.cream2,color:(ci>=categories.length-2)?C.text3+'55':C.text3,cursor:(ci>=categories.length-2)?'default':'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.6 }}>▼</button>
+                <button onClick={e=>{e.stopPropagation();moveCat(cat,-1);}} disabled={ci===0} style={{ padding:'0 4px',border:`1px solid ${C.border}`,borderRadius:4,background:C.cream2,color:ci===0?C.text3+'55':C.text3,cursor:ci===0?'default':'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.6 }}>▲</button>
+                <button onClick={e=>{e.stopPropagation();moveCat(cat,1);}} disabled={ci===categories.length-1||(ci===categories.length-2&&categories[categories.length-1]==='その他')} style={{ padding:'0 4px',border:`1px solid ${C.border}`,borderRadius:4,background:C.cream2,color:(ci>=categories.length-2)?C.text3+'55':C.text3,cursor:(ci>=categories.length-2)?'default':'pointer',fontSize:10,fontFamily:'inherit',lineHeight:1.6 }}>▼</button>
               </span>}
             </div>
-            <table style={{ width:'100%',borderCollapse:'collapse' }}>
+            {!collapsedCats.has(cat) && <table style={{ width:'100%',borderCollapse:'collapse' }}>
               <thead><tr>{(bulkMode?['']:(onTimerSelect?['']:[])).concat(['タスク名','ステータス','担当者','期日','目安','']).map((h,i)=>(
                 <th key={h||`empty${i}`} style={{...thStyle,...(i===0&&onTimerSelect?{width:24,padding:'8px 4px'}:{})}}>{h}</th>
               ))}</tr></thead>
               <tbody>{catTasks.map(t => renderRow(t))}</tbody>
-            </table>
+            </table>}
           </div>
         );
       })}
