@@ -911,8 +911,9 @@ function KanbanView({ tasks, projects, members, onOpenTask, onStatusChange, onAd
       catMap.get(cat).push(t);
     });
     const catColors = ['#5856d6','#1a6bbf','#e07840','#34c759','#ff3b30','#ff9500','#8e8e93'];
+    let ci2 = 0;
     return Array.from(catMap.entries()).map(([cat, catTasks]) => {
-      const color = cat === 'その他' ? C.text3 : catColors[([...cat].reduce((h,c)=>(h*31+c.charCodeAt(0))|0,0)>>>0) % catColors.length];
+      const color = cat === 'その他' ? C.text3 : catColors[ci2++ % catColors.length];
       return (
         <div key={cat}>
           <div style={{ fontSize:10,fontWeight:700,color,letterSpacing:0.3,padding:'8px 2px 4px',borderBottom:`2px solid ${color}33`,marginBottom:6,display:'flex',alignItems:'center',gap:4 }}>
@@ -1402,6 +1403,13 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
     onCatOrderChange(curr);
   }
   const catColors = ['#5856d6','#1a6bbf','#e07840','#34c759','#ff9500','#ff3b30','#8e8e93'];
+  // カテゴリ名→色の安定マップ（catOrderベースで固定）
+  const catColorMap = (() => {
+    const m = {};
+    const ordered = [...(catOrder||[]), ...allCats.filter(c=>!(catOrder||[]).includes(c))].filter(c=>c!=='その他');
+    ordered.forEach((c,i) => { m[c] = catColors[i % catColors.length]; });
+    return m;
+  })();
 
   const renderRow = (t) => {
     const pj=projects.find(p=>p.id===t.projectId);
@@ -1641,26 +1649,29 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
       , document.body)}
       {categories.map((cat, ci) => {
         const catTasks = catMap.get(cat);
-        const color = cat === 'その他' ? C.text3 : catColors[([...cat].reduce((h,c)=>(h*31+c.charCodeAt(0))|0,0)>>>0) % catColors.length];
+        const color = cat === 'その他' ? C.text3 : (catColorMap[cat] || catColors[0]);
         return (
           <div key={cat} style={{ marginBottom:20 }}
-            draggable={cat!=='その他'}
-            onDragStart={e=>{if(cat==='その他'){e.preventDefault();return;}setDragCat(cat);e.dataTransfer.effectAllowed='move';}}
             onDragOver={e=>{if(cat==='その他')return;e.preventDefault();setDragOverCat(cat);}}
-            onDragEnd={()=>{
-              if(dragCat && dragOverCat && dragCat!==dragOverCat) {
-                const reorderCats = categories.filter(c=>c!=='その他');
-                const arr = [...reorderCats];
-                const fi = arr.indexOf(dragCat), ti = arr.indexOf(dragOverCat);
-                arr.splice(fi,1); arr.splice(ti,0,dragCat);
-                if(categories.includes('その他')) arr.push('その他');
-                onCatOrderChange(arr);
-              }
-              setDragCat(null);setDragOverCat(null);
-            }}
             onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget))setDragOverCat(null);}}>
             <div style={{ display:'flex',alignItems:'center',gap:8,padding:'10px 0 6px',borderBottom:`2px solid ${dragOverCat===cat?C.orange:color+'44'}`,cursor:'pointer',background:dragCat===cat?C.orangeBg+'88':'transparent',transition:'border-color 0.15s' }}
               onClick={()=>toggleCollapse(cat)}>
+              {cat!=='その他' && <span draggable
+                onDragStart={e=>{setDragCat(cat);e.dataTransfer.effectAllowed='move';}}
+                onDragEnd={()=>{
+                  if(dragCat && dragOverCat && dragCat!==dragOverCat) {
+                    const reorderCats = categories.filter(c=>c!=='その他');
+                    const arr = [...reorderCats];
+                    const fi = arr.indexOf(dragCat), ti = arr.indexOf(dragOverCat);
+                    arr.splice(fi,1); arr.splice(ti,0,dragCat);
+                    if(categories.includes('その他')) arr.push('その他');
+                    onCatOrderChange(arr);
+                  }
+                  setDragCat(null);setDragOverCat(null);
+                }}
+                onClick={e=>e.stopPropagation()}
+                style={{ cursor:'grab',fontSize:12,color:C.text3,userSelect:'none',padding:'0 2px',lineHeight:1 }}
+                title="ドラッグで並び替え">☰</span>}
               <span style={{ fontSize:10,color:C.text3,width:10,flexShrink:0 }}>{openedCats.has(cat)?'▼':'▶'}</span>
               <div style={{ width:8,height:8,borderRadius:'50%',background:color,flexShrink:0 }}/>
               <span style={{ fontSize:13,fontWeight:600,color }}>{cat}</span>
