@@ -911,9 +911,8 @@ function KanbanView({ tasks, projects, members, onOpenTask, onStatusChange, onAd
       catMap.get(cat).push(t);
     });
     const catColors = ['#5856d6','#1a6bbf','#e07840','#34c759','#ff3b30','#ff9500','#8e8e93'];
-    let ci = 0;
     return Array.from(catMap.entries()).map(([cat, catTasks]) => {
-      const color = cat === 'その他' ? C.text3 : catColors[ci++ % catColors.length];
+      const color = cat === 'その他' ? C.text3 : catColors[([...cat].reduce((h,c)=>(h*31+c.charCodeAt(0))|0,0)>>>0) % catColors.length];
       return (
         <div key={cat}>
           <div style={{ fontSize:10,fontWeight:700,color,letterSpacing:0.3,padding:'8px 2px 4px',borderBottom:`2px solid ${color}33`,marginBottom:6,display:'flex',alignItems:'center',gap:4 }}>
@@ -1642,7 +1641,7 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
       , document.body)}
       {categories.map((cat, ci) => {
         const catTasks = catMap.get(cat);
-        const color = cat === 'その他' ? C.text3 : catColors[ci % catColors.length];
+        const color = cat === 'その他' ? C.text3 : catColors[([...cat].reduce((h,c)=>(h*31+c.charCodeAt(0))|0,0)>>>0) % catColors.length];
         return (
           <div key={cat} style={{ marginBottom:20 }}
             draggable={cat!=='その他'}
