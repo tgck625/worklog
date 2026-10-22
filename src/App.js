@@ -1690,8 +1690,9 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
               {/* Member avatars in this category */}
               {(() => {
                 const mids = new Set();
-                const hasUnassigned = catTasks.some(t=>!(t.assigneeIds||[]).length);
-                catTasks.forEach(t=>(t.assigneeIds||[]).forEach(id=>mids.add(id)));
+                const activeTasks = catTasks.filter(t=>t.status!=='skip');
+                const hasUnassigned = activeTasks.some(t=>!(t.assigneeIds||[]).length);
+                activeTasks.forEach(t=>(t.assigneeIds||[]).forEach(id=>mids.add(id)));
                 const catMembers = [...mids].map(id=>members.find(m=>m.id===id)).filter(Boolean);
                 return (catMembers.length > 0 || hasUnassigned) ? (
                   <div style={{ display:'flex',gap:2,marginLeft:4,alignItems:'center' }} onClick={e=>e.stopPropagation()}>
