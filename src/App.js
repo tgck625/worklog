@@ -1657,11 +1657,12 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
       {categories.map((cat, ci) => {
         const catTasks = catMap.get(cat);
         const color = cat === 'その他' ? C.text3 : (catColorMap[cat] || catColors[0]);
+        const allDone = catTasks.length > 0 && catTasks.every(t=>t.status==='done'||t.status==='skip');
         return (
           <div key={cat} style={{ marginBottom:20 }}
             onDragOver={e=>{if(cat==='その他')return;e.preventDefault();setDragOverCat(cat);}}
             onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget))setDragOverCat(null);}}>
-            <div style={{ display:'flex',alignItems:'center',gap:8,padding:'10px 0 6px',borderBottom:`2px solid ${dragOverCat===cat?C.orange:color+'44'}`,cursor:'pointer',background:dragCat===cat?C.orangeBg+'88':'transparent',transition:'border-color 0.15s' }}
+            <div style={{ display:'flex',alignItems:'center',gap:8,padding:'10px 0 6px',borderBottom:`2px solid ${dragOverCat===cat?C.orange:color+'44'}`,cursor:'pointer',background:dragCat===cat?C.orangeBg+'88':'transparent',transition:'border-color 0.15s',opacity:allDone?0.45:1 }}
               onClick={()=>toggleCollapse(cat)}>
               {cat!=='その他' && <span draggable
                 onDragStart={e=>{setDragCat(cat);e.dataTransfer.effectAllowed='move';}}
@@ -1681,10 +1682,9 @@ function ListView({ tasks, projects, members, onOpenTask, onStatusChange, onDele
                 title="ドラッグで並び替え">☰</span>}
               <span style={{ fontSize:10,color:C.text3,width:10,flexShrink:0 }}>{openedCats.has(cat)?'▼':'▶'}</span>
               <div style={{ width:8,height:8,borderRadius:'50%',background:color,flexShrink:0 }}/>
-              <span style={{ fontSize:13,fontWeight:600,color }}>{cat}</span>
+              <span style={{ fontSize:13,fontWeight:600,color:allDone?C.text3:color,textDecoration:allDone?'line-through':'none' }}>{cat}</span>
               <span style={{ fontSize:11,color:C.text3 }}>({catTasks.length})</span>
-              {/* All done/skip badge */}
-              {catTasks.length > 0 && catTasks.every(t=>t.status==='done'||t.status==='skip') && (
+              {allDone && (
                 <span style={{ fontSize:9,padding:'1px 6px',borderRadius:999,background:C.green+'20',color:C.green,border:`1px solid ${C.green}44`,fontWeight:600 }}>完了</span>
               )}
               {/* Member avatars in this category */}
