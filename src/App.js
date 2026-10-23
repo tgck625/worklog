@@ -2138,7 +2138,7 @@ function Workflow() {
   const fetchFromGAS = useCallback(async (url) => {
     try {
       setGasFetchDebug('取得中...');
-      const res = await fetch(`${url}?action=getWorkflowData&_t=${Date.now()}&_r=${Math.random()}`, { cache:'no-store', headers:{'Cache-Control':'no-cache'} });
+      const res = await fetch(`${url}?action=getWorkflowData&_t=${Date.now()}`);
       const json = await res.json();
       if (json.ok) {
         setLastSyncedAt(new Date());
