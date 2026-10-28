@@ -4047,8 +4047,9 @@ function renderPayment(content, right) {
             const isCustomTime = a?.customOpHours != null || a?.customStudyHours != null;
             const timeCell = `<span onclick="event.stopPropagation();openStaffTimeModal(${sel.id},${e.id})" style="cursor:pointer;border-bottom:1px dashed ${isCustomTime?'var(--accent)':'var(--ink-faint)'};color:${isCustomTime?'var(--accent)':'inherit'}" title="クリックで時間を編集">${displayOp.toFixed(1)}h${displayStudy?'+'+displayStudy+'h':''}</span>${isCustomTime?'<div style="font-size:9px;color:var(--accent)">個別</div>':''}`;
             const extraLabels = extras.map(x => `<div style="font-size:10px;color:var(--purple)">+¥${x.amount.toLocaleString()} ${x.label||''}</div>`).join('');
-            const payCell = p.total===0 && extraTotal===0 ? '⚠ 未設定'
-              : `¥${p.total.toLocaleString()}${p.isCustom ? '<div style="font-size:9px;color:var(--accent)">時給計算</div>' : ''}${p.logiBonus ? `<div style="font-size:10px;color:var(--green-dark)">+¥${p.logiBonus.toLocaleString()} ロジ</div>` : ''}${extraLabels}${p._dbg ? `<div style="font-size:8px;color:#999;word-break:break-all;max-width:200px">[${p._path}] ${p._dbg}</div>` : ''}`;
+            let payCell = p.total===0 && extraTotal===0 ? '⚠ 未設定'
+              : '¥'+p.total.toLocaleString()+(p.isCustom ? '<div style="font-size:9px;color:var(--accent)">時給計算</div>' : '')+(p.logiBonus ? '<div style="font-size:10px;color:var(--green-dark)">+¥'+p.logiBonus.toLocaleString()+' ロジ</div>' : '')+extraLabels;
+            if (p._dbg) payCell += '<div style="font-size:8px;color:red;word-break:break-all;max-width:250px;margin-top:2px">['+p._path+'] '+p._dbg+'</div>';
             const distLabel = !sel.lat || !v?.lat ? '<span style="color:var(--red);font-size:10px">座標未設定</span>'
               : dist > 0 ? `<span style="font-size:11px">${dist.toFixed(1)}km</span>`
               : dist === null ? '<span style="font-size:11px;color:var(--ink-faint)">-</span>'
