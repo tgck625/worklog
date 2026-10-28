@@ -1109,6 +1109,10 @@ function openTransportOverrideModal(staffId, month, calcedAmount, mDist) {
   // 旧形式receiptsから新形式transitDaysへの移行
   const currentTransitDays = hasCustom && entry.transitDays ? entry.transitDays : [];
   window._ctTransitDays = currentTransitDays.map(d => ({date:d.date, amount:d.amount, urls:d.urls?d.urls.map(u=>({...u})):[]}));
+  // 高速代の日別エントリ（旧: 単一金額 → 新: 日別）
+  const currentHighwayDays = hasCustom && entry.highwayDays ? entry.highwayDays :
+    (currentHighway > 0 ? [{date: month+'-01', amount: currentHighway, urls: []}] : []);
+  window._ctHighwayDays = currentHighwayDays.map(d => ({date:d.date, amount:d.amount||0, urls:d.urls?d.urls.map(u=>({...u})):[]}));
   window._ctCalcedAmount = calcedAmount;
   const [yr, mo] = month.split('-');
   const ml = `${yr}年${parseInt(mo)}月`;
@@ -1121,10 +1125,21 @@ function openTransportOverrideModal(staffId, month, calcedAmount, mDist) {
       <label style="display:block;margin-bottom:8px;font-size:13px;font-weight:500">ガソリン代（円）</label>
       <input type="number" id="_ctAmount" value="${currentVal}" min="0" step="100"
              style="width:100%;padding:8px;font-size:15px;border:1px solid var(--surface-3);border-radius:6px" />
-      <label style="display:block;margin-top:12px;margin-bottom:8px;font-size:13px;font-weight:500">🛣 高速代（円）</label>
-      <input type="number" id="_ctHighway" value="${currentHighway}" min="0" step="100"
-             style="width:100%;padding:8px;font-size:15px;border:1px solid var(--surface-3);border-radius:6px" />
-      <div style="font-size:11px;color:var(--ink-soft);margin-top:4px">高速道路利用時の料金。交通費に加算されます。</div>
+      <hr style="margin:16px 0;border:none;border-top:1px solid var(--surface-3)">
+      <label style="display:block;margin-bottom:4px;font-size:13px;font-weight:500">🛣 高速代</label>
+      <div style="font-size:11px;color:var(--ink-soft);margin-bottom:10px">日別に金額とURL（ETC明細等）を登録。合計がガソリン代に加算されます。</div>
+      <div id="_ctHighwayList"></div>
+      <div style="margin-top:8px;padding:10px;background:var(--surface-2);border-radius:8px">
+        <div style="font-size:11px;font-weight:500;margin-bottom:6px;color:var(--ink-soft)">日別エントリ追加</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <input type="date" id="_ctHighwayDate" value="${month}-01"
+                 style="padding:6px 8px;font-size:12px;border:1px solid var(--surface-3);border-radius:6px" />
+          <input type="number" id="_ctHighwayAmount" placeholder="金額" min="0" step="10"
+                 style="width:120px;padding:6px 8px;font-size:12px;border:1px solid var(--surface-3);border-radius:6px" />
+          <button class="btn" type="button" onclick="addCtHighwayDay()" style="padding:6px 10px;font-size:12px;white-space:nowrap">＋日追加</button>
+        </div>
+      </div>
+      <div id="_ctHighwaySummary" style="margin-top:8px"></div>
       <label style="display:block;margin-top:12px;margin-bottom:8px;font-size:13px;font-weight:500">理由・明細</label>
       <textarea id="_ctNote" rows="2" placeholder="例: タクシー利用、駐車場代含む等"
              style="width:100%;padding:8px;font-size:13px;border:1px solid var(--surface-3);border-radius:6px;resize:vertical">${currentNote.replace(/</g,'&lt;')}</textarea>
@@ -1151,6 +1166,67 @@ function openTransportOverrideModal(staffId, month, calcedAmount, mDist) {
     </div>
   </div>`);
   renderCtTransitDays();
+  renderCtHighwayDays();
+}
+function renderCtHighwayDays() {
+  const list = document.getElementById('_ctHighwayList');
+  const summary = document.getElementById('_ctHighwaySummary');
+  if (!list) return;
+  const days = window._ctHighwayDays || [];
+  list.innerHTML = days.length === 0 ? '<div style="font-size:12px;color:var(--ink-faint);padding:4px 0">高速代の記録なし</div>'
+    : days.map((d, i) =>
+    '<div style="border:1px solid var(--surface-3);border-radius:8px;padding:8px 10px;margin-bottom:6px">'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+    + '<span style="font-size:12px;font-weight:500">' + d.date + '</span>'
+    + '<span style="font-size:13px;font-weight:500;color:var(--green-dark)">¥' + (d.amount||0).toLocaleString() + '</span>'
+    + '<button type="button" onclick="removeCtHighwayDay(' + i + ')" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--red);font-size:14px;padding:0 4px;line-height:1">×</button>'
+    + '</div>'
+    + (d.urls||[]).map((u, j) =>
+      '<div style="display:flex;align-items:center;gap:4px;padding:1px 0;margin-left:8px">'
+      + '<a href="' + u.url.replace(/"/g,'&quot;') + '" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px">📎' + (u.label||'ETC明細').replace(/</g,'&lt;') + '</a>'
+      + '<button type="button" onclick="removeCtHighwayUrl(' + i + ',' + j + ')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:12px;padding:0 2px;line-height:1">×</button>'
+      + '</div>'
+    ).join('')
+    + '<div style="display:flex;gap:4px;margin-top:4px;margin-left:8px">'
+    + '<input type="text" placeholder="ラベル" id="_hurl_label_' + i + '" style="width:80px;padding:4px 6px;font-size:11px;border:1px solid var(--surface-3);border-radius:4px" />'
+    + '<input type="url" placeholder="https://..." id="_hurl_url_' + i + '" style="flex:1;padding:4px 6px;font-size:11px;border:1px solid var(--surface-3);border-radius:4px" />'
+    + '<button class="btn" type="button" onclick="addCtHighwayUrl(' + i + ')" style="padding:3px 8px;font-size:10px">+URL</button>'
+    + '</div>'
+    + '</div>'
+  ).join('');
+  if (summary) {
+    const total = days.reduce((s,d) => s + (d.amount||0), 0);
+    summary.innerHTML = total > 0
+      ? '<div style="padding:6px 10px;border-radius:6px;background:#e8f5e9;font-size:12px;display:flex;justify-content:space-between"><span>🛣 高速代 合計</span><strong>¥' + total.toLocaleString() + '</strong></div>'
+      : '';
+  }
+}
+function addCtHighwayDay() {
+  const dateInput = document.getElementById('_ctHighwayDate');
+  const amountInput = document.getElementById('_ctHighwayAmount');
+  const date = dateInput.value;
+  const amount = parseInt(amountInput.value) || 0;
+  if (!date) { dateInput.focus(); return; }
+  window._ctHighwayDays.push({ date, amount, urls: [] });
+  window._ctHighwayDays.sort((a,b) => a.date.localeCompare(b.date));
+  amountInput.value = '';
+  renderCtHighwayDays();
+}
+function removeCtHighwayDay(i) {
+  window._ctHighwayDays.splice(i, 1);
+  renderCtHighwayDays();
+}
+function addCtHighwayUrl(dayIdx) {
+  const label = document.getElementById('_hurl_label_' + dayIdx).value.trim() || 'ETC明細';
+  const url = document.getElementById('_hurl_url_' + dayIdx).value.trim();
+  if (!url) { document.getElementById('_hurl_url_' + dayIdx).focus(); return; }
+  if (!window._ctHighwayDays[dayIdx].urls) window._ctHighwayDays[dayIdx].urls = [];
+  window._ctHighwayDays[dayIdx].urls.push({ label, url });
+  renderCtHighwayDays();
+}
+function removeCtHighwayUrl(dayIdx, urlIdx) {
+  window._ctHighwayDays[dayIdx].urls.splice(urlIdx, 1);
+  renderCtHighwayDays();
 }
 function renderCtTransitDays() {
   const list = document.getElementById('_ctTransitList');
@@ -1220,11 +1296,13 @@ function removeCtTransitUrl(dayIdx, urlIdx) {
 }
 function saveCustomTransport(key) {
   const baseVal = parseInt(document.getElementById('_ctAmount').value) || 0;
-  const highway = parseInt(document.getElementById('_ctHighway').value) || 0;
+  const hwDays = window._ctHighwayDays || [];
+  const highway = hwDays.reduce((s,d) => s + (d.amount||0), 0);
   const val = baseVal + highway;
   const note = document.getElementById('_ctNote').value.trim();
   const ct = load(SK.customTransport, {});
   const entry = { amount: val, note: note, highwayToll: highway };
+  if (hwDays.length) entry.highwayDays = hwDays;
   const days = window._ctTransitDays || [];
   if (days.length) {
     entry.transitDays = days;
