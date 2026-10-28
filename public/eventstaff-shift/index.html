@@ -368,7 +368,7 @@
   }
 </style>
 </head>
-<body><div id="_deploy_check" style="background:red;color:white;padding:8px;text-align:center;font-weight:bold">DEBUG BUILD 2026-10-28 13:00</div>
+<body>
 
 <nav class="app-nav">
   <div class="app-switcher">
@@ -1379,7 +1379,7 @@ function calcHourlyRate(dailyWage, baseStudyH, baseOpH) {
 
 function calcPay(ev, staffId) {
   const a = ev.staffAssignments.find(x=>x.staffId===staffId);
-  if (!a) return {hourly:0, studyPay:0, opPay:0, total:0, dailyWage:0, _dbg:'no assignment', _path:'none'};
+  if (!a) return {hourly:0, studyPay:0, opPay:0, total:0, dailyWage:0};
 
   const staffs = load(SK.staffs,[]);
   const cats   = load(SK.cats,[]);
@@ -1388,7 +1388,7 @@ function calcPay(ev, staffId) {
   const staff = staffs.find(s=>s.id===staffId);
   const cat   = cats.find(c=>c.id===ev.categoryId);
   const rank  = ranks.find(r=>r.id===staff?.rankId);
-  if (!staff||!cat||!rank) return {hourly:0, studyPay:0, opPay:0, total:0, dailyWage:0, _dbg:`missing: staff=${!!staff} cat=${!!cat} rank=${!!rank} rankId=${staff?.rankId}`, _path:'missing'};
+  if (!staff||!cat||!rank) return {hourly:0, studyPay:0, opPay:0, total:0, dailyWage:0};
 
   // 実際の稼働時間（イベントに入力された値）
   const {opHours, studyHours} = calcEventHours(ev);
@@ -1420,9 +1420,9 @@ function calcPay(ev, staffId) {
       const actOpR = roundHalfHour(customOp);
       const studyPay = Math.floor(hourlyRate * actStudyR);
       const opPay = Math.floor(calcHoursWage(actOpR, hourlyRate));
-      return { hourly: hourlyRate, studyPay, opPay, total: studyPay + opPay, dailyWage, missingWage: dailyWage === 0, isLeader: true, isCustom: true, _dbg:`LEADER+CUSTOM dw:${dailyWage}`, _path:'ldr-custom' };
+      return { hourly: hourlyRate, studyPay, opPay, total: studyPay + opPay, dailyWage, missingWage: dailyWage === 0, isLeader: true, isCustom: true };
     }
-    return { hourly: hourlyRate, studyPay: 0, opPay: dailyWage, total: dailyWage, dailyWage, missingWage: dailyWage === 0, isLeader: true, _dbg:`LEADER dw:${dailyWage}`, _path:'ldr-flat' };
+    return { hourly: hourlyRate, studyPay: 0, opPay: dailyWage, total: dailyWage, dailyWage, missingWage: dailyWage === 0, isLeader: true };
   } else {
     // 一般：ランク別日給・一般基本稼働時間を使用
     dailyWage = (cat.rankWages && (cat.rankWages[rank.id] || cat.rankWages[String(rank.id)])) || 0;
@@ -1435,7 +1435,7 @@ function calcPay(ev, staffId) {
   if (staff.contractSigned && cpItems.length > 0) {
     const contractStudyPay = cpItems.reduce((s,ci)=>s+(ci.amount||0), 0);
     const logiBonus = a.isLogi ? (cat.logiWage || 0) : 0;
-    return { hourly: 0, studyPay: contractStudyPay, opPay: dailyWage, total: contractStudyPay + dailyWage + logiBonus, dailyWage, logiBonus, missingWage: dailyWage === 0, isLeader: isLeaderRole, isContractPrep: true, contractPrepItems: cpItems, _dbg:`CONTRACT dw:${dailyWage} prepPay:${contractStudyPay}`, _path:'contract' };
+    return { hourly: 0, studyPay: contractStudyPay, opPay: dailyWage, total: contractStudyPay + dailyWage + logiBonus, dailyWage, logiBonus, missingWage: dailyWage === 0, isLeader: isLeaderRole, isContractPrep: true, contractPrepItems: cpItems };
   }
 
   const baseStudyR = roundHalfHour(baseStudy);
@@ -1449,19 +1449,16 @@ function calcPay(ev, staffId) {
 
   const logiBonus = a.isLogi ? (cat.logiWage || 0) : 0;
 
-  // デバッグ情報
-  const _dbg = `dw:${dailyWage} bS:${baseStudy}→${baseStudyR} bO:${baseOp.toFixed(2)}→${baseOpR} aS:${actualStudyRaw}→${actualStudyR} aO:${customOp.toFixed?customOp.toFixed(2):customOp}→${actualOpR} ldr:${a.isLeader} logi:${a.isLogi} cOp:${hasCustomOp} cSt:${hasCustomStudy} rank:${rank.id}/${rank.name||''} cat:${cat.name||cat.id}`;
-
   // 基本と実際が同じ → 日給をそのまま返す（端数ゼロ）
   if (actualStudyR === baseStudyR && actualOpR === baseOpR) {
-    return { hourly: Math.floor(hourly), studyPay: 0, opPay: dailyWage, total: dailyWage + logiBonus, dailyWage, logiBonus, missingWage: dailyWage === 0, isLeader: isLeaderRole, _dbg, _path:'flat' };
+    return { hourly: Math.floor(hourly), studyPay: 0, opPay: dailyWage, total: dailyWage + logiBonus, dailyWage, logiBonus, missingWage: dailyWage === 0, isLeader: isLeaderRole };
   }
 
   // イレギュラー → 時給ベースで計算
   const isCustom = hasCustomOp || hasCustomStudy;
   const studyPay = Math.floor(hourly * actualStudyR);
   const opPay    = Math.floor(calcHoursWage(actualOpR, hourly));
-  return { hourly: Math.floor(hourly), studyPay, opPay, total: studyPay + opPay + logiBonus, dailyWage, logiBonus, missingWage: dailyWage === 0, isLeader: isLeaderRole, isCustom, _dbg, _path:'hourly' };
+  return { hourly: Math.floor(hourly), studyPay, opPay, total: studyPay + opPay + logiBonus, dailyWage, logiBonus, missingWage: dailyWage === 0, isLeader: isLeaderRole, isCustom };
 }
 
 function calcEventHours(ev) {
@@ -4048,9 +4045,8 @@ function renderPayment(content, right) {
             const isCustomTime = a?.customOpHours != null || a?.customStudyHours != null;
             const timeCell = `<span onclick="event.stopPropagation();openStaffTimeModal(${sel.id},${e.id})" style="cursor:pointer;border-bottom:1px dashed ${isCustomTime?'var(--accent)':'var(--ink-faint)'};color:${isCustomTime?'var(--accent)':'inherit'}" title="クリックで時間を編集">${displayOp.toFixed(1)}h${displayStudy?'+'+displayStudy+'h':''}</span>${isCustomTime?'<div style="font-size:9px;color:var(--accent)">個別</div>':''}`;
             const extraLabels = extras.map(x => `<div style="font-size:10px;color:var(--purple)">+¥${x.amount.toLocaleString()} ${x.label||''}</div>`).join('');
-            let payCell = p.total===0 && extraTotal===0 ? '⚠ 未設定'
+            const payCell = p.total===0 && extraTotal===0 ? '⚠ 未設定'
               : '¥'+p.total.toLocaleString()+(p.isCustom ? '<div style="font-size:9px;color:var(--accent)">時給計算</div>' : '')+(p.logiBonus ? '<div style="font-size:10px;color:var(--green-dark)">+¥'+p.logiBonus.toLocaleString()+' ロジ</div>' : '')+extraLabels;
-            if (p._dbg) payCell += '<div style="font-size:8px;color:red;word-break:break-all;max-width:250px;margin-top:2px">['+p._path+'] '+p._dbg+'</div>';
             const distLabel = !sel.lat || !v?.lat ? '<span style="color:var(--red);font-size:10px">座標未設定</span>'
               : dist > 0 ? `<span style="font-size:11px">${dist.toFixed(1)}km</span>`
               : dist === null ? '<span style="font-size:11px;color:var(--ink-faint)">-</span>'
@@ -5652,52 +5648,41 @@ function showPayDetail(staffId, eventId) {
   const rank = ranks.find(r=>r.id===staff.rankId);
   const p = calcPay(ev, staffId);
   const h = calcEventHours(ev);
-  const baseOp = cat ? (timeToHours(cat.opStart, cat.opEnd, cat.opBreak||0) || 7) : 0;
-  const baseStudy = cat ? (cat.studyHours || 1) : 0;
-  const dw = cat && rank ? (cat.rankWages && (cat.rankWages[rank.id] || cat.rankWages[String(rank.id)])) || 0 : 0;
+  const cpItems = cat?.contractPrepItems || [];
+  const roleLabel = a?.isLeader ? 'リーダー' : (a?.isLogi ? 'ロジ担当' : '一般');
+  const contractLabel = staff.contractSigned ? '契約済（業務委託）' : '未契約';
+
+  let breakdown = '';
+  if (p.isContractPrep) {
+    breakdown = '【業務委託＋事前準備】\n'
+      + '  日給: ¥' + p.dailyWage.toLocaleString() + '\n'
+      + '  事前準備: ¥' + p.studyPay.toLocaleString() + '\n'
+      + cpItems.map(ci => '    ・' + (ci.name||'項目') + ': ¥' + (ci.amount||0).toLocaleString()).join('\n') + '\n'
+      + (p.logiBonus ? '  ロジ手当: ¥' + p.logiBonus.toLocaleString() + '\n' : '');
+  } else if (p.isLeader) {
+    breakdown = '【リーダー日給】\n  リーダー日給: ¥' + p.dailyWage.toLocaleString() + '\n';
+  } else if (p.isCustom) {
+    breakdown = '【時給計算（時間差あり）】\n'
+      + '  時給: ¥' + p.hourly.toLocaleString() + '\n'
+      + '  事前準備: ¥' + p.studyPay.toLocaleString() + '\n'
+      + '  当日運営: ¥' + p.opPay.toLocaleString() + '\n'
+      + (p.logiBonus ? '  ロジ手当: ¥' + p.logiBonus.toLocaleString() + '\n' : '');
+  } else {
+    breakdown = '【日給（定額）】\n  日給: ¥' + p.dailyWage.toLocaleString() + '\n'
+      + (p.logiBonus ? '  ロジ手当: ¥' + p.logiBonus.toLocaleString() + '\n' : '');
+  }
+
   const lines = [
-    '=== 給与計算詳細 ===',
-    'スタッフ: ' + staff.name,
-    'イベント: ' + ev.date + ' (ID:' + ev.id + ')',
-    'カテゴリ: ' + (cat?.name||'不明') + ' (ID:' + ev.categoryId + ')',
-    'ランク: ' + (rank?.name||rank?.label||'不明') + ' (ID:' + staff.rankId + ')',
+    staff.name + ' — ' + ev.date,
+    'カテゴリ: ' + (cat?.name||''),
+    'ランク: ' + (rank?.label||rank?.name||''),
+    '役割: ' + roleLabel,
+    '契約: ' + contractLabel,
     '',
-    '--- アサイン情報 ---',
-    'isLeader: ' + (a?.isLeader),
-    'isLogi: ' + (a?.isLogi),
-    'customOpHours: ' + (a?.customOpHours ?? 'なし'),
-    'customStudyHours: ' + (a?.customStudyHours ?? 'なし'),
-    'status: ' + (a?.status),
+    '稼働時間: 事前 ' + h.studyHours + 'h ＋ 当日 ' + h.opHours.toFixed(1) + 'h',
     '',
-    '--- カテゴリ設定 ---',
-    'rankWages: ' + JSON.stringify(cat?.rankWages),
-    'dailyWage(lookup): ¥' + dw,
-    'leaderDailyWage: ¥' + (cat?.leaderDailyWage||0),
-    'opStart: ' + cat?.opStart + ' opEnd: ' + cat?.opEnd,
-    'opBreak: ' + cat?.opBreak + '分',
-    'studyHours: ' + cat?.studyHours + 'h',
-    'baseOp(計算): ' + baseOp.toFixed(4) + 'h → ' + roundHalfHour(baseOp) + 'h',
-    'baseStudy: ' + baseStudy + 'h → ' + roundHalfHour(baseStudy) + 'h',
-    '',
-    '--- イベント設定 ---',
-    'ev.opStart: ' + ev.opStart + ' ev.opEnd: ' + ev.opEnd,
-    'ev.opBreak: ' + ev.opBreak + '分',
-    'ev.studyHours: ' + ev.studyHours + 'h',
-    'eventOp(計算): ' + h.opHours.toFixed(4) + 'h → ' + roundHalfHour(h.opHours) + 'h',
-    'eventStudy: ' + h.studyHours + 'h → ' + roundHalfHour(h.studyHours) + 'h',
-    '',
-    '--- calcPay結果 ---',
-    'path: ' + (p._path||'不明'),
-    'total: ¥' + p.total,
-    'dailyWage: ¥' + p.dailyWage,
-    'hourly: ¥' + p.hourly,
-    'studyPay: ¥' + p.studyPay,
-    'opPay: ¥' + p.opPay,
-    'logiBonus: ¥' + (p.logiBonus||0),
-    'isLeader: ' + p.isLeader,
-    'isCustom: ' + p.isCustom,
-    'isContractPrep: ' + p.isContractPrep,
-    '_dbg: ' + (p._dbg||'なし'),
+    breakdown,
+    '合計: ¥' + p.total.toLocaleString(),
   ];
   alert(lines.join('\n'));
 }
