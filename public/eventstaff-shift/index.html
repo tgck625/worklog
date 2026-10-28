@@ -3999,6 +3999,7 @@ function renderPayment(content, right) {
             const roleBadge = ev.rl==='leader' ? '<span class="badge badge-purple" style="font-size:10px">リーダー</span>' : '';
             const timeCell = `${(ev.o||0).toFixed(1)}h${ev.s?'+'+ev.s+'h':''}`;
             const extraLabels = (ev.ex||[]).map(x => `<div style="font-size:10px;color:var(--purple)">+¥${x.am.toLocaleString()} ${x.lb||''}</div>`).join('');
+            const snapEvMatch = mes.find(x=>x.date===ev.dt);
             const payCell = ev.p===0 ? '⚠ 未設定' : `¥${ev.p.toLocaleString()}${extraLabels}`;
             return `<tr>
               <td style="white-space:nowrap;font-weight:500">${ev.dt}</td>
@@ -4007,7 +4008,7 @@ function renderPayment(content, right) {
               <td style="font-size:12px;text-align:center">${timeCell}</td>
               <td style="text-align:center">${roleBadge}</td>
               <td style="text-align:right;color:var(--ink-soft)">-</td>
-              <td style="text-align:right;font-weight:500">${payCell}</td>
+              <td style="text-align:right;font-weight:500;cursor:pointer;text-decoration:underline dotted" onclick="event.stopPropagation();${snapEvMatch ? `showPayDetail(${sel.id},${snapEvMatch.id})` : `alert('snap: ¥${ev.p} role:${ev.rl}')`}" title="クリックで給与計算詳細">${payCell}</td>
             </tr>`;
           }).join('');
           prepRows = (snap.prepWork||[]).map(pw => {
@@ -4061,7 +4062,7 @@ function renderPayment(content, right) {
               <td style="font-size:12px;text-align:center">${timeCell}</td>
               <td style="text-align:center">${roleBadges}</td>
               <td style="text-align:right;color:var(--ink-soft)">${distLabel}</td>
-              <td style="text-align:right;font-weight:500">${payCell}</td>
+              <td style="text-align:right;font-weight:500;cursor:pointer;text-decoration:underline dotted" onclick="event.stopPropagation();showPayDetail(${sel.id},${e.id})" title="クリックで給与計算詳細">${payCell}</td>
             </tr>`;
           }).join('');
           // 事前準備作業の行
@@ -5636,6 +5637,69 @@ function resetStaffTime(staffId, eventId) {
   delete a.customBreak;
   save(SK.events, events);
   renderPage();
+}
+
+function showPayDetail(staffId, eventId) {
+  const events = load(SK.events,[]);
+  const staffs = load(SK.staffs,[]);
+  const cats = load(SK.cats,[]);
+  const ranks = load(SK.ranks,[]);
+  const ev = events.find(x=>x.id===eventId);
+  const staff = staffs.find(x=>x.id===staffId);
+  if (!ev||!staff) { alert('データが見つかりません'); return; }
+  const a = ev.staffAssignments.find(x=>x.staffId===staffId);
+  const cat = cats.find(c=>c.id===ev.categoryId);
+  const rank = ranks.find(r=>r.id===staff.rankId);
+  const p = calcPay(ev, staffId);
+  const h = calcEventHours(ev);
+  const baseOp = cat ? (timeToHours(cat.opStart, cat.opEnd, cat.opBreak||0) || 7) : 0;
+  const baseStudy = cat ? (cat.studyHours || 1) : 0;
+  const dw = cat && rank ? (cat.rankWages && (cat.rankWages[rank.id] || cat.rankWages[String(rank.id)])) || 0 : 0;
+  const lines = [
+    '=== 給与計算詳細 ===',
+    'スタッフ: ' + staff.name,
+    'イベント: ' + ev.date + ' (ID:' + ev.id + ')',
+    'カテゴリ: ' + (cat?.name||'不明') + ' (ID:' + ev.categoryId + ')',
+    'ランク: ' + (rank?.name||rank?.label||'不明') + ' (ID:' + staff.rankId + ')',
+    '',
+    '--- アサイン情報 ---',
+    'isLeader: ' + (a?.isLeader),
+    'isLogi: ' + (a?.isLogi),
+    'customOpHours: ' + (a?.customOpHours ?? 'なし'),
+    'customStudyHours: ' + (a?.customStudyHours ?? 'なし'),
+    'status: ' + (a?.status),
+    '',
+    '--- カテゴリ設定 ---',
+    'rankWages: ' + JSON.stringify(cat?.rankWages),
+    'dailyWage(lookup): ¥' + dw,
+    'leaderDailyWage: ¥' + (cat?.leaderDailyWage||0),
+    'opStart: ' + cat?.opStart + ' opEnd: ' + cat?.opEnd,
+    'opBreak: ' + cat?.opBreak + '分',
+    'studyHours: ' + cat?.studyHours + 'h',
+    'baseOp(計算): ' + baseOp.toFixed(4) + 'h → ' + roundHalfHour(baseOp) + 'h',
+    'baseStudy: ' + baseStudy + 'h → ' + roundHalfHour(baseStudy) + 'h',
+    '',
+    '--- イベント設定 ---',
+    'ev.opStart: ' + ev.opStart + ' ev.opEnd: ' + ev.opEnd,
+    'ev.opBreak: ' + ev.opBreak + '分',
+    'ev.studyHours: ' + ev.studyHours + 'h',
+    'eventOp(計算): ' + h.opHours.toFixed(4) + 'h → ' + roundHalfHour(h.opHours) + 'h',
+    'eventStudy: ' + h.studyHours + 'h → ' + roundHalfHour(h.studyHours) + 'h',
+    '',
+    '--- calcPay結果 ---',
+    'path: ' + (p._path||'不明'),
+    'total: ¥' + p.total,
+    'dailyWage: ¥' + p.dailyWage,
+    'hourly: ¥' + p.hourly,
+    'studyPay: ¥' + p.studyPay,
+    'opPay: ¥' + p.opPay,
+    'logiBonus: ¥' + (p.logiBonus||0),
+    'isLeader: ' + p.isLeader,
+    'isCustom: ' + p.isCustom,
+    'isContractPrep: ' + p.isContractPrep,
+    '_dbg: ' + (p._dbg||'なし'),
+  ];
+  alert(lines.join('\n'));
 }
 
 function openExtraCostModal(staffId, eventId) {
