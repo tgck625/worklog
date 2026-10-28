@@ -2035,6 +2035,8 @@ function Workflow() {
   }, [authMemberId]);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(() => { try { return parseInt(localStorage.getItem('wf_sidebarW')) || 230; } catch { return 230; } });
+  const sidebarDragRef = useRef(null);
   const [closedProjOpen, setClosedProjOpen] = useState(false);
   const [bulkCloseMode, setBulkCloseMode] = useState(false);
   const [bulkCloseIds, setBulkCloseIds] = useState(new Set());
@@ -2539,8 +2541,22 @@ function Workflow() {
         )}
 
         {/* ── Sidebar ── */}
-        <div style={{ width:230,background:'#fff',borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column',flexShrink:0,overflowY:'auto',
+        <div style={{ width:isMobile?230:sidebarWidth,background:'#fff',borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column',flexShrink:0,overflowY:'auto',position:'relative',
           ...(isMobile ? { position:'fixed',top:52,left:0,height:'calc(100% - 52px)',zIndex:300,transform:sidebarOpen?'translateX(0)':'translateX(-100%)',transition:'transform 0.25s ease' } : {}) }}>
+          {!isMobile && <div
+            onMouseDown={e=>{
+              e.preventDefault();
+              const startX=e.clientX, startW=sidebarWidth;
+              let lastW=startW;
+              const onMove=ev=>{lastW=Math.max(160,Math.min(500,startW+(ev.clientX-startX)));setSidebarWidth(lastW);};
+              const onUp=()=>{document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);try{localStorage.setItem('wf_sidebarW',String(lastW));}catch{}};
+              document.addEventListener('mousemove',onMove);
+              document.addEventListener('mouseup',onUp);
+            }}
+            style={{ position:'absolute',top:0,right:0,width:4,height:'100%',cursor:'col-resize',zIndex:10,background:'transparent' }}
+            onMouseEnter={e=>e.currentTarget.style.background=C.orange+'44'}
+            onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+          />}
           <div style={{ padding:'16px 12px 8px' }}>
             {/* Bulk close bar */}
             {bulkCloseMode ? (
