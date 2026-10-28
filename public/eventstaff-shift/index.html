@@ -1430,14 +1430,6 @@ function calcPay(ev, staffId) {
     baseOp    = timeToHours(cat.opStart, cat.opEnd, cat.opBreak||0) || 7;
   }
 
-  // ── 業務委託スタッフ ＋ 項目金額ベースの事前準備がある場合 ──
-  const cpItems = cat.contractPrepItems || [];
-  if (staff.contractSigned && cpItems.length > 0) {
-    const contractStudyPay = cpItems.reduce((s,ci)=>s+(ci.amount||0), 0);
-    const logiBonus = a.isLogi ? (cat.logiWage || 0) : 0;
-    return { hourly: 0, studyPay: contractStudyPay, opPay: dailyWage, total: contractStudyPay + dailyWage + logiBonus, dailyWage, logiBonus, missingWage: dailyWage === 0, isLeader: isLeaderRole, isContractPrep: true, contractPrepItems: cpItems };
-  }
-
   const baseStudyR = roundHalfHour(baseStudy);
   const baseOpR    = roundHalfHour(baseOp);
   const hourly     = calcHourlyRate(dailyWage, baseStudyR, baseOpR);
@@ -5648,18 +5640,11 @@ function showPayDetail(staffId, eventId) {
   const rank = ranks.find(r=>r.id===staff.rankId);
   const p = calcPay(ev, staffId);
   const h = calcEventHours(ev);
-  const cpItems = cat?.contractPrepItems || [];
   const roleLabel = a?.isLeader ? 'リーダー' : (a?.isLogi ? 'ロジ担当' : '一般');
   const contractLabel = staff.contractSigned ? '契約済（業務委託）' : '未契約';
 
   let breakdown = '';
-  if (p.isContractPrep) {
-    breakdown = '【業務委託＋事前準備】\n'
-      + '  日給: ¥' + p.dailyWage.toLocaleString() + '\n'
-      + '  事前準備: ¥' + p.studyPay.toLocaleString() + '\n'
-      + cpItems.map(ci => '    ・' + (ci.name||'項目') + ': ¥' + (ci.amount||0).toLocaleString()).join('\n') + '\n'
-      + (p.logiBonus ? '  ロジ手当: ¥' + p.logiBonus.toLocaleString() + '\n' : '');
-  } else if (p.isLeader) {
+  if (p.isLeader) {
     breakdown = '【リーダー日給】\n  リーダー日給: ¥' + p.dailyWage.toLocaleString() + '\n';
   } else if (p.isCustom) {
     breakdown = '【時給計算（時間差あり）】\n'
