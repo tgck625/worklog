@@ -1131,12 +1131,14 @@ function openTransportOverrideModal(staffId, month, calcedAmount, mDist) {
       <div id="_ctHighwayList"></div>
       <div style="margin-top:8px;padding:10px;background:var(--surface-2);border-radius:8px">
         <div style="font-size:11px;font-weight:500;margin-bottom:6px;color:var(--ink-soft)">日別エントリ追加</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <input type="date" id="_ctHighwayDate" value="${month}-01"
                  style="padding:6px 8px;font-size:12px;border:1px solid var(--surface-3);border-radius:6px" />
           <input type="number" id="_ctHighwayAmount" placeholder="金額" min="0" step="10"
-                 style="width:120px;padding:6px 8px;font-size:12px;border:1px solid var(--surface-3);border-radius:6px" />
-          <button class="btn" type="button" onclick="addCtHighwayDay()" style="padding:6px 10px;font-size:12px;white-space:nowrap">＋日追加</button>
+                 style="width:100px;padding:6px 8px;font-size:12px;border:1px solid var(--surface-3);border-radius:6px" />
+          <input type="url" id="_ctHighwayUrl" placeholder="https://..."
+                 style="flex:1;min-width:120px;padding:6px 8px;font-size:12px;border:1px solid var(--surface-3);border-radius:6px" />
+          <button class="btn" type="button" onclick="addCtHighwayDay()" style="padding:6px 10px;font-size:12px;white-space:nowrap">＋追加</button>
         </div>
       </div>
       <div id="_ctHighwaySummary" style="margin-top:8px"></div>
@@ -1149,12 +1151,14 @@ function openTransportOverrideModal(staffId, month, calcedAmount, mDist) {
       <div id="_ctTransitList"></div>
       <div style="margin-top:8px;padding:10px;background:var(--surface-2);border-radius:8px">
         <div style="font-size:11px;font-weight:500;margin-bottom:6px;color:var(--ink-soft)">日別エントリ追加</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <input type="date" id="_ctTransitDate" value="${month}-01"
                  style="padding:6px 8px;font-size:12px;border:1px solid var(--surface-3);border-radius:6px" />
-          <input type="number" id="_ctTransitAmount" placeholder="日別合計金額" min="0" step="10"
-                 style="width:120px;padding:6px 8px;font-size:12px;border:1px solid var(--surface-3);border-radius:6px" />
-          <button class="btn" type="button" onclick="addCtTransitDay()" style="padding:6px 10px;font-size:12px;white-space:nowrap">＋日追加</button>
+          <input type="number" id="_ctTransitAmount" placeholder="金額" min="0" step="10"
+                 style="width:100px;padding:6px 8px;font-size:12px;border:1px solid var(--surface-3);border-radius:6px" />
+          <input type="url" id="_ctTransitUrl" placeholder="https://..."
+                 style="flex:1;min-width:120px;padding:6px 8px;font-size:12px;border:1px solid var(--surface-3);border-radius:6px" />
+          <button class="btn" type="button" onclick="addCtTransitDay()" style="padding:6px 10px;font-size:12px;white-space:nowrap">＋追加</button>
         </div>
       </div>
       <div id="_ctTransitSummary" style="margin-top:10px"></div>
@@ -1183,12 +1187,11 @@ function renderCtHighwayDays() {
     + '</div>'
     + (d.urls||[]).map((u, j) =>
       '<div style="display:flex;align-items:center;gap:4px;padding:1px 0;margin-left:8px">'
-      + '<a href="' + u.url.replace(/"/g,'&quot;') + '" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px">📎' + (u.label||'ETC明細').replace(/</g,'&lt;') + '</a>'
+      + '<a href="' + u.url.replace(/"/g,'&quot;') + '" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px">📎' + u.url.replace(/</g,'&lt;').replace(/^https?:\/\//,'').slice(0,40) + '</a>'
       + '<button type="button" onclick="removeCtHighwayUrl(' + i + ',' + j + ')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:12px;padding:0 2px;line-height:1">×</button>'
       + '</div>'
     ).join('')
     + '<div style="display:flex;gap:4px;margin-top:4px;margin-left:8px">'
-    + '<input type="text" placeholder="ラベル" id="_hurl_label_' + i + '" style="width:80px;padding:4px 6px;font-size:11px;border:1px solid var(--surface-3);border-radius:4px" />'
     + '<input type="url" placeholder="https://..." id="_hurl_url_' + i + '" style="flex:1;padding:4px 6px;font-size:11px;border:1px solid var(--surface-3);border-radius:4px" />'
     + '<button class="btn" type="button" onclick="addCtHighwayUrl(' + i + ')" style="padding:3px 8px;font-size:10px">+URL</button>'
     + '</div>'
@@ -1207,9 +1210,13 @@ function addCtHighwayDay() {
   const date = dateInput.value;
   const amount = parseInt(amountInput.value) || 0;
   if (!date) { dateInput.focus(); return; }
-  window._ctHighwayDays.push({ date, amount, urls: [] });
+  const urlInput = document.getElementById('_ctHighwayUrl');
+  const url = urlInput.value.trim();
+  const urls = url ? [{ url }] : [];
+  window._ctHighwayDays.push({ date, amount, urls });
   window._ctHighwayDays.sort((a,b) => a.date.localeCompare(b.date));
   amountInput.value = '';
+  urlInput.value = '';
   renderCtHighwayDays();
 }
 function removeCtHighwayDay(i) {
@@ -1217,11 +1224,10 @@ function removeCtHighwayDay(i) {
   renderCtHighwayDays();
 }
 function addCtHighwayUrl(dayIdx) {
-  const label = document.getElementById('_hurl_label_' + dayIdx).value.trim() || 'ETC明細';
   const url = document.getElementById('_hurl_url_' + dayIdx).value.trim();
   if (!url) { document.getElementById('_hurl_url_' + dayIdx).focus(); return; }
   if (!window._ctHighwayDays[dayIdx].urls) window._ctHighwayDays[dayIdx].urls = [];
-  window._ctHighwayDays[dayIdx].urls.push({ label, url });
+  window._ctHighwayDays[dayIdx].urls.push({ url });
   renderCtHighwayDays();
 }
 function removeCtHighwayUrl(dayIdx, urlIdx) {
@@ -1243,12 +1249,11 @@ function renderCtTransitDays() {
     + '</div>'
     + (d.urls||[]).map((u, j) =>
       '<div style="display:flex;align-items:center;gap:4px;padding:1px 0;margin-left:8px">'
-      + '<a href="' + u.url.replace(/"/g,'&quot;') + '" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px">📎' + (u.label||'領収書').replace(/</g,'&lt;') + '</a>'
+      + '<a href="' + u.url.replace(/"/g,'&quot;') + '" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px">📎' + u.url.replace(/</g,'&lt;').replace(/^https?:\/\//,'').slice(0,40) + '</a>'
       + '<button type="button" onclick="removeCtTransitUrl(' + i + ',' + j + ')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:12px;padding:0 2px;line-height:1">×</button>'
       + '</div>'
     ).join('')
     + '<div style="display:flex;gap:4px;margin-top:4px;margin-left:8px">'
-    + '<input type="text" placeholder="ラベル" id="_turl_label_' + i + '" style="width:80px;padding:4px 6px;font-size:11px;border:1px solid var(--surface-3);border-radius:4px" />'
     + '<input type="url" placeholder="https://drive.google.com/..." id="_turl_url_' + i + '" style="flex:1;padding:4px 6px;font-size:11px;border:1px solid var(--surface-3);border-radius:4px" />'
     + '<button class="btn" type="button" onclick="addCtTransitUrl(' + i + ')" style="padding:3px 8px;font-size:10px">+URL</button>'
     + '</div>'
@@ -1273,9 +1278,13 @@ function addCtTransitDay() {
   const date = dateInput.value;
   const amount = parseInt(amountInput.value) || 0;
   if (!date) { dateInput.focus(); return; }
-  window._ctTransitDays.push({ date, amount, urls: [] });
+  const urlInput = document.getElementById('_ctTransitUrl');
+  const url = urlInput.value.trim();
+  const urls = url ? [{ url }] : [];
+  window._ctTransitDays.push({ date, amount, urls });
   window._ctTransitDays.sort((a,b) => a.date.localeCompare(b.date));
   amountInput.value = '';
+  urlInput.value = '';
   renderCtTransitDays();
 }
 function removeCtTransitDay(i) {
@@ -1283,11 +1292,10 @@ function removeCtTransitDay(i) {
   renderCtTransitDays();
 }
 function addCtTransitUrl(dayIdx) {
-  const label = document.getElementById('_turl_label_' + dayIdx).value.trim() || '領収書';
   const url = document.getElementById('_turl_url_' + dayIdx).value.trim();
   if (!url) { document.getElementById('_turl_url_' + dayIdx).focus(); return; }
   if (!window._ctTransitDays[dayIdx].urls) window._ctTransitDays[dayIdx].urls = [];
-  window._ctTransitDays[dayIdx].urls.push({ label, url });
+  window._ctTransitDays[dayIdx].urls.push({ url });
   renderCtTransitDays();
 }
 function removeCtTransitUrl(dayIdx, urlIdx) {
