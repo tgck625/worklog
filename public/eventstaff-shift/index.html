@@ -1379,7 +1379,7 @@ function calcHourlyRate(dailyWage, baseStudyH, baseOpH) {
 
 function calcPay(ev, staffId) {
   const a = ev.staffAssignments.find(x=>x.staffId===staffId);
-  if (!a) return {hourly:0, studyPay:0, opPay:0, total:0, dailyWage:0};
+  if (!a) return {hourly:0, studyPay:0, opPay:0, total:0, dailyWage:0, _dbg:'no assignment', _path:'none'};
 
   const staffs = load(SK.staffs,[]);
   const cats   = load(SK.cats,[]);
@@ -1388,7 +1388,7 @@ function calcPay(ev, staffId) {
   const staff = staffs.find(s=>s.id===staffId);
   const cat   = cats.find(c=>c.id===ev.categoryId);
   const rank  = ranks.find(r=>r.id===staff?.rankId);
-  if (!staff||!cat||!rank) return {hourly:0, studyPay:0, opPay:0, total:0, dailyWage:0};
+  if (!staff||!cat||!rank) return {hourly:0, studyPay:0, opPay:0, total:0, dailyWage:0, _dbg:`missing: staff=${!!staff} cat=${!!cat} rank=${!!rank} rankId=${staff?.rankId}`, _path:'missing'};
 
   // 実際の稼働時間（イベントに入力された値）
   const {opHours, studyHours} = calcEventHours(ev);
@@ -1420,9 +1420,9 @@ function calcPay(ev, staffId) {
       const actOpR = roundHalfHour(customOp);
       const studyPay = Math.floor(hourlyRate * actStudyR);
       const opPay = Math.floor(calcHoursWage(actOpR, hourlyRate));
-      return { hourly: hourlyRate, studyPay, opPay, total: studyPay + opPay, dailyWage, missingWage: dailyWage === 0, isLeader: true, isCustom: true };
+      return { hourly: hourlyRate, studyPay, opPay, total: studyPay + opPay, dailyWage, missingWage: dailyWage === 0, isLeader: true, isCustom: true, _dbg:`LEADER+CUSTOM dw:${dailyWage}`, _path:'ldr-custom' };
     }
-    return { hourly: hourlyRate, studyPay: 0, opPay: dailyWage, total: dailyWage, dailyWage, missingWage: dailyWage === 0, isLeader: true };
+    return { hourly: hourlyRate, studyPay: 0, opPay: dailyWage, total: dailyWage, dailyWage, missingWage: dailyWage === 0, isLeader: true, _dbg:`LEADER dw:${dailyWage}`, _path:'ldr-flat' };
   } else {
     // 一般：ランク別日給・一般基本稼働時間を使用
     dailyWage = (cat.rankWages && (cat.rankWages[rank.id] || cat.rankWages[String(rank.id)])) || 0;
@@ -1435,7 +1435,7 @@ function calcPay(ev, staffId) {
   if (staff.contractSigned && cpItems.length > 0) {
     const contractStudyPay = cpItems.reduce((s,ci)=>s+(ci.amount||0), 0);
     const logiBonus = a.isLogi ? (cat.logiWage || 0) : 0;
-    return { hourly: 0, studyPay: contractStudyPay, opPay: dailyWage, total: contractStudyPay + dailyWage + logiBonus, dailyWage, logiBonus, missingWage: dailyWage === 0, isLeader: isLeaderRole, isContractPrep: true, contractPrepItems: cpItems };
+    return { hourly: 0, studyPay: contractStudyPay, opPay: dailyWage, total: contractStudyPay + dailyWage + logiBonus, dailyWage, logiBonus, missingWage: dailyWage === 0, isLeader: isLeaderRole, isContractPrep: true, contractPrepItems: cpItems, _dbg:`CONTRACT dw:${dailyWage} prepPay:${contractStudyPay}`, _path:'contract' };
   }
 
   const baseStudyR = roundHalfHour(baseStudy);
