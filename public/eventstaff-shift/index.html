@@ -1449,16 +1449,19 @@ function calcPay(ev, staffId) {
 
   const logiBonus = a.isLogi ? (cat.logiWage || 0) : 0;
 
+  // デバッグ情報
+  const _dbg = `dw:${dailyWage} bS:${baseStudy}→${baseStudyR} bO:${baseOp.toFixed(2)}→${baseOpR} aS:${actualStudyRaw}→${actualStudyR} aO:${customOp.toFixed?customOp.toFixed(2):customOp}→${actualOpR} ldr:${a.isLeader} logi:${a.isLogi} cOp:${hasCustomOp} cSt:${hasCustomStudy} rank:${rank.id}/${rank.name||''} cat:${cat.name||cat.id}`;
+
   // 基本と実際が同じ → 日給をそのまま返す（端数ゼロ）
   if (actualStudyR === baseStudyR && actualOpR === baseOpR) {
-    return { hourly: Math.floor(hourly), studyPay: 0, opPay: dailyWage, total: dailyWage + logiBonus, dailyWage, logiBonus, missingWage: dailyWage === 0, isLeader: isLeaderRole };
+    return { hourly: Math.floor(hourly), studyPay: 0, opPay: dailyWage, total: dailyWage + logiBonus, dailyWage, logiBonus, missingWage: dailyWage === 0, isLeader: isLeaderRole, _dbg, _path:'flat' };
   }
 
   // イレギュラー → 時給ベースで計算
   const isCustom = hasCustomOp || hasCustomStudy;
   const studyPay = Math.floor(hourly * actualStudyR);
   const opPay    = Math.floor(calcHoursWage(actualOpR, hourly));
-  return { hourly: Math.floor(hourly), studyPay, opPay, total: studyPay + opPay + logiBonus, dailyWage, logiBonus, missingWage: dailyWage === 0, isLeader: isLeaderRole, isCustom };
+  return { hourly: Math.floor(hourly), studyPay, opPay, total: studyPay + opPay + logiBonus, dailyWage, logiBonus, missingWage: dailyWage === 0, isLeader: isLeaderRole, isCustom, _dbg, _path:'hourly' };
 }
 
 function calcEventHours(ev) {
@@ -4045,7 +4048,7 @@ function renderPayment(content, right) {
             const timeCell = `<span onclick="event.stopPropagation();openStaffTimeModal(${sel.id},${e.id})" style="cursor:pointer;border-bottom:1px dashed ${isCustomTime?'var(--accent)':'var(--ink-faint)'};color:${isCustomTime?'var(--accent)':'inherit'}" title="クリックで時間を編集">${displayOp.toFixed(1)}h${displayStudy?'+'+displayStudy+'h':''}</span>${isCustomTime?'<div style="font-size:9px;color:var(--accent)">個別</div>':''}`;
             const extraLabels = extras.map(x => `<div style="font-size:10px;color:var(--purple)">+¥${x.amount.toLocaleString()} ${x.label||''}</div>`).join('');
             const payCell = p.total===0 && extraTotal===0 ? '⚠ 未設定'
-              : `¥${p.total.toLocaleString()}${p.isCustom ? '<div style="font-size:9px;color:var(--accent)">時給計算</div>' : ''}${p.logiBonus ? `<div style="font-size:10px;color:var(--green-dark)">+¥${p.logiBonus.toLocaleString()} ロジ</div>` : ''}${extraLabels}`;
+              : `¥${p.total.toLocaleString()}${p.isCustom ? '<div style="font-size:9px;color:var(--accent)">時給計算</div>' : ''}${p.logiBonus ? `<div style="font-size:10px;color:var(--green-dark)">+¥${p.logiBonus.toLocaleString()} ロジ</div>` : ''}${extraLabels}${p._dbg ? `<div style="font-size:8px;color:#999;word-break:break-all;max-width:200px">[${p._path}] ${p._dbg}</div>` : ''}`;
             const distLabel = !sel.lat || !v?.lat ? '<span style="color:var(--red);font-size:10px">座標未設定</span>'
               : dist > 0 ? `<span style="font-size:11px">${dist.toFixed(1)}km</span>`
               : dist === null ? '<span style="font-size:11px;color:var(--ink-faint)">-</span>'
