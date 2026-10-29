@@ -4055,7 +4055,9 @@ function renderPayment(content, right) {
       const currentMonth = new Date().toISOString().slice(0,7);
       // 初回: 今月以降をデフォルトで開く
       if (_openPayMonths.size === 0) {
-        Object.keys(byMonth).forEach(m => { if (m >= currentMonth) _openPayMonths.add(m); });
+        const d = new Date(); d.setMonth(d.getMonth() - 1);
+        const prevMonth = d.toISOString().slice(0,7);
+        Object.keys(byMonth).forEach(m => { if (m >= prevMonth) _openPayMonths.add(m); });
       }
       let grandPay = 0, grandTransport = 0, grandExtra = 0, grandPrep = 0;
       const monthBlocks = Object.entries(byMonth).sort().map(([month, mes]) => {
