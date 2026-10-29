@@ -2065,9 +2065,25 @@ function Workflow() {
   // ── Event Staff data ──
   const [esEvents, setEsEvents] = useState(() => { try { return JSON.parse(localStorage.getItem('staff_mgmt_events')) || []; } catch { return []; } });
   const [esStaffs, setEsStaffs] = useState(() => { try { return JSON.parse(localStorage.getItem('staff_mgmt_staffs')) || []; } catch { return []; } });
-  const [staffRoles, setStaffRoles] = useState(() => { try { return JSON.parse(localStorage.getItem('wf_staff_roles')) || {}; } catch { return {}; } });
+  const [staffRoles, setStaffRoles] = useState(() => {
+    try {
+      // dataから読む（同期データ優先）、なければlocalStorageフォールバック
+      const d = JSON.parse(localStorage.getItem(KEY));
+      if (d?.staffRoles && Object.keys(d.staffRoles).length) return d.staffRoles;
+      return JSON.parse(localStorage.getItem('wf_staff_roles')) || {};
+    } catch { return {}; }
+  });
   const [staffOrder, setStaffOrder] = useState(() => { try { return JSON.parse(localStorage.getItem('wf_staff_order')) || {}; } catch { return {}; } });
-  useEffect(() => { try { localStorage.setItem('wf_staff_roles', JSON.stringify(staffRoles)); } catch {} }, [staffRoles]);
+  useEffect(() => {
+    try { localStorage.setItem('wf_staff_roles', JSON.stringify(staffRoles)); } catch {}
+    // staffRolesをdataに含めてGAS同期
+    if (data && updateRef.current) {
+      const prev = data.staffRoles || {};
+      if (JSON.stringify(prev) !== JSON.stringify(staffRoles)) {
+        updateRef.current({ ...data, staffRoles });
+      }
+    }
+  }, [staffRoles]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { try { localStorage.setItem('wf_staff_order', JSON.stringify(staffOrder)); } catch {} }, [staffOrder]);
   const [dragStaff, setDragStaff] = useState(null);
   useEffect(() => {
@@ -2169,6 +2185,8 @@ function Workflow() {
             }
             syncVersionRef.current = json.version;
             if (prev?.catOrder && !merged.catOrder) merged.catOrder = prev.catOrder;
+            // リモートのstaffRolesをローカルに反映
+            if (merged.staffRoles) setStaffRoles(merged.staffRoles);
             saveData(merged);
             setGasFetchDebug(`OK P:${(merged.projects||[]).length} T:${(merged.tasks||[]).length}`);
             return merged;
