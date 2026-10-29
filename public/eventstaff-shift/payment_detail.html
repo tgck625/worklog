@@ -147,7 +147,7 @@ function render() {
     + '<tbody>' + rows + '</tbody>'
     + '<tfoot>'
     + '<tr class="subtotal-row"><td colspan="2" style="text-align:right">\u5c0f\u8a08</td><td style="text-align:right">\uffe5' + subtotalPay.toLocaleString() + '</td></tr>'
-    + '<tr class="subtotal-row"><td colspan="2" style="text-align:right">\u4ea4\u901a\u8cbb' + (m && m.trd > 0 ? '<div style="font-size:10px;color:#888;margin-top:2px">\u203b\u516c\u5171\u4ea4\u901a\u6a5f\u95a2\u3067\u306e\u8cbb\u7528\u5dee\u984d\u5206\u3092\u542b\u3080</div>' : '') + '</td><td style="text-align:right">\uffe5' + transport.toLocaleString() + '</td></tr>'
+    + '<tr class="subtotal-row"><td colspan="2" style="text-align:right">\u4ea4\u901a\u8cbb' + (function(){ var notes = []; if (m && m.hw) notes.push('\u203b\u9ad8\u901f\u4ee3\u542b\u3080'); if (m && m.trd > 0) notes.push('\u203b\u516c\u5171\u4ea4\u901a\u6a5f\u95a2\u3067\u306e\u8cbb\u7528\u5dee\u984d\u5206\u3092\u542b\u3080'); return notes.length ? '<div style="font-size:10px;color:#888;margin-top:2px">' + notes.join('<br>') + '</div>' : ''; })() + '</td><td style="text-align:right">\uffe5' + transport.toLocaleString() + '</td></tr>'
     + '<tr class="total-row"><td colspan="2" style="text-align:right">\u5408\u8a08</td><td style="text-align:right">\uffe5' + grandTotal.toLocaleString() + '</td></tr>'
     + '</tfoot>'
     + '</table>'

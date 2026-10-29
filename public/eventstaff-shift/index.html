@@ -920,6 +920,7 @@ function buildMonthSnapshot(staffId, month) {
                  total:mPay+mTransport+mExtra+mPrep, dist:parseFloat(mDist.toFixed(1)),
                  events:evSnap, prepWork:prepSnap };
   if(ctEntry?.transitDays?.length) { snap.transitDays=ctEntry.transitDays; snap.transitTotal=ctEntry.transitTotal||0; snap.transitDiff=ctEntry.transitDiff||0; }
+  if(ctEntry?.highwayToll > 0 || ctEntry?.highwayDays?.some(d => d.amount > 0)) snap.hasHighway = true;
   return snap;
 }
 // スタッフ×月の合計金額を計算（ライブ計算）
@@ -3750,6 +3751,7 @@ function buildStaffPaymentUrl(staffId, targetMonth) {
       if (snap.prepWork?.length) md.prep = snap.prepWork;
       if (snap.extra) md.ex = snap.extra;
       if (snap.transitDays?.length) { md.td = snap.transitDays; md.trt = snap.transitTotal||0; md.trd = snap.transitDiff||0; }
+      if (snap.hasHighway) md.hw = 1;
       return md;
     }
     let mPay = 0, mDist = 0, mExtra = 0;
@@ -3786,6 +3788,7 @@ function buildStaffPaymentUrl(staffId, targetMonth) {
     if (prepData.length) md.prep = prepData;
     if (mExtra) md.ex = mExtra;
     if (ctEntry?.transitDays?.length) { md.td = ctEntry.transitDays; md.trt = ctEntry.transitTotal||0; md.trd = ctEntry.transitDiff||0; }
+    if (ctEntry?.highwayToll > 0 || ctEntry?.highwayDays?.some(d => d.amount > 0)) md.hw = 1;
     return md;
   });
   const payload = { n: s.name, r: rank?.label||'', addr: s.address||'', phone: s.phone||'', tp: totalPay, tt: totalTransport, ms: monthsData };
