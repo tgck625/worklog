@@ -2781,12 +2781,22 @@ function Workflow() {
                   <div style={{ padding:'8px 24px',borderBottom:`1px solid ${C.border}`,background:'#fefcfa',flexShrink:0 }}>
                     <div style={{ fontSize:10,fontWeight:600,color:C.text3,letterSpacing:0.3,marginBottom:6 }}>参加確定 作り手（{confirmedMakers.length}名）</div>
                     <div style={{ display:'flex',flexWrap:'wrap',gap:6 }}>
-                      {confirmedMakers.map(m => (
+                      {confirmedMakers.map(m => {
+                        const makerRoleKey = `${_pj.id}_maker_${m.name}`;
+                        const makerRole = staffRoles[makerRoleKey] || '';
+                        return (
                         <div key={m.name} style={{ display:'flex',alignItems:'center',gap:4,padding:'4px 10px',borderRadius:8,background:'#fff',border:`1px solid ${C.border}`,fontSize:11 }}>
                           <span style={{ color:'#5a9070',fontWeight:600 }}>🌿</span>
                           <span style={{ fontWeight:500,color:C.text }}>{m.name}</span>
-                        </div>
-                      ))}
+                          <input
+                            value={makerRole}
+                            onChange={e=>setStaffRoles(prev=>({...prev,[makerRoleKey]:e.target.value}))}
+                            placeholder="役割"
+                            onClick={e=>e.stopPropagation()}
+                            style={{ border:'none',outline:'none',fontSize:10,color:C.text2,background:'transparent',width:makerRole?Math.max(40,makerRole.length*12):40,padding:'2px 4px',fontFamily:'inherit' }}
+                          />
+                        </div>);
+                      })}
                     </div>
                   </div>
                 )}
