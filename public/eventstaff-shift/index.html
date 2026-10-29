@@ -1097,6 +1097,24 @@ function getCustomTransportEntry(staffId, month) {
   if (typeof entry === 'object') return entry;
   return { amount: entry, note: '' };
 }
+function buildDayDistances(staffId, month) {
+  const events = load(SK.events,[]);
+  const venues = load(SK.venues,[]);
+  const staffs = load(SK.staffs,[]);
+  const s = staffs.find(x=>x.id===staffId);
+  if (!s) return {};
+  const map = {};
+  events.filter(e=>e.date.startsWith(month)&&e.staffAssignments.some(a=>a.staffId===staffId&&a.status==='worked'))
+    .forEach(e=>{
+      const v = venues.find(x=>x.id===e.venueId);
+      const d = getRoadDistKm(s, v);
+      if (d !== null) {
+        const roundTrip = d * 2;
+        map[e.date] = (map[e.date]||0) + roundTrip;
+      }
+    });
+  return map;
+}
 function openTransportOverrideModal(staffId, month, calcedAmount, mDist) {
   const ct = load(SK.customTransport, {});
   const key = `${staffId}:${month}`;
@@ -1114,6 +1132,7 @@ function openTransportOverrideModal(staffId, month, calcedAmount, mDist) {
     (currentHighway > 0 ? [{date: month+'-01', amount: currentHighway, urls: []}] : []);
   window._ctHighwayDays = currentHighwayDays.map(d => ({date:d.date, amount:d.amount||0, urls:d.urls?d.urls.map(u=>({...u})):[]}));
   window._ctCalcedAmount = calcedAmount;
+  window._ctDayDistances = buildDayDistances(staffId, month);
   const [yr, mo] = month.split('-');
   const ml = `${yr}年${parseInt(mo)}月`;
   openModal(`<div class="modal">
@@ -1259,16 +1278,29 @@ function renderCtTransitDays() {
     + '</div>'
     + '</div>'
   ).join('');
-  // サマリー
+  // サマリー（日別比較：その日の公共交通機関 vs その日の往復距離×10円）
   if (summary) {
+    const distMap = window._ctDayDistances || {};
     const transitTotal = days.reduce((s,d) => s + (d.amount||0), 0);
-    const gasAmount = window._ctCalcedAmount || 0;
-    const diff = transitTotal - gasAmount;
+    let totalDiff = 0;
+    const dayDetails = days.map(d => {
+      const dayKm = distMap[d.date] || 0;
+      const dayGas = Math.round(dayKm * 10);
+      const dayDiff = Math.max(0, (d.amount||0) - dayGas);
+      totalDiff += dayDiff;
+      return { date: d.date, transit: d.amount||0, km: dayKm, gas: dayGas, diff: dayDiff };
+    });
     summary.innerHTML = days.length === 0 ? ''
       : '<div style="padding:10px;border-radius:8px;background:var(--accent-light)">'
-      + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span>公共交通機関 合計</span><strong>¥' + transitTotal.toLocaleString() + '</strong></div>'
-      + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span>ガソリン規定額</span><strong>¥' + gasAmount.toLocaleString() + '</strong></div>'
-      + '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;border-top:1px solid var(--surface-3);padding-top:4px;color:' + (diff > 0 ? 'var(--accent)' : 'var(--ink-soft)') + '"><span>差額（追加支給）</span><strong>' + (diff > 0 ? '¥' + diff.toLocaleString() : '¥0') + '</strong></div>'
+      + dayDetails.map(dd =>
+        '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;color:var(--ink-soft)">'
+        + '<span>' + dd.date + '</span>'
+        + '<span>交通費¥' + dd.transit.toLocaleString() + ' − ガソリン¥' + dd.gas.toLocaleString() + '（' + dd.km.toFixed(1) + 'km×10円）= '
+        + (dd.diff > 0 ? '<strong style="color:var(--accent)">+¥' + dd.diff.toLocaleString() + '</strong>' : '¥0')
+        + '</span></div>'
+      ).join('')
+      + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;margin-bottom:4px"><span>公共交通機関 合計</span><strong>¥' + transitTotal.toLocaleString() + '</strong></div>'
+      + '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;border-top:1px solid var(--surface-3);padding-top:4px;color:' + (totalDiff > 0 ? 'var(--accent)' : 'var(--ink-soft)') + '"><span>差額合計（追加支給）</span><strong>' + (totalDiff > 0 ? '¥' + totalDiff.toLocaleString() : '¥0') + '</strong></div>'
       + '</div>';
   }
 }
@@ -1314,10 +1346,16 @@ function saveCustomTransport(key) {
   const days = window._ctTransitDays || [];
   if (days.length) {
     entry.transitDays = days;
+    const distMap = window._ctDayDistances || {};
     const transitTotal = days.reduce((s,d) => s + (d.amount||0), 0);
-    const gasAmount = window._ctCalcedAmount || 0;
+    let totalDiff = 0;
+    days.forEach(d => {
+      const dayKm = distMap[d.date] || 0;
+      const dayGas = Math.round(dayKm * 10);
+      totalDiff += Math.max(0, (d.amount||0) - dayGas);
+    });
     entry.transitTotal = transitTotal;
-    entry.transitDiff = Math.max(0, transitTotal - gasAmount);
+    entry.transitDiff = totalDiff;
   }
   ct[key] = entry;
   save(SK.customTransport, ct);
