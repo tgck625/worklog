@@ -1122,7 +1122,8 @@ function openTransportOverrideModal(staffId, month, calcedAmount, mDist) {
   const hasCustom = raw != null;
   const entry = hasCustom ? (typeof raw === 'object' ? raw : { amount: raw, note: '' }) : null;
   const currentHighway = hasCustom ? (entry.highwayToll || 0) : 0;
-  const currentVal = hasCustom ? (entry.amount - currentHighway) : calcedAmount;
+  const currentTransitDiff = hasCustom ? (entry.transitDiff || 0) : 0;
+  const currentVal = hasCustom ? (entry.gasBase != null ? entry.gasBase : (entry.amount - currentHighway - currentTransitDiff)) : calcedAmount;
   const currentNote = hasCustom ? (entry.note || '') : '';
   // 旧形式receiptsから新形式transitDaysへの移行
   const currentTransitDays = hasCustom && entry.transitDays ? entry.transitDays : [];
@@ -1341,22 +1342,24 @@ function saveCustomTransport(key) {
   const val = baseVal + highway;
   const note = document.getElementById('_ctNote').value.trim();
   const ct = load(SK.customTransport, {});
-  const entry = { amount: val, note: note, highwayToll: highway };
-  if (hwDays.length) entry.highwayDays = hwDays;
+  let transitDiff = 0;
   const days = window._ctTransitDays || [];
+  const entry = { amount: val, note: note, highwayToll: highway, gasBase: baseVal };
+  if (hwDays.length) entry.highwayDays = hwDays;
   if (days.length) {
     entry.transitDays = days;
     const distMap = window._ctDayDistances || {};
     const transitTotal = days.reduce((s,d) => s + (d.amount||0), 0);
-    let totalDiff = 0;
     days.forEach(d => {
       const dayKm = distMap[d.date] || 0;
       const dayGas = Math.round(dayKm * 10);
-      totalDiff += Math.max(0, (d.amount||0) - dayGas);
+      transitDiff += Math.max(0, (d.amount||0) - dayGas);
     });
     entry.transitTotal = transitTotal;
-    entry.transitDiff = totalDiff;
+    entry.transitDiff = transitDiff;
   }
+  // 交通費合計 = ガソリン代 + 高速代 + 公共交通機関差額
+  entry.amount = val + transitDiff;
   ct[key] = entry;
   save(SK.customTransport, ct);
   closeModal();
