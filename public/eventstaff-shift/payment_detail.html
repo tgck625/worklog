@@ -112,8 +112,8 @@ function render() {
     (m.prep || []).forEach(function(pw) {
       subtotalPay += pw.p;
       rows += '<tr><td style="white-space:nowrap">' + pw.dt + '</td>'
-        + '<td style="color:#5856d6">' + pw.desc + '</td>'
-        + '<td style="text-align:right;font-weight:500;color:#5856d6">\uffe5' + pw.p.toLocaleString() + '</td></tr>';
+        + '<td>' + pw.desc + '</td>'
+        + '<td style="text-align:right;font-weight:500">\uffe5' + pw.p.toLocaleString() + '</td></tr>';
     });
   }
 
